@@ -39,6 +39,10 @@ if (!is_array($config['ovpn']['client'])){
 	$config['ovpn']['client']['tunnel'] =  array();
 }
 
+$id = $_GET['id'];
+if (isset($_POST['id']))
+	$id = $_POST['id'];
+
 $ovpncli =& $config['ovpn']['client']['tunnel'];
 
 if ($_POST['apply']) {
@@ -58,11 +62,19 @@ if ($_POST['apply']) {
 }
 
 if ($_GET['act'] == "del") {
-	if ($ovpncli[$_GET['id']]) {
-		unset($ovpncli[$_GET['id']]);
+	if ($ovpncli[$id]) {
+		$ovpnent = $ovpncli[$id];
+		unset($ovpncli[$id]);
+
+		/* Kill running processes */
+		/* Remove old certs & keys */
+		ovpn_client_kill($ovpnent['if']);
+
+		/* Remove interface from list of optional interfaces */
+		ovpn_client_iface_del($ovpnent['if']);
+
 		write_config();
-		ovpn_client_kill($_GET['id']);
-		touch($d_ovpnclidirty_path);
+		touch($d_sysrebootreqd_path);
 		header("Location: vpn_openvpn_cli.php");
 		exit;
 	}
@@ -80,7 +92,7 @@ if ($_GET['act'] == "del") {
 <table width="100%" border="0" cellpadding="0" cellspacing="0">
   <tr><td>
   <ul id="tabnav">	        
-	<li class="tabinact1"><a href="vpn_openvpn.php">Server</a></li>
+	<li class="tabinact1"><a href="vpn_openvpn_srv.php">Server</a></li>
 	<li class="tabact">Client</li>
   </ul>
   </td></tr>
@@ -93,8 +105,10 @@ if ($_GET['act'] == "del") {
     <table width="100%" border="0" cellpadding="0" cellspacing="0">
 	<tr>
 	  <td width="10%" class="listhdrr">Interface</td>
-	  <td width="30%" class="listhdrr">Server address</td>
-	  <td width="10%" class="listhdrr" align="middle">Version</td>
+	  <td width="5%" class="listhdrr">Protocol</td>
+	  <td width="15%" class="listhdrr">Socket</td>
+	  <td width="15%" class="listhdrr">Server address</td>
+	  <td width="5%" class="listhdrr" align="center">Version</td>
 	  <td width="40%" class="listhdr">Description</td>
 	  <td width="10%" class="list"></td>
 	</tr>
@@ -110,7 +124,13 @@ if ($_GET['act'] == "del") {
 	
 	<tr>
 	  <td class="listlr"><?=$spans;?>
-		<?= $client['if'].":".$client['cport'];?>	
+		<?= $config['interfaces'][ovpn_get_opt_interface($client['if'])]['descr'] . " (" . $client['if'] . ")";?>
+	  <?=$spane;?></td>
+	  <td class="listr"><?=$spans;?>
+		<?= strtoupper($client['proto']);?>     
+          <?=$spane;?></td>
+	  <td class="listr"><?=$spans;?>
+		<?= "0.0.0.0:" . $client['port'];?>	
 	  <?=$spane;?></td>
 	  <td class="listr"><?=$spans;?>
 		<?= $client['saddr'].":".$client['sport'];?>
@@ -119,14 +139,14 @@ if ($_GET['act'] == "del") {
 	  	<?= $client['ver'];?>
 	  <?=$spane;?></td>
 	   <td class="listbg"><?=$spans;?>
-	  	<?= $client['descr'];?>
+	  	<?= htmlspecialchars($client['descr']);?>&nbsp;
 	  <?=$spane;?></td>
 	  <td valign="middle" nowrap class="list"> <a href="vpn_openvpn_cli_edit.php?id=<?=$i;?>"><img src="e.gif" title="edit client configuration" width="17" height="17" border="0"></a>
 		 &nbsp;<a href="vpn_openvpn_cli.php?act=del&id=<?=$i;?>" onclick="return confirm('Do you really want to delete this client configuration?')"><img src="x.gif" title="delete client configuration" width="17" height="17" border="0"></a></td>
 	</tr>
   	<?php $i++; endforeach; ?>
 	<tr> 
-	  <td class="list" colspan="4">&nbsp;</td>
+	  <td class="list" colspan="6">&nbsp;</td>
 	  <td class="list"> <a href="vpn_openvpn_cli_edit.php"><img src="plus.gif" title="add client configuration" width="17" height="17" border="0"></a></td>
 	</tr>
     </table>

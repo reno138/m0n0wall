@@ -93,7 +93,7 @@ if ($_POST) {
 		else
 			$a_hosts[] = $hostent;
 		
-		touch($d_hostsdirty_path);
+		touch($d_dnsmasqdirty_path);
 		
 		write_config();
 		
