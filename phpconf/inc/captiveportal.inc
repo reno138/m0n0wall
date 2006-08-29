@@ -886,32 +886,65 @@ function radius($username,$password,$clientip,$clientmac,$type) {
 /* read captive portal DB into array */
 function captiveportal_read_db() {
 
-        global $g;
+    global $g;
 
-        if (file_exists("{$g['vardb_path']}/captiveportal.db")) {
-            $cpdb = unserialize(file_get_contents("{$g['vardb_path']}/captiveportal.db"));
-        } else {
-            $cpdb = array();
+    $cpdb = array();
+    $fd = @fopen("{$g['vardb_path']}/captiveportal.db", "r");
+    if ($fd) {
+        while (!feof($fd)) {
+            $line = trim(fgets($fd));
+            if ($line) {
+                $cpdb[] = explode(",", $line);
+            }
         }
-        print_r($cpdb);
-        return $cpdb;
+        fclose($fd);
+    }
+    return $cpdb;
+}
+
+/* read captive portal DB into array - serialized */
+function captiveportal_read_db_new() {
+
+    global $g;
+
+    if (file_exists("{$g['vardb_path']}/captiveportal.db")) {
+        $cpdb = unserialize(file_get_contents("{$g['vardb_path']}/captiveportal.db"));
+    } else {
+        $cpdb = array();
+    }
+    return $cpdb;
 }
 
 /* write captive portal DB */
 function captiveportal_write_db($cpdb) {
 
-        global $g;
+    global $g;
 
-        $fd = @fopen("{$g['vardb_path']}/captiveportal.db", "w");
-        if ($fd) {
-            fwrite($fd,serialize($cpdb));
-            fclose($fd);
+    $fd = @fopen("{$g['vardb_path']}/captiveportal.db", "w");
+    if ($fd) {
+        foreach ($cpdb as $cpent) {
+            fwrite($fd, join(",", $cpent) . "\n");
         }
+        fclose($fd);
+    }
+}
+
+
+/* write captive portal DB - serialized */
+function captiveportal_write_db_new($cpdb) {
+
+    global $g;
+
+    $fd = @fopen("{$g['vardb_path']}/captiveportal.db", "wb");
+    if ($fd) {
+        fwrite($fd,serialize($cpdb));
+        fclose($fd);
+    }
 }
 
 function captiveportal_write_elements() {
     global $g, $config;
-    
+
     /* delete any existing elements */
     if (is_dir($g['captiveportal_element_path'])) {
         $dh = opendir($g['captiveportal_element_path']);
