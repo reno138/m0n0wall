@@ -47,6 +47,7 @@
 		<!-- <harddiskstandby></harddiskstandby> -->
 		<!-- <polling/> -->
 		<!-- <notes></notes> -->
+		<!-- <watchdog/> -->
 	</system>
 	<interfaces>
 		<lan>
@@ -145,6 +146,13 @@
 		<local-ip></local-ip>
 		<remote-ip></remote-ip>
 		<timeout></timeout>
+		<radius>
+			<enable/>
+			<accounting/>
+			<radiusip/>
+			<server></server>
+			<secret></secret>
+		</radius>
 		-->
 	</pptp>
 	<bigpond>

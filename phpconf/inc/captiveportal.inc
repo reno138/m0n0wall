@@ -884,7 +884,7 @@ function radius($username,$password,$clientip,$clientmac,$type) {
 }
 
 /* read captive portal DB into array */
-function captiveportal_read_db_old() {
+function captiveportal_read_db() {
 
     global $g;
 
@@ -903,7 +903,7 @@ function captiveportal_read_db_old() {
 }
 
 /* read captive portal DB into array - serialized */
-function captiveportal_read_db() {
+function captiveportal_read_db_new() {
 
     global $g;
 
@@ -916,7 +916,7 @@ function captiveportal_read_db() {
 }
 
 /* write captive portal DB */
-function captiveportal_write_db_old($cpdb) {
+function captiveportal_write_db($cpdb) {
 
     global $g;
 
@@ -931,7 +931,7 @@ function captiveportal_write_db_old($cpdb) {
 
 
 /* write captive portal DB - serialized */
-function captiveportal_write_db($cpdb) {
+function captiveportal_write_db_new($cpdb) {
 
     global $g;
 

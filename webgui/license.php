@@ -4,7 +4,7 @@
 	$Id$
 	part of m0n0wall (http://m0n0.ch/wall)
 	
-	Copyright (C) 2003-2006 Manuel Kasper <mk@neon1.net>.
+	Copyright (C) 2003-2007 Manuel Kasper <mk@neon1.net>.
 	All rights reserved.
 	
 	Redistribution and use in source and binary forms, with or without
@@ -33,7 +33,7 @@ $pgtitle = array("License");
 require("guiconfig.inc"); 
 ?>
 <?php include("fbegin.inc"); ?>
-            <p><strong>m0n0wall is Copyright &copy; 2002-2006 by Manuel Kasper 
+            <p><strong>m0n0wall is Copyright &copy; 2002-2007 by Manuel Kasper 
               (<a href="mailto:mk@neon1.net">mk@neon1.net</a>).<br>
               All rights reserved.</strong></p>
             <p> Redistribution and use in source and binary forms, with or without<br>
@@ -165,6 +165,9 @@ require("guiconfig.inc");
               Jonathan De Graeve (<a href="mailto:Jonathan.De.Graeve@imelda.be">Jonathan.De.Graeve@imelda.be</a>)<br>
               &nbsp;&nbsp;&nbsp;&nbsp;<em><font color="#666666">Complete captive portal RADIUS overhaul, cleanup</font></em><br>
               &nbsp;&nbsp;&nbsp;&nbsp;<em><font color="#666666">captive portal: file manager, volume stats, FW rulepool (virtual port pool), MAC formatting, per-user bandwidth limitation</font></em><br>
+			  <br>
+              Marcel Wiget (<a href="mailto:mwiget@mac.com">mwiget@mac.com</a>)<br>
+              &nbsp;&nbsp;&nbsp;&nbsp;<em><font color="#666666">WRAP watchdog code</font></em><br>
             <hr size="1">
             <p>m0n0wall is based upon/includes various free software packages, 
               listed below.<br>
