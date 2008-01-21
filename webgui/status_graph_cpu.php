@@ -34,8 +34,9 @@ require("guiconfig.inc");
 ?>
 <?php include("fbegin.inc"); ?>
 <div align="center">
-<embed src="graph_cpu.php" type="image/svg+xml"
-		width="550" height="275" pluginspage="http://www.adobe.com/svg/viewer/install/auto" />
+<object data="graph_cpu.php" type="image/svg+xml" width="550" height="275">
+Your browser does not support the type SVG! You need to either use Firefox or download the Adobe SVG plugin.
+</object>
 </div>
-<br><span class="red"><strong>Note:</strong></span> if you can't see the graph, you may have to install the <a href="http://www.adobe.com/svg/viewer/install/" target="_blank">Adobe SVG viewer</a>.
+<br><span class="red"><strong>Note:</strong></span> if you can't see the graph, you may need to download the most recent version of the <a href="http://www.mozilla.com/" target="_blank">Firefox</a> browser or install the <a href="http://www.adobe.com/svg/viewer/install/" target="_blank">Adobe SVG viewer</a>.
 <?php include("fend.inc"); ?>
