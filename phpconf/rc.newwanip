@@ -40,6 +40,8 @@
 		sleep(1);
 	}
 	
+	lock_file("{$g['varrun_path']}/newwanip.lock");
+	
 	$curwanip = get_current_wan_address();
 	
 	/*	dhclient or MPD told us that the IP address has changed;
@@ -50,8 +52,10 @@
 	if (file_exists("{$g['vardb_path']}/wanip")) {
 		$oldwanip = chop(file_get_contents("{$g['vardb_path']}/wanip"));
 		
-		if ($curwanip == $oldwanip)
+		if ($curwanip == $oldwanip) {
+			unlock_file("{$g['varrun_path']}/newwanip.lock");
 			return 0;	/* nothing to do */
+		}
 	}
 	
 	/* reload firewall/NAT rules */
@@ -81,4 +85,6 @@
 		fwrite($fd, $curwanip);
 		fclose($fd);
 	}
+	
+	unlock_file("{$g['varrun_path']}/newwanip.lock");
 ?>
