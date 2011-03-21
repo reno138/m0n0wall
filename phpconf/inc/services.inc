@@ -31,6 +31,123 @@
 /* include all configuration functions */
 require_once("functions.inc");
 
+function services_dhcp6c_stop() {
+	/* kill any running dhcp6c */
+	killbypid("{$g['varrun_path']}/dhcp6c.pid");
+	mwexec('/sbin/sysctl net.inet6.ip6.accept_rtadv=0');
+}
+
+function services_dhcp6c_configure() {
+	global $config, $g;
+	
+	/* kill any running dhcp6c */
+	killbypid("{$g['varrun_path']}/dhcp6c.pid");
+	
+	/* write dhcp6c_duid */
+	if ($config['interfaces']['wan']['v6duid']) {
+		
+		$dhcp6duid = $config['interfaces']['wan']['v6duid'] ;
+		$fd = fopen("{$g['vardb_path']}/dhcp6c_duid", "w");
+		if (!$fd) {
+			printf("Error: cannot open dhcp6c_duid in services_dhcp6c_configure().\n");
+			return 1;
+		}
+	
+		$duidbytes = explode(":",$dhcp6duid);
+	
+		foreach ($duidbytes as $duidpiece) {
+		    $tmpdhcp6duid .= pack("H*", $duidpiece);    
+		}
+
+		fwrite($fd, chr(strlen($tmpdhcp6duid)) . chr(0) . $tmpdhcp6duid);
+		fclose($fd);
+	}
+	
+	/* write dhcp6c.conf */
+	$wanif = get_real_wan_interface();
+	$fd = fopen("{$g['varetc_path']}/dhcp6c.conf", "w");
+	if (!$fd) {
+		printf("Error: cannot open dhcp6c.conf in services_dhcp6c_configure().\n");
+		return 1;
+	}
+	
+	if ($config['interfaces']['wan']['ipaddr6'] == "DHCP") {
+		mwexec('/sbin/sysctl net.inet6.ip6.accept_rtadv=1');
+		$d6wans = <<<EOD
+		request domain-name-servers;
+		script "/etc/dhcp6c-exit-hooks";
+		send ia-na 0;
+
+EOD;
+	}
+	$p = 1;
+	if ($config['interfaces']['lan']['ipaddr6'] == "DHCP-PD") {
+		$d6wanm = "\t\tsend ia-pd 0;\n";
+		$d6pds = "id-assoc pd 0 {\n";
+		$d6pde = "};\n";
+		if (isset($config['interfaces']['lan']['slaid'])) {
+			$d6pdi = $config['interfaces']['lan']['slaid'];
+		} else {
+			$d6pdi = $p;
+		}
+		if (isset($config['interfaces']['lan']['slalen'])) {
+			$d6pdl = $config['interfaces']['lan']['slalen'];
+		} else {
+			$d6pdl = 16;
+		}
+		$d6lan .= <<<EOD
+		prefix-interface {$config['interfaces']['lan']['if']} {
+			sla-id {$d6pdi};
+			sla-len {$d6pdl};
+		};
+
+EOD;
+	$p++;
+	}
+			
+	for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
+		if ($config['interfaces']['opt' . $i]['ipaddr6'] == "DHCP-PD") {
+			$d6wanm = "\t\tsend ia-pd 0;\n";
+			$d6pds = "id-assoc pd 0 {\n";
+			$d6pde = "};\n";
+			if (isset($config['interfaces']['opt' . $i]['slaid'])) {
+				$d6pdi = $config['interfaces']['opt' . $i]['slaid'];
+			} else {
+				$d6pdi = $p;
+			}
+			if (isset($config['interfaces']['opt' . $i]['slalen'])) {
+				$d6pdl = $config['interfaces']['opt' . $i]['slalen'];
+			} else {
+				$d6pdl = 16;
+			}
+			$d6opt .= <<<EOD
+		prefix-interface {$config['interfaces']['opt' . $i]['if']} {
+			sla-id {$d6pdi};
+			sla-len {$d6pdl};
+		};
+
+EOD;
+			$p++;
+		}
+	}
+
+	$dhcp6cconf = "interface {$wanif} {\n" . $d6wans . $d6wanm . "};\n" . $d6pds . $d6lan . $d6opt . $d6pde ;
+ 	$dhcp6cconf .= <<<EOD
+id-assoc na 0 {
+};
+EOD;
+	
+	fwrite($fd, $dhcp6cconf);
+	fclose($fd);
+
+	/* fire up dhcp6c */
+	$wanif = get_real_wan_interface();
+	mwexec("/usr/local/sbin/dhcp6c -c {$g['varetc_path']}/dhcp6c.conf -p {$g['varrun_path']}/dhcp6c.pid {$wanif}" );
+
+	return 0;
+
+}
+
 function services_dhcp6s_configure() {
 	global $config, $g;
 	
@@ -92,16 +209,16 @@ EOD;
 			
 		if (is_array($dhcpifconf['dnsserver']) && ($dhcpifconf['dnsserver'][0])) {
 			list($dnsconfig['dns1'],$dnsconfig['dns2'],$dnsconfig['dns3']) = $dhcpifconf['dnsserver'];
-			if (is_ipaddr6($dnsconfig['dns1']))	$dnscfg .= "option domain-name-servers" . $dnsconfig['dns1'] . " ;\n";
-			if (is_ipaddr6($dnsconfig['dns2']))	$dnscfg .= "option domain-name-servers" . $dnsconfig['dns2'] . ";\n";
-			if (is_ipaddr6($dnsconfig['dns3']))	$dnscfg .= "option domain-name-servers" . $dnsconfig['dns3'] . ";\n";
+			if (is_ipaddr6($dnsconfig['dns1']))	$dnscfg .= "option domain-name-servers " . $dnsconfig['dns1'] . ";\n";
+			if (is_ipaddr6($dnsconfig['dns2']))	$dnscfg .= "option domain-name-servers " . $dnsconfig['dns2'] . ";\n";
+			if (is_ipaddr6($dnsconfig['dns3']))	$dnscfg .= "option domain-name-servers " . $dnsconfig['dns3'] . ";\n";
 		} else if (isset($config['dnsmasq']['enable'])) {
 			$dnscfg .= "option domain-name-servers " . $ifcfg['ipaddr6'] . ";\n";
 		} else if (is_array($syscfg['dnsserver']) && ($syscfg['dnsserver'][0])) {
 			list($dnsconfig['dns1'],$dnsconfig['dns2'],$dnsconfig['dns3']) = $syscfg['dnsserver'];
-			if (is_ipaddr6($dnsconfig['dns1']))	$dnscfg .= "option domain-name-servers" . $dnsconfig['dns1'] . ";\n";
-			if (is_ipaddr6($dnsconfig['dns2']))	$dnscfg .= "option domain-name-servers" . $dnsconfig['dns2'] . ";\n";
-			if (is_ipaddr6($dnsconfig['dns3']))	$dnscfg .= "option domain-name-servers" . $dnsconfig['dns3']  . ";\n";
+			if (is_ipaddr6($dnsconfig['dns1']))	$dnscfg .= "option domain-name-servers " . $dnsconfig['dns1'] . ";\n";
+			if (is_ipaddr6($dnsconfig['dns2']))	$dnscfg .= "option domain-name-servers " . $dnsconfig['dns2'] . ";\n";
+			if (is_ipaddr6($dnsconfig['dns3']))	$dnscfg .= "option domain-name-servers " . $dnsconfig['dns3'] . ";\n";
 		}
 		$dhcp6sconf .= <<<EOD
 $dnscfg
@@ -220,13 +337,24 @@ EOD;
 			$dnscfg .= "	option domain-name \"{$dhcpifconf['domain']}\";\n";
 		}
 		
-		if (is_array($dhcpifconf['dnsserver']) && ($dhcpifconf['dnsserver'][0])) {
-			$dnscfg .= "	option domain-name-servers " . join(",", $dhcpifconf['dnsserver']) . ";";
-		} else if (isset($config['dnsmasq']['enable'])) {
-			$dnscfg .= "	option domain-name-servers " . $ifcfg['ipaddr'] . ";";
-		} else if (is_array($syscfg['dnsserver']) && ($syscfg['dnsserver'][0])) {
-			$dnscfg .= "	option domain-name-servers " . join(",", $syscfg['dnsserver']) . ";";
+		
+		$dnscfg = "";
+		
+		if ($dhcpifconf['domain']) {
+			$dnscfg .= "	option domain-name \"{$dhcpifconf['domain']}\";\n";
 		}
+		
+		$dnsservers = array();
+		if (is_array($dhcpifconf['dnsserver']) && ($dhcpifconf['dnsserver'][0]))
+			$dnsservers = $dhcpifconf['dnsserver'];
+		else if (isset($config['dnsmasq']['enable']))
+			$dnsservers = array($ifcfg['ipaddr']);
+		else if (is_array($syscfg['dnsserver']) && ($syscfg['dnsserver'][0]))
+			$dnsservers = $syscfg['dnsserver'];
+		
+		$dnsservers = array_filter($dnsservers, "is_ipaddr");
+		if (!empty($dnsservers))
+			$dnscfg .= "	option domain-name-servers " . join(",", $dnsservers) . ";\n";
 
 		$dhcpdconf .= "subnet $subnet netmask $subnetmask {\n";
 		$dhcpdconf .= "	pool {\n";
@@ -497,7 +625,7 @@ function services_dnsmasq_configure() {
 		/* generate hosts file */
 		system_hosts_generate();
 		
-		$args = "";
+		$args = "--edns-packet-max=4096";
 		
 		if (isset($config['dnsmasq']['regdhcp'])) {
 			
@@ -505,6 +633,14 @@ function services_dnsmasq_configure() {
 				" -s {$config['system']['domain']}";
 		}
 		
+		$dnsmasqcfg = $config['dnsmasq'];
+		if (is_array($dnsmasqcfg['hosts'])) {
+			foreach ($dnsmasqcfg['hosts'] as $host) {
+			if (($host['host']) && ($host['host'] == '*'))
+				$args .= " " . escapeshellarg('--address=/.' . $host['domain'] . '/' . $host['ip']);
+			}
+		}
+
 		if (isset($config['dnsmasq']['allservers'])) {
 			$args .= " --all-servers";
 		}
@@ -519,6 +655,10 @@ function services_dnsmasq_configure() {
 			}
 		}
 
+		if (isset($config['dnsmasq']['stoprebind'])) {
+			$args .= " --stop-dns-rebind";
+		}
+		
 		/* run dnsmasq */
 		mwexec("/usr/local/sbin/dnsmasq {$args}");
 

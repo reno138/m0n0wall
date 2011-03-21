@@ -36,6 +36,7 @@ $pconfig['enable'] = isset($config['dnsmasq']['enable']);
 $pconfig['regdhcp'] = isset($config['dnsmasq']['regdhcp']);
 $pconfig['allservers'] = isset($config['dnsmasq']['allservers']);
 $pconfig['strictorder'] = isset($config['dnsmasq']['strictorder']);
+$pconfig['stoprebind'] = isset($config['dnsmasq']['stoprebind']);
 
 if (!is_array($config['dnsmasq']['hosts'])) {
 	$config['dnsmasq']['hosts'] = array();
@@ -56,6 +57,7 @@ if ($_POST) {
 	$config['dnsmasq']['regdhcp'] = ($_POST['regdhcp']) ? true : false;
 	$config['dnsmasq']['allservers'] = ($_POST['allservers']) ? true : false;
 	$config['dnsmasq']['strictorder'] = ($_POST['strictorder']) ? true : false;
+	$config['dnsmasq']['stoprebind'] = ($_POST['stoprebind']) ? true : false;
 
 	write_config();
 	
@@ -118,9 +120,17 @@ if ($_GET['act'] == "del") {
 				<td class="vtable">
                       <input name="strictorder" type="checkbox" id="strictorder" value="yes" <?php if ($pconfig['strictorder']) echo "checked";?>>
                       <strong>Strict Order</strong><br>
-					  By default, dnsmasq will send queries to any of the upstream servers it
+					  By default, the DNS forwarder will send queries to any of the upstream servers it
 					  knows about and tries to favour servers that are known to be up. Setting
-					  this flag forces dnsmasq to try each query with each server strictly in order.</td>
+					  this flag forces it to try each query with each server strictly in order.</td>
+                </tr>
+				<td class="vtable">
+                      <input name="stoprebind" type="checkbox" id="stoprebind" value="yes" <?php if ($pconfig['stoprebind']) echo "checked";?>>
+                      <strong>Block DNS Rebind attacks</strong><br>
+					  If this option is set, the DNS forwarder will reject (and log) addresses from upstream nameservers 
+					  which are in the private IP ranges. 
+					  This blocks an attack where a browser behind a firewall is used to probe machines on the local network. 
+					  If you use domain overrides, this may cause responses to be blocked if they resolve within private IP ranges.</td>
                 </tr>
                 <tr> 
                   <td class="vtable">

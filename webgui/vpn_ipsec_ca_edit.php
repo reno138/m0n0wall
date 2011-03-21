@@ -29,7 +29,7 @@
 	POSSIBILITY OF SUCH DAMAGE.
 */
 
-$pgtitle = array("VPN", "IPsec", "Edit CA certificate");
+$pgtitle = array("VPN", "IPsec", "Edit CA/CRL certificate");
 require("guiconfig.inc");
 
 if (!is_array($config['ipsec']['cacert'])) {
@@ -45,6 +45,10 @@ if (isset($_POST['id']))
 if (isset($id) && $a_secret[$id]) {
 	$pconfig['ident'] = $a_secret[$id]['ident'];
 	$pconfig['cert'] = base64_decode($a_secret[$id]['cert']);
+	if ((isset($a_secret[$id]['crl'])) and ($a_secret[$id]['crl']!=""))
+		$pconfig['crl'] = base64_decode($a_secret[$id]['crl']);
+	else 
+		$pconfig['crl'] = "";
 }
 
 if ($_POST) {
@@ -57,6 +61,10 @@ if ($_POST) {
 	$reqdfieldsn = explode(",", "Identifier,CA Certificate");
 	if (!strstr($_POST['cert'], "BEGIN CERTIFICATE") || !strstr($_POST['cert'], "END CERTIFICATE"))
 			$input_errors[] = "This certificate does not appear to be valid.";
+	
+	if ((isset($_POST['crl'])) and ($_POST['crl']!=""))
+		if (!strstr($_POST['crl'], "BEGIN X509 CRL") || !strstr($_POST['crl'], "END X509 CRL"))
+				$input_errors[] = "This CRL does not appear to be valid.";
 	
 	do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
 	
@@ -80,6 +88,10 @@ if ($_POST) {
 	
 		$secretent['ident'] = $_POST['ident'];
 		$secretent['cert'] = base64_encode($_POST['cert']);
+		if ((isset($_POST['crl'])) and ($_POST['crl']!=""))
+			$secretent['crl'] = base64_encode($_POST['crl']);
+		else 
+			$secretent['crl'] = "";
 		
 		if (isset($id) && $a_secret[$id])
 			$a_secret[$id] = $secretent;
@@ -101,7 +113,7 @@ if ($_POST) {
                 <tr> 
                   <td valign="top" class="vncellreq">Identifier</td>
                   <td class="vtable">
- <input name="ident" type="text" class="formfld" id="ident" size="30" value="<?=$pconfig['ident'];?>">
+ <input name="ident" type="text" class="formfld" id="ident" size="30" value="<?=htmlspecialchars($pconfig['ident']);?>">
                     <br>
 This can be any text to describe the certificate authority.       
                   </td>
@@ -114,11 +126,18 @@ This can be any text to describe the certificate authority.
                     Paste a CA certificate in X.509 PEM format here.</td>
                 </tr>
                 <tr> 
+                  <td width="22%" valign="top" class="vncell">Certificate Revocation List</td>
+                  <td width="78%" class="vtable"> 
+                    <textarea name="crl" cols="65" rows="7" id="crl" class="formpre"><?=htmlspecialchars($pconfig['crl']);?></textarea>
+                    <br> 
+                    Paste a CRL in X.509 PEM format here.</td>
+                </tr>
+                <tr> 
                   <td width="22%" valign="top">&nbsp;</td>
                   <td width="78%"> 
                     <input name="Submit" type="submit" class="formbtn" value="Save"> 
                     <?php if (isset($id) && $a_secret[$id]): ?>
-                    <input name="id" type="hidden" value="<?=$id;?>">
+                    <input name="id" type="hidden" value="<?=htmlspecialchars($id);?>">
                     <?php endif; ?>
                   </td>
                 </tr>

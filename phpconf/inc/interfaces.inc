@@ -176,6 +176,8 @@ function interfaces_lan_configure6() {
 			$v6addr = calc_6to4_address("lan");
 			if ($v6addr)
 				mwexec("/sbin/ifconfig " . escapeshellarg($lancfg['if']) . " inet6 $v6addr prefixlen 64 alias");
+		} else if ($lancfg['ipaddr6'] == "DHCP-PD") {
+			services_dhcp6c_configure();
 		} else if ($lancfg['ipaddr6'] && $lancfg['subnet6']) {
 			mwexec('/sbin/ifconfig ' . escapeshellarg($lancfg['if']) .
 				' inet6 ' . escapeshellarg($lancfg['ipaddr6']) .
@@ -423,6 +425,8 @@ function interfaces_optional_configure_if6($opti) {
 				$v6addr = calc_6to4_address("opt" . $opti);
 				if ($v6addr)
 					mwexec("/sbin/ifconfig " . escapeshellarg($optcfg['if']) . " inet6 $v6addr prefixlen 64 alias");
+			} else if ($optcfg['ipaddr6'] == "DHCP-PD") {
+					services_dhcp6c_configure();
 			} else if ($optcfg['ipaddr6'] && $optcfg['subnet6']) {
 				mwexec('/sbin/ifconfig ' . escapeshellarg($optcfg['if']) .
 					' inet6 ' . escapeshellarg($optcfg['ipaddr6']) .
@@ -565,7 +569,8 @@ function interfaces_wan_configure() {
 		unlink_if_exists("{$g['varetc_path']}/mpd.conf");
 		unlink_if_exists("{$g['varetc_path']}/mpd.links");
 		unlink_if_exists("{$g['vardb_path']}/wanip");
-		unlink_if_exists("{$g['varetc_path']}/nameservers.conf");
+		unlink_if_exists("{$g['varetc_path']}/nameservers.inet.conf");
+		unlink_if_exists("{$g['varetc_path']}/nameservers.inet6.conf");
 	}
 	
 	/* remove all addresses first */
@@ -668,6 +673,7 @@ function interfaces_wan_configure6($newwanip = false) {
 	remove_all_ipv6_addresses($wancfg['if']);
 	remove_all_ipv6_addresses("stf0");
 	remove_all_ipv6_addresses("gif0");
+	services_dhcp6c_stop();
 	
 	/* kill any running aiccu */
 	killbypid("{$g['varrun_path']}/aiccu.pid");
@@ -692,11 +698,16 @@ function interfaces_wan_configure6($newwanip = false) {
 					interfaces_optional_configure6();
 				}
 			}
+		} else if ($wancfg['ipaddr6'] == "DHCP") {
+			services_dhcp6c_configure();
 		} else if ($wancfg['ipaddr6'] == "ppp") {
 			if ($newwanip) {
 				/* called from up-script -> add IPv6 default route */
 				mwexec('/sbin/route delete -inet6 default');
 				mwexec('/sbin/route add -inet6 default -iface ' . $g['pppoe_interface']);
+			}
+			if ($config['interfaces']['lan']['ipaddr6'] == "DHCP-PD") {
+				services_dhcp6c_configure();
 			}
 		} else if ($wancfg['ipaddr6'] == "aiccu") {
 			/* fire up AICCU, which will take care of setting the IP address
@@ -1057,8 +1068,6 @@ function interfaces_rtadvd_configure() {
 
 	$wasrunning = file_exists("{$g['varrun_path']}/rtadvd.pid");
 
-	mwexec('/sbin/sysctl net.inet6.ip6.accept_rtadv=0');
-
 	if (!ipv6enabled())
 		return 0;
 
@@ -1075,7 +1084,17 @@ function interfaces_rtadvd_configure() {
 			$raflags .= "o";
 		}
 		$rtadvdifs .= ' ' . $config['interfaces']['lan']['if'];
-		$rtadvdconf .= $config['interfaces']['lan']['if'] . ":raflags=\"" . $raflags . "\":maxinterval#10:mininterval#4\n";
+		$rtadvdconf .= $config['interfaces']['lan']['if'] . ":raflags=\"" . $raflags . "\":maxinterval#10:mininterval#4:rtplen#";
+		if ($config['interfaces']['lan']['ipv6mode'] == "DHCP-PD") {
+			$rtadvdconf .= 64 - $config['interfaces']['lan']['slalen'];
+		} else {
+			$rtadvdconf .= $config['interfaces']['lan']['subnet6'];
+		}
+		if (isset($config['interfaces']['lan']['ipv6ramtu'])) {
+			$rtadvdconf .= ":mtu#" . $config['interfaces']['lan']['ipv6ramtu'];
+		}
+		$rtadvdconf .= "\n";
+
 	}
 	
 	if (isset($config['interfaces']['wan']['ipv6ra'])) {
@@ -1097,7 +1116,16 @@ function interfaces_rtadvd_configure() {
 			}
 			$rtadvdifs .= ' ' . $optcfg['if'];
 			/* maybe this can be configurable in the future */
-			$rtadvdconf .= $optcfg['if'] . ":raflags=\"" . $raflags . "\":maxinterval#10:mininterval#4\n";
+			$rtadvdconf .= $optcfg['if'] . ":raflags=\"" . $raflags . "\":maxinterval#10:mininterval#4:rtplen#";
+			if ($config['interfaces']['opt' . $i]['ipv6mode'] == "DHCP-PD") {
+				$rtadvdconf .= 64 - $config['interfaces']['opt' . $i]['slalen'];
+			} else {
+				$rtadvdconf .= $config['interfaces']['opt' . $i]['subnet6'];
+			}
+			if (isset($config['interfaces']['opt' . $i]['ipv6ramtu'])) {
+				$rtadvdconf .= ":mtu#" . $config['interfaces']['opt' . $i]['ipv6ramtu'];
+			}
+			$rtadvdconf .= "\n";
 		}
 	}
 
@@ -1312,6 +1340,18 @@ function calc_6to4_address($if) {
 	return false;
 }
 
+function get_dhcppd_address($if) {
+	$addresses = get_interface_ipv6_adresses($if);
+
+	foreach ($addresses as $adr) {
+		if ((!preg_match('/^fe80:/', $adr[0])) || (!preg_match('/autoconf$/',$adr[0]))) {
+			$ipv6addr=$adr;
+		}
+	}
+	return $ipv6addr;
+	
+}
+
 function suggest_ipv6_lan_addr(){
 	$sugipv6lan = "No RA found! Maybe try again in a few minutes.";
 	 /* get the prefix */
@@ -1326,7 +1366,7 @@ function suggest_ipv6_lan_addr(){
 			$sugipv6lan .= "1" . substr($lograsrch,$prefixpos,strpos($lograsrch, "from",0)-$prefixpos);
 		} 
 	}
-	if (!is_ipaddr6 ($sugipv6lan)) {
+	if (!is_ipaddr6andprefix ($sugipv6lan) && ($sugipv6lan != "No RA found. Maybe try again in a few minutes.")) {
 		return "Error calculating IPv6 address!";
 	} else {
 		return $sugipv6lan;

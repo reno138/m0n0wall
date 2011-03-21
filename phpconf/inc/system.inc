@@ -51,7 +51,7 @@ function system_resolvconf_generate($dynupdate = false) {
 	
 	if (isset($syscfg['dnsallowoverride'])) {
 		/* get dynamically assigned DNS servers (if any) */
-		$nfd = @fopen("{$g['varetc_path']}/nameservers.conf", "r");
+		$nfd = @fopen("{$g['varetc_path']}/nameservers.inet.conf", "r");
 		if ($nfd) {
 			while (!feof($nfd)) {
 				$dnss = trim(fgets($nfd));
@@ -63,6 +63,22 @@ function system_resolvconf_generate($dynupdate = false) {
 			fclose($nfd);
 		}
 	}
+	
+	if (isset($syscfg['dnsallowoverride']) && ipv6enabled()) {
+		/* get dynamically assigned DNS servers (if any) */
+		$nfd = @fopen("{$g['varetc_path']}/nameservers.inet6.conf", "r");
+		if ($nfd) {
+			while (!feof($nfd)) {
+				$dnss = trim(fgets($nfd));
+				if ($dnss) {
+					$resolvconf .= "nameserver $dnss\n";
+					$havedns = true;
+				}
+			}
+			fclose($nfd);
+		}
+	}
+	
 	if (!$havedns && is_array($syscfg['dnsserver'])) {
 		foreach ($syscfg['dnsserver'] as $ns) {
 			if ($ns)
@@ -108,7 +124,7 @@ function system_hosts_generate() {
 EOD;
 	
 	foreach ($hostscfg as $host) {
-		if ($host['host'])
+		if (($host['host']) && ($host['host'] != '*'))
 			$hosts .= "{$host['ip']}	{$host['host']}.{$host['domain']} {$host['host']}\n";
 		else
 			$hosts .= "{$host['ip']}	{$host['domain']}\n";
@@ -244,7 +260,11 @@ function system_syslogd_start() {
 			return 1;
 		}
 		
-		$syslogserver = $syslogcfg['remoteserver'];
+		if (is_ipaddr6($syslogcfg['remoteserver'])) {
+			$syslogserver = "[" . $syslogcfg['remoteserver'] . "]";
+		} else {
+			$syslogserver = $syslogcfg['remoteserver'];
+		}
 		if ($syslogcfg['remoteport'])
 			$syslogserver .= ":" . $syslogcfg['remoteport'];
 		
@@ -259,6 +279,9 @@ auth.info;authpriv.info;daemon.info		%/var/log/system.log
 *.emerg						*
 
 EOD;
+		if (isset($config['syslog']['bindlan'])) {
+			$snmpdconf .= "agentaddress udp:161@{$config['interfaces']['lan']['ipaddr']}\n";
+		}
 
 		if (isset($syslogcfg['filter'])) {
 			$syslogconf .= <<<EOD
@@ -300,9 +323,11 @@ EOD;
 
 		fwrite($fd, $syslogconf);
 		fclose($fd);
-		
-		$retval = mwexec("/usr/sbin/syslogd -s -f {$g['varetc_path']}/syslog.conf");
-
+		if (isset($syslogcfg['bindlan'])) {
+			$retval = mwexec("/usr/sbin/syslogd -b {$config['interfaces']['lan']['ipaddr']} -s -f {$g['varetc_path']}/syslog.conf");
+		} else {
+			$retval = mwexec("/usr/sbin/syslogd -s -f {$g['varetc_path']}/syslog.conf");
+		}
 	} else {
 		$retval = mwexec("/usr/sbin/syslogd -ss");
 	}
@@ -527,7 +552,7 @@ function system_do_shell_commands($early = 0) {
 function system_do_extensions($early = false) {
 	global $config, $g;
 	
-	if (!is_dir("{$g['etc_path']}/inc/ext") || is_dir("{$g['www_path']}/ext"))
+	if (!is_dir("{$g['etc_path']}/inc/ext") || !is_dir("{$g['www_path']}/ext"))
 		return;
 	
 	$dh = @opendir("{$g['etc_path']}/inc/ext");
@@ -606,7 +631,7 @@ function system_dmesg_save() {
 function system_set_harddisk_standby() {
 	global $g, $config;
 
-	if ($g['platform'] != "generic-pc")
+	if ($g['platform'] != "generic-pc" && $g['platform'] != "generic-pc-serial")
 		return;
 
 	if (isset($config['system']['harddiskstandby']) && 
@@ -739,6 +764,9 @@ function system_identify_specific_platform() {
 	
 	if ($g['platform'] == 'generic-pc')
 		return array('name' => 'generic-pc', 'descr' => "Generic PC");
+
+	if ($g['platform'] == 'generic-pc-serial')
+		return array('name' => 'generic-pc-serial', 'descr' => "Generic PC (serial console)");
 	
 	if ($g['platform'] == 'generic-pc-cdrom')
 		return array('name' => 'generic-pc-cdrom', 'descr' => "Generic PC (CD-ROM)");

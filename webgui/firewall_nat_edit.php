@@ -77,6 +77,10 @@ if ($_POST) {
 	
 	do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
 	
+	if ($_POST['extaddr'] == 'wan' && $_POST['interface'] == 'wan') {
+		$input_errors[] = "The interface must not be WAN if the External Address is set to WAN.";
+	}
+	
 	if (($_POST['beginport'] && !is_port($_POST['beginport']))) {
 		$input_errors[] = "The start port must be an integer between 1 and 65535.";
 	}
@@ -148,7 +152,7 @@ if ($_POST) {
 		
 		touch($d_natconfdirty_path);
 		
-		if ($_POST['autoadd']) {
+		if ($_POST['autoadd'] && ($_POST['extaddr'] != 'wan')) {
 			/* auto-generate a matching firewall rule */
 			$filterent = array();		
 			$filterent['interface'] = $_POST['interface'];
@@ -215,7 +219,7 @@ function ext_rep_change() {
                   <td width="78%" class="vtable">
 					<select name="interface" class="formfld">
 						<?php
-						$interfaces = array('wan' => 'WAN');
+						$interfaces = array('wan' => 'WAN', 'lan' => 'LAN');
 						for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
 							$interfaces['opt' . $i] = $config['interfaces']['opt' . $i]['descr'];
 						}
@@ -233,6 +237,7 @@ function ext_rep_change() {
                   <td width="78%" class="vtable"> 
                     <select name="extaddr" class="formfld">
 					  <option value="" <?php if (!$pconfig['extaddr']) echo "selected"; ?>>Interface address</option>
+					  <option value="wan" <?php if ($pconfig['extaddr'] == 'wan' ) echo "selected"; ?>>WAN address</option>		
                       <?php
 					  if (is_array($config['nat']['servernat'])):
 						  foreach ($config['nat']['servernat'] as $sn): ?>
@@ -272,7 +277,7 @@ function ext_rep_change() {
 							<?=htmlspecialchars($wkportdesc);?>
 							</option>
                             <?php endforeach; ?>
-                          </select> <input name="beginport_cust" type="text" size="5" value="<?php if (!$bfound) echo $pconfig['beginport']; ?>"></td>
+                          </select> <input name="beginport_cust" type="text" size="5" value="<?php if (!$bfound) echo htmlspecialchars($pconfig['beginport']); ?>"></td>
                       </tr>
                       <tr> 
                         <td>to:</td>
@@ -286,7 +291,7 @@ function ext_rep_change() {
 							<?=htmlspecialchars($wkportdesc);?>
 							</option>
 							<?php endforeach; ?>
-                          </select> <input name="endport_cust" type="text" size="5" value="<?php if (!$bfound) echo $pconfig['endport']; ?>"></td>
+                          </select> <input name="endport_cust" type="text" size="5" value="<?php if (!$bfound) echo htmlspecialchars($pconfig['endport']); ?>"></td>
                       </tr>
                     </table>
                     <br> <span class="vexpl">Specify the port or port range on 
@@ -315,7 +320,7 @@ function ext_rep_change() {
 					  <?=htmlspecialchars($wkportdesc);?>
 					  </option>
                       <?php endforeach; ?>
-                    </select> <input name="localbeginport_cust" type="text" size="5" value="<?php if (!$bfound) echo $pconfig['localbeginport']; ?>"> 
+                    </select> <input name="localbeginport_cust" type="text" size="5" value="<?php if (!$bfound) echo htmlspecialchars($pconfig['localbeginport']); ?>"> 
                     <br>
                     <span class="vexpl">Specify the port on the machine with the 
                     IP address entered above. In case of a port range, specify 
@@ -342,7 +347,7 @@ function ext_rep_change() {
                   <td width="78%"> 
                     <input name="Submit" type="submit" class="formbtn" value="Save"> 
                     <?php if (isset($id) && $a_nat[$id]): ?>
-                    <input name="id" type="hidden" value="<?=$id;?>"> 
+                    <input name="id" type="hidden" value="<?=htmlspecialchars($id);?>"> 
                     <?php endif; ?>
                   </td>
                 </tr>

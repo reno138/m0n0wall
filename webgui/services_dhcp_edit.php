@@ -101,6 +101,17 @@ if ($_POST) {
 			$input_errors[] = "This IPv6 address already exists.";
 			break;
 		}
+		
+		/* check for duplicate MAC address entries with the same protocol family */
+		if ($_POST['mac'] && $mapent['mac'] == $_POST['mac']) {
+			if (is_ipaddr($mapent['ipaddr']) && is_ipaddr($_POST['ipaddr'])) {
+				$input_errors[] = "An IPv4 mapping for this MAC address already exists.";
+				break;
+			} else if (is_ipaddr6($mapent['ipaddr']) && is_ipaddr6($_POST['ipaddr'])) {
+				$input_errors[] = "An IPv6 mapping for this MAC address already exists.";
+				break;
+			}
+		}
 	}
 		
 	/* make sure it's not within the dynamic subnet */
@@ -207,9 +218,9 @@ if ($_POST) {
                   <td width="78%"> 
                     <input name="Submit" type="submit" class="formbtn" value="Save"> 
                     <?php if (isset($id) && $a_maps[$id]): ?>
-                    <input name="id" type="hidden" value="<?=$id;?>">
+                    <input name="id" type="hidden" value="<?=htmlspecialchars($id);?>">
                     <?php endif; ?>
-                    <input name="if" type="hidden" value="<?=$if;?>"> 
+                    <input name="if" type="hidden" value="<?=htmlspecialchars($if);?>"> 
                   </td>
                 </tr>
               </table>

@@ -38,13 +38,21 @@ if ($_GET['if'])
 	
 if ($curif == "wan")
 	$ifnum = get_real_wan_interface();
+elseif ($curif == "SixXS")
+	if (isset($wancfg['aiccu']['ayiya'])) {
+		$ifnum = 'tun0';
+	} else {
+		$ifnum = 'gif0';
+	}
 else
 	$ifnum = $config['interfaces'][$curif]['if'];
 ?>
 <?php include("fbegin.inc"); ?>
 <?php
 $ifdescrs = array('wan' => 'WAN', 'lan' => 'LAN');
-	
+if (ipv6enabled() && ($config['interfaces']['wan']['ipaddr6'] == "aiccu")) {
+	$ifdescrs['SixXS'] = 'SixXS';
+}
 for ($j = 1; isset($config['interfaces']['opt' . $j]); $j++) {
 	$ifdescrs['opt' . $j] = $config['interfaces']['opt' . $j]['descr'];
 }
@@ -62,8 +70,8 @@ foreach ($ifdescrs as $ifn => $ifd) {
 </select>
 </form>
 <div align="center">
-<object data="graph.php?ifnum=<?=$ifnum;?>&amp;ifname=<?=rawurlencode($ifdescrs[$curif]);?>" type="image/svg+xml" width="550" height="275">
-<param name="src" value="graph.php?ifnum=<?=$ifnum;?>&amp;ifname=<?=rawurlencode($ifdescrs[$curif]);?>" />
+<object data="graph.php?ifnum=<?=htmlspecialchars($ifnum);?>&amp;ifname=<?=rawurlencode($ifdescrs[$curif]);?>" type="image/svg+xml" width="550" height="275">
+<param name="src" value="graph.php?ifnum=<?=htmlspecialchars($ifnum);?>&amp;ifname=<?=rawurlencode($ifdescrs[$curif]);?>" />
 Your browser does not support the type SVG! You need to either use Firefox or download the Adobe SVG plugin.
 </object>
 </div>

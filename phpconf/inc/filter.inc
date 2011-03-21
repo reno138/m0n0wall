@@ -140,19 +140,26 @@ function filter_nat_rules_generate_if($if, $src, $dst, $target, $portmap = true)
 	else
 		$natrule = "map $if $src $dst -> {$tgt} proxy port 21 ftp/tcp\n";
 	
-	if ($portmap) {
-		$rangelow = 1024;
-		$rangehigh = 64535;
-		
-		if ($config['nat']['portrange-low'] && $config['nat']['portrange-high']) {
-			$rangelow = $config['nat']['portrange-low'];
-			$rangehigh = $config['nat']['portrange-high'];
-		}
-		
-		$natrule .= "map $if $src $dst -> {$tgt} portmap tcp/udp $rangelow:$rangehigh\n";
+	$rangelow = 1024;
+	$rangehigh = 64535;
+	
+	if ($config['nat']['portrange-low'] && $config['nat']['portrange-high']) {
+		$rangelow = $config['nat']['portrange-low'];
+		$rangehigh = $config['nat']['portrange-high'];
 	}
 	
-	$natrule .= "map $if $src $dst -> {$tgt}\n";
+	$portmaprule = "map $if $src $dst -> {$tgt} portmap tcp/udp $rangelow:$rangehigh\n";
+	$ipmaprule = "map $if $src $dst -> {$tgt}\n";
+	
+	/* depending on whether or not port mapping is disabled, we put the (generic) IP
+	   rule or the portmap rule first. If the portmap rule comes first, we will always
+	   have mapped/randomized ports. Otherwise, the port will only be mapped if there
+	   is already another mapping for the same port.
+	*/
+	if ($portmap)
+		$natrule .= $portmaprule . $ipmaprule;
+	else
+		$natrule .= $ipmaprule . $portmaprule;
 	
 	return $natrule;
 }
@@ -269,9 +276,13 @@ function filter_nat_rules_generate() {
 			if (!$target)
 				continue;	/* unresolvable alias */
 			
-			if ($rule['external-address'])
-				$extaddr = $rule['external-address'] . "/32";
-			else
+			if ($rule['external-address']) {
+				if ($rule['external-address'] == 'wan') {
+					$extaddr = get_current_wan_address(false) . "/32";
+				} else {
+					$extaddr = $rule['external-address'] . "/32";
+				}
+			} else
 				$extaddr = "0/0";
 			
 			if (!$rule['interface'] || ($rule['interface'] == "wan"))
@@ -344,9 +355,13 @@ function filter_rules_generate($ipv6 = false) {
 			$lanip = calc_6to4_address("lan");
 			$lansn = 64;
 		}
+		if ($lanip == "DHCP-PD") {
+			$lansn = 64;
+			list($lanip,$lansn) = get_dhcppd_address($lancfg['if']);
+		}
 		
 		if (!$lanip) {
-			$lanip = "::1";	/* dummy until 6to4 address is known */
+			$lanip = "::1";	/* dummy until 6to4 or DHCP-PD address is known */
 			$lansa = "::";
 		} else {
 			$lansa = gen_subnet6($lanip, $lansn);
@@ -385,6 +400,9 @@ function filter_rules_generate($ipv6 = false) {
 					if ($oc['ipaddr6'] == "6to4") {
 						$oic['ip'] = calc_6to4_address('opt' . $i);
 						$oic['sn'] = 64;
+					} elseif ($oc['ipaddr6'] == "DHCP-PD") {
+						$oic['sn'] = 64;
+						list($oic['ip'],$oic['sn']) = get_dhcppd_address($oc['if']);
 					} else {
 						$oic['ip'] = $oc['ipaddr6'];
 						$oic['sn'] = $oc['subnet6'];
@@ -479,11 +497,11 @@ pass in quick on $lanif proto udp from any port = 546 to ff02::1:2 port = 547
 EOD;
 		/* allow access to DHCP server on optional interfaces */
 		foreach ($optcfg as $on => $oc) {
-			$ipfrules .= "# allow link-local traffic on {$on}";
+			$ipfrules .= "# allow link-local traffic on {$on}\n";
 			$ipfrules .= "pass in quick on {$oc['if']} from fe80::/10 to fe80::/10\n";
 			$ipfrules .= "pass out quick on {$oc['if']} from fe80::/10 to fe80::/10\n";
-			if ((isset($config['dhcpd'][$on]['enable']) && !$oc['bridge']) ||
-					($oc['bridge'] && isset($config['dhcpd'][$oc['bridge_if']]['enable']))) {
+			if ((isset($config['dhcpd'][$on]['v6enable']) && !$oc['bridge']) ||
+					($oc['bridge'] && isset($config['dhcpd'][$oc['bridge_if']]['v6enable']))) {
 
 				$ipfrules .= <<<EOD
 
@@ -516,6 +534,13 @@ pass in quick proto ipv6-icmp from any to any icmp-type 2
 pass out quick proto ipv6-icmp from any to any icmp-type 2
 pass in quick proto ipv6-icmp from any to any icmp-type 3
 pass out quick proto ipv6-icmp from any to any icmp-type 3
+
+# allow our DHCPv6 client out to the WAN
+# XXX - should be more restrictive
+# (not possible at the moment - need 'me' like in ipfw)
+pass out quick on $wanif proto udp from any port = 546 to any port = 547
+pass in quick on $wanif proto udp from any to any port = 546
+
 
 EOD;
 		
@@ -655,7 +680,7 @@ pass in quick on $wanif proto udp from any port = 67 to any port = 68
 # LAN/OPT spoof check (needs to be after DHCP because of broadcast addresses)
 
 EOD;
-	}
+	} 
 
 	/* LAN spoof check */
 	/* omit if any interface is bridged to LAN and the filtering bridge is on */
@@ -742,6 +767,8 @@ block in $log quick on $wanif from any to 2002:c0a8::/32
 
 block in $log quick on $wanif from ff05::/16 to any
 block in $log quick on $wanif from any to ff05::/16
+
+pass in quick on $wanif proto udp from any to any  port = 546
 
 EOD;
 		}

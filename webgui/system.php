@@ -92,6 +92,9 @@ if ($_POST) {
 	if (($_POST['password']) && ($_POST['password'] != $_POST['password2'])) {
 		$input_errors[] = "The passwords do not match.";
 	}
+	if ($_POST['password'] && strpos($_POST['password'], ":") !== false) {
+		$input_errors[] = "The password may not contain colons (:).";
+	}
 	
 	$t = (int)$_POST['timeupdateinterval'];
 	if (($t < 0) || (($t > 0) && ($t < 6)) || ($t > 1440)) {
@@ -215,7 +218,7 @@ if ($_POST) {
                 </tr>
                 <tr> 
                   <td valign="top" class="vncell">Username</td>
-                  <td class="vtable"> <input name="username" type="text" class="formfld" id="username" size="20" value="<?=$pconfig['username'];?>">
+                  <td class="vtable"> <input name="username" type="text" class="formfld" id="username" size="20" value="<?=htmlspecialchars($pconfig['username']);?>">
                     <br>
                      <span class="vexpl">If you want 
                     to change the username for accessing the webGUI, enter it 

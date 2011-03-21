@@ -88,7 +88,9 @@ if ($_SERVER['REMOTE_USER'] === $config['system']['username']) {
     		
     	if (($_POST['password']) && ($_POST['password'] != $_POST['password2']))
     		$input_errors[] = "The passwords do not match.";
-    		
+		if ($_POST['password'] && strpos($_POST['password'], ":") !== false)
+			$input_errors[] = "The password may not contain colons (:).";
+
        	if (!$input_errors && !(isset($id) && $a_user[$id])) {
     		/* make sure there are no dupes */
     		foreach ($a_user as $userent) {
@@ -196,7 +198,7 @@ if($_GET['act']=="new" || $_GET['act']=="edit" || $input_errors){
                   <td width="78%"> 
                     <input name="save" type="submit" class="formbtn" value="Save"> 
             		<?php if (isset($id) && $a_user[$id]): ?>
-                    <input name="id" type="hidden" value="<?=$id;?>">
+                    <input name="id" type="hidden" value="<?=htmlspecialchars($id);?>">
 		            <?php endif; ?>
                   </td>
                 </tr>
@@ -276,7 +278,7 @@ if($_GET['act']=="new" || $_GET['act']=="edit" || $input_errors){
       <form action="system_usermanager.php" method="post" name="iform" id="iform">
          <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="password change pane">
             <tr> 
-              <td colspan="2" valign="top" class="listtopic"><?=$_SERVER['REMOTE_USER']?>'s Password</td>
+              <td colspan="2" valign="top" class="listtopic"><?=htmlspecialchars($_SERVER['REMOTE_USER'])?>'s Password</td>
             </tr>
 		    <tr> 
 		      <td width="22%" valign="top" class="vncell">Password</td>

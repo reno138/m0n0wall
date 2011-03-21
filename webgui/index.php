@@ -148,7 +148,12 @@ echo $memUsage . "%";
                 </td>
               </tr>
 			  <?php
-                                exec("/usr/local/bin/mbmon -c1 -r 2>/dev/null ", $mbmonop, $error);
+					if ( isset($config['system']['webgui']['mbmon']['enable']) ) {
+								if ($config['system']['webgui']['mbmon']['type'] == 'F') {
+                                exec("/usr/local/bin/mbmon -f -c1 -r 2>/dev/null ", $mbmonop, $error);
+								} else {
+								exec("/usr/local/bin/mbmon -c1 -r 2>/dev/null ", $mbmonop, $error);
+								}
                                 if (!$error){
                         ?>
 				<tr>
@@ -169,7 +174,11 @@ echo $memUsage . "%";
 				<td align="left" width="85%" class="listsensorval">
 																<?php
 																echo htmlspecialchars($mbmonp[1]);
-                                                                echo '&deg;C</td></tr>';
+																if ($config['system']['webgui']['mbmon']['type'] == 'F') {
+                                                                echo '&deg;F</td></tr>';
+																} else {
+																echo '&deg;C</td></tr>';
+																}
 																
                                                         }
                                                 }
@@ -250,7 +259,8 @@ echo $memUsage . "%";
                                                 }
 										echo '</table></td></tr>';
                                 }
-                        ?>
+                        }
+						?>
               <tr> 
                 <td width="25%" class="vncellt" valign="top">Notes</td>
                 <td width="75%" class="listr">

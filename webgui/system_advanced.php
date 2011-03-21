@@ -32,13 +32,14 @@
 $pgtitle = array("System", "Advanced setup");
 require("guiconfig.inc");
 $pconfig['nospoofcheck'] = isset($config['bridge']['nospoofcheck']);
+$pconfig['mbmon'] = isset($config['system']['webgui']['mbmon']['enable']);
 $pconfig['cert'] = base64_decode($config['system']['webgui']['certificate']);
 $pconfig['key'] = base64_decode($config['system']['webgui']['private-key']);
 $pconfig['disableconsolemenu'] = isset($config['system']['disableconsolemenu']);
 $pconfig['disablefirmwarecheck'] = isset($config['system']['disablefirmwarecheck']);
 $pconfig['allowipsecfrags'] = isset($config['filter']['allowipsecfrags']);
 $pconfig['expanddiags'] = isset($config['system']['webgui']['expanddiags']);
-if ($g['platform'] == "generic-pc")
+if ($g['platform'] == "generic-pc" || $g['platform'] == "generic-pc-serial")
 	$pconfig['harddiskstandby'] = $config['system']['harddiskstandby'];
 $pconfig['bypassstaticroutes'] = isset($config['filter']['bypassstaticroutes']);
 $pconfig['noantilockout'] = isset($config['system']['webgui']['noantilockout']);
@@ -95,6 +96,8 @@ if ($_POST) {
 
 	if (!$input_errors) {
 		$config['bridge']['nospoofcheck'] = $_POST['nospoofcheck'] ? true : false;
+		$config['system']['webgui']['mbmon']['enable'] = $_POST['mbmon'] ? true : false;
+		$config['system']['webgui']['mbmon']['type'] = $_POST['mbmontype'];
 		$oldcert = $config['system']['webgui']['certificate'];
 		$oldkey = $config['system']['webgui']['private-key'];
 		$config['system']['webgui']['certificate'] = base64_encode($_POST['cert']);
@@ -103,7 +106,7 @@ if ($_POST) {
 		$config['system']['disablefirmwarecheck'] = $_POST['disablefirmwarecheck'] ? true : false;
 		$config['filter']['allowipsecfrags'] = $_POST['allowipsecfrags'] ? true : false;
 		$config['system']['webgui']['expanddiags'] = $_POST['expanddiags'] ? true : false;
-		if ($g['platform'] == "generic-pc") {
+		if ($g['platform'] == "generic-pc" || $g['platform'] == "generic-pc-serial") {
 			$oldharddiskstandby = $config['system']['harddiskstandby'];
 			$config['system']['harddiskstandby'] = $_POST['harddiskstandby'];
 		}
@@ -133,7 +136,7 @@ if ($_POST) {
 				|| ($config['system']['polling'] != $oldpolling)) {
 			touch($d_sysrebootreqd_path);
 		}
-		if (($g['platform'] == "generic-pc") && ($config['system']['harddiskstandby'] != $oldharddiskstandby)) {
+		if (($g['platform'] == "generic-pc" || $g['platform'] == "generic-pc-serial") && ($config['system']['harddiskstandby'] != $oldharddiskstandby)) {
 			if (!$config['system']['harddiskstandby']) {
 				// Reboot needed to deactivate standby due to a stupid ATA-protocol
 				touch($d_sysrebootreqd_path);
@@ -211,10 +214,10 @@ if ($_POST) {
                   <td width="22%" valign="top" class="vncell">&nbsp;</td>
                   <td width="78%" class="vtable"> 
 				    <input name="nospoofcheck" type="checkbox" id="nospoofcheck" value="yes" <?php if ($pconfig['nospoofcheck']) echo "checked"; ?>>
-                    <strong>Disable Spoof Checking On Bridge</strong><span class="vexpl"><br>
+                    <strong>Disable Spoof Checking on bridge</strong><span class="vexpl"><br>
                     Spoof Checking blocks packets not sourced from the subnet of the
 					interface the packet was recieved on.<br>
-					Disabling this will only effect bridged interfaces.
+					This option only affects bridged interfaces.
                     </span></td>
                 </tr>
                 <tr> 
@@ -292,6 +295,23 @@ if ($_POST) {
                   <td colspan="2" valign="top" class="listtopic">Miscellaneous</td>
                 </tr>
 				<tr> 
+				<td width="22%" valign="top" class="vncell">Motherboard Monitor</td>
+                <td width="78%" class="vtable"> 
+				<table >
+					<tr>
+					<td > 
+                    <select class="formfld" name="mbmontype" align="bottom">
+					<option <?php if(!$config['system']['webgui']['mbmon']['type'] == 'F') echo('selected');?> value="C">&deg;C</option>
+					<option <?php if($config['system']['webgui']['mbmon']['type'] == 'F') echo('selected');?> value="F">&deg;F</option>
+					</select></td>
+					<td>
+						<input id="mbmon" <?php if ($pconfig['mbmon']) echo "checked"; ?>=""  name="mbmon" type="checkbox" value="yes"><strong> Enable Motherboard Monitoring</strong></td>
+						</tr>
+					</table>
+					<span class="vexpl">
+                    This will display Motherboard information on the system status page for supported chipsets.  On some systems this may cause a delay in loading the system status page or wrong temperatures.</span></td>
+                </tr>
+				<tr> 
                   <td width="22%" valign="top" class="vncell">Console menu </td>
                   <td width="78%" class="vtable"> 
                     <input name="disableconsolemenu" type="checkbox" id="disableconsolemenu" value="yes" <?php if ($pconfig['disableconsolemenu']) echo "checked"; ?>>
@@ -314,7 +334,7 @@ if ($_POST) {
     is performed at the interval specified here, and if the IP address that the host name resolved to has changed,
     the IPsec tunnel is reconfigured. The default is 60 seconds.</span></td>
 			    </tr>
-<?php if ($g['platform'] == "generic-pc"): ?>
+<?php if ($g['platform'] == "generic-pc" || $g['platform'] == "generic-pc-serial"): ?>
 				<tr> 
                   <td width="22%" valign="top" class="vncell">Hard disk standby time </td>
                   <td width="78%" class="vtable"> 
