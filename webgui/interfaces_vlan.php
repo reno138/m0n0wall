@@ -93,6 +93,7 @@ if ($_GET['act'] == "del") {
   <ul id="tabnav">
     <li class="tabinact1"><a href="interfaces_assign.php">Interface assignments</a></li>
     <li class="tabact">VLANs</li>
+    <li class="tabinact"><a href="interfaces_wlan.php">WLANs</a></li>
   </ul>
   </td></tr>
   <tr> 
