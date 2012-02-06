@@ -1,8 +1,8 @@
 #!/usr/local/bin/php -f
 <?php
 /*
-	$Id: reboot.cjob 1 2012-01-24 22:39:00Z masterkeule $
-	extension for m0n0wall (http://m0n0.ch/wall)
+	$Id$
+	part of m0n0wall (http://m0n0.ch/wall)
 	
 	Copyright (C) 2012 Lennart Grahl <masterkeule@gmail.com>.
 	All rights reserved.
