@@ -451,11 +451,13 @@ function pf_user_rule_generate($rule, $ctx, $iface) {
 	if ($type != "pass" && $type != "block" && $type != "reject")
 		$type = "pass";                 /* default for pre-1.3 rules */
 
+	$ruleproto = isset($rule['protocol']) ? $rule['protocol'] : "";
+
 	/* action. pf spells the reject responses the same way ipf did. */
 	if ($type == "reject") {
-		if ($rule['protocol'] == "tcp")
+		if ($ruleproto == "tcp")
 			$line = "block return-rst";
-		else if ($rule['protocol'] == "udp")
+		else if ($ruleproto == "udp")
 			$line = "block return-icmp(port-unr)";
 		else
 			$line = "block";
@@ -471,7 +473,7 @@ function pf_user_rule_generate($rule, $ctx, $iface) {
 	if ($iface)
 		$line .= " on $iface";
 
-	$proto = pf_proto_spec(isset($rule['protocol']) ? $rule['protocol'] : "");
+	$proto = pf_proto_spec($ruleproto);
 	if ($proto !== "")
 		$line .= " " . $proto;
 
@@ -482,7 +484,7 @@ function pf_user_rule_generate($rule, $ctx, $iface) {
 	$line .= " from " . pf_addr_spec($src, isset($rule['source']['not']));
 
 	$portproto = array("tcp", "udp", "tcp/udp");
-	if (in_array($rule['protocol'], $portproto) && !empty($rule['source']['port'])) {
+	if (in_array($ruleproto, $portproto) && !empty($rule['source']['port'])) {
 		$ps = pf_port_spec($rule['source']['port']);
 		if ($ps !== "") $line .= " " . $ps;
 	}
@@ -493,12 +495,12 @@ function pf_user_rule_generate($rule, $ctx, $iface) {
 		return "";
 	$line .= " to " . pf_addr_spec($dst, isset($rule['destination']['not']));
 
-	if (in_array($rule['protocol'], $portproto) && !empty($rule['destination']['port'])) {
+	if (in_array($ruleproto, $portproto) && !empty($rule['destination']['port'])) {
 		$ps = pf_port_spec($rule['destination']['port']);
 		if ($ps !== "") $line .= " " . $ps;
 	}
 
-	if (($rule['protocol'] == "icmp" || $rule['protocol'] == "ipv6-icmp")
+	if (($ruleproto == "icmp" || $ruleproto == "ipv6-icmp")
 	    && !empty($rule['icmptype']))
 		$line .= " icmp-type {$rule['icmptype']}";
 
@@ -510,7 +512,7 @@ function pf_user_rule_generate($rule, $ctx, $iface) {
 	/* ipf needed 'flags S/SA' to make return-rst fire only on a SYN. pf's
 	   return-rst already applies to the connection attempt, but stating the
 	   flags keeps behaviour identical rather than merely equivalent. */
-	if ($type == "reject" && $rule['protocol'] == "tcp")
+	if ($type == "reject" && $ruleproto == "tcp")
 		$line .= " flags S/SA";
 
 	return pf_tidy($line) . "\n";
