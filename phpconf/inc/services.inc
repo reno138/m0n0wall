@@ -274,7 +274,11 @@ EOD;
 	
 	return 0;
 }
-function services_dhcpd_configure() {
+/* SUPERSEDED. ISC dhcpd reached end of maintenance at the end of 2022 and is
+   no longer in the image; DHCP is served by dnsmasq. Kept for reference while
+   the option mapping is still being verified against real clients -- see
+   dhcp_dnsmasq.inc, which reads exactly the same $config['dhcpd'] keys. */
+function services_dhcpd_configure_isc_superseded() {
 	global $config, $g;
 	
 	/* kill any running dhcpd */

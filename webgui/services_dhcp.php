@@ -326,8 +326,12 @@ function enable_change(enable_over) {
                         <td width="78%" class="vtable"> 
                           <input name="maxtime" type="text" class="formfld" id="maxtime" size="10" value="<?=htmlspecialchars($pconfig['maxtime']);?>">
                           seconds<br>
-                          This is the maximum lease time for clients that ask 
-                          for a specific expiration time.<br>
+                          <span class="red"><strong>Not currently applied.</strong></span>
+                          DHCP is served by dnsmasq, which has a single lease time per
+                          range rather than a default and a maximum, so only the default
+                          lease time above takes effect. This field is kept so existing
+                          configurations are not altered, and will apply again if a server
+                          that distinguishes the two is ever used.<br>
                           The default is 86400 seconds.</td>
                       </tr>
                       <tr>
