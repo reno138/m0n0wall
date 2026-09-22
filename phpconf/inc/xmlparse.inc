@@ -134,7 +134,9 @@ function parse_xml_config($cffile, $rootobj) {
 						xml_get_current_line_number($xml_parser)));
 		}
 	}
-	xml_parser_free($xml_parser);
+	/* xml_parser_free() has had no effect since PHP 8.0 (the parser is freed
+	   when the last reference goes away) and is deprecated as of 8.5. */
+	unset($xml_parser);
 	
 	if (!$config[$rootobj]) {
 		die("XML error: no $rootobj object found!\n");

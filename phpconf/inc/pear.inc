@@ -783,6 +783,10 @@ class PEAR_Error
     var $userinfo             = '';
     var $backtrace            = null;
 
+    /* Was created dynamically by the constructor; PHP 8.2 deprecates dynamic
+       property creation, so declare it explicitly. */
+    var $callback             = null;
+
     // }}}
     // {{{ constructor
 
