@@ -198,7 +198,13 @@ function is_subnet($subnet) {
 	if (!is_string($subnet))
 		return false;
 		
-	list($hp,$np) = explode('/', $subnet);
+	/* A bare address has no '/', so list() would read an undefined index.
+	   Harmless in PHP 4, a warning in PHP 8 -- and these validators are fed
+	   arbitrary text straight from the webGUI forms. */
+	$parts = explode('/', $subnet);
+	if (count($parts) != 2)
+		return false;
+	list($hp,$np) = $parts;
 	
 	if (!is_ipaddr($hp))
 		return false;
@@ -214,7 +220,13 @@ function is_subnet6($subnet) {
 	if (!is_string($subnet))
 		return false;
 		
-	list($hp,$np) = explode('/', $subnet);
+	/* A bare address has no '/', so list() would read an undefined index.
+	   Harmless in PHP 4, a warning in PHP 8 -- and these validators are fed
+	   arbitrary text straight from the webGUI forms. */
+	$parts = explode('/', $subnet);
+	if (count($parts) != 2)
+		return false;
+	list($hp,$np) = $parts;
 	
 	if (!is_ipaddr6($hp))
 		return false;
