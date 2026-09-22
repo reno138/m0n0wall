@@ -1,4 +1,19 @@
 <?php
+/* ===========================================================================
+ * SUPERSEDED -- this whole file generates ipfilter and ipnat rules.
+ *
+ * ipfilter's upstream died in 2014 and pf replaces it. The functions below
+ * are renamed with an _ipf_superseded suffix so that NOTHING reaches them:
+ * the canonical names -- filter_configure(), filter_resync() and the rest --
+ * are defined in filter_pf.inc and every one of the 26 call sites across the
+ * tree lands there instead, unchanged.
+ *
+ * Kept, rather than deleted, while the pf translation is still being verified
+ * against real traffic: tests/compare_ipf_pf.php generates both rulesets from
+ * one config and diffs them, and needs this to do it.
+ * ===========================================================================
+ */
+
 /*
 	$Id$
 	part of m0n0wall (http://m0n0.ch/wall)
@@ -31,20 +46,20 @@
 /* include all configuration functions */
 require_once("functions.inc");
 	
-function filter_resync() {
+function filter_resync_ipf_superseded() {
 	global $config, $g;
 	
 	mwexec("/sbin/ipf -y");
 	mwexec("/sbin/ipf -6 -y");
 }
 
-function filter_ipmon_start() {
+function filter_ipmon_start_ipf_superseded() {
 	global $config, $g;
 	
 	mwexec("/sbin/ipmon -sD");
 }
 
-function filter_configure($ipv4only = false) {
+function filter_configure_ipf_superseded($ipv4only = false) {
 	global $config, $g;
 	
 	if ($g['booting'])
@@ -102,7 +117,7 @@ function filter_configure($ipv4only = false) {
 	return 0;
 }
 
-function filter_configure6() {
+function filter_configure6_ipf_superseded() {
 
 	lock_file("{$g['varrun_path']}/filter6.lock");
 
@@ -121,19 +136,19 @@ function filter_configure6() {
 	return 0;
 }
 
-function filter_flush_nat_table() {
+function filter_flush_nat_table_ipf_superseded() {
 	global $config, $g;
 	
 	return mwexec("/sbin/ipnat -F");
 }
 
-function filter_flush_state_table() {
+function filter_flush_state_table_ipf_superseded() {
 	global $config, $g;
 	
 	return mwexec("/sbin/ipf -FS");
 }
 
-function filter_flush_state_table_ipv6() {
+function filter_flush_state_table_ipv6_ipf_superseded() {
 	if (ipv6enabled()) {
 		return mwexec("/sbin/ipf -6 -FS");
 	} else {

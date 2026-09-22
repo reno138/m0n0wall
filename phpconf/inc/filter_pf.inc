@@ -673,6 +673,8 @@ function pf_rules_generate($ipv6 = false) {
 		        "to {$ctx['lanip']} keep state\n";
 	}
 
+	$out .= pf_captiveportal_rules_generate($ctx);
+
 	/* --- user rules ---
 	 * Both families in one pass. ipf needed two rulesets and two pfctl-
 	 * equivalent loads; pf qualifies each rule with inet or inet6 instead. */
@@ -911,3 +913,63 @@ function pf_pflogd_start() {
 	return mwexec("/sbin/pflogd -f {$g['varlog_path']}/pflog.cap " .
 	              "-p {$g['varrun_path']}/pflogd.pid");
 }
+
+/* ---------------------------------------------------------------------------
+ * Captive portal
+ *
+ * The portal's web servers listen on 8000 and 8001 of the portal interface,
+ * and anyone on that network can reach them BEFORE authenticating. That makes
+ * the per-source connection cap a real control rather than a nicety.
+ *
+ * m0n0wall did it with a patched mini_httpd (-maxperip). lighttpd 1.4.84 no
+ * longer ships mod_evasive, so it is done here instead -- which is better
+ * placed anyway: pf drops the connection before a worker is allocated rather
+ * than after, and the state limit is enforced in the kernel.
+ * ------------------------------------------------------------------------ */
+function pf_captiveportal_rules_generate($ctx) {
+	global $config;
+
+	if (!isset($config['captiveportal']['enable']))
+		return "";
+
+	$cp = $config['captiveportal'];
+	$if = isset($ctx['optcfg'][$cp['interface']]['if'])
+	      ? $ctx['optcfg'][$cp['interface']]['if']
+	      : (($cp['interface'] == 'lan') ? $ctx['lanif'] : null);
+	if (!$if)
+		return "";
+
+	/* mini_httpd's -maxperip defaulted to 4. */
+	$perip = isset($cp['nomaxperip']) ? 0 : 4;
+
+	$ports = "{ 8000 8001 }";
+	$out  = "\n# captive portal web servers\n";
+	if ($perip > 0) {
+		$out .= "pass in quick on $if inet proto tcp to port $ports " .
+		        "keep state (max-src-conn $perip, source-track rule)\n";
+		$out .= "# 'max-src-conn $perip' replaces mini_httpd's -maxperip. Exceeding it\n";
+		$out .= "# drops the connection in the kernel, before a worker is allocated.\n";
+	} else {
+		$out .= "pass in quick on $if inet proto tcp to port $ports keep state\n";
+	}
+	return $out;
+}
+
+
+/* ---------------------------------------------------------------------------
+ * Canonical names.
+ *
+ * 26 call sites across the tree say filter_configure(). Rather than edit all
+ * of them -- and risk missing one, which would silently leave a code path
+ * generating ipfilter rules for a firewall that has no ipfilter -- the
+ * canonical names resolve here. filter.inc's versions are renamed
+ * _ipf_superseded and are unreachable.
+ * ------------------------------------------------------------------------ */
+
+function filter_configure($ipv4only = false) { return pf_filter_configure($ipv4only); }
+function filter_resync()                     { return pf_filter_resync(); }
+function filter_configure6()                 { return 0; /* one unified ruleset now */ }
+function filter_ipmon_start()                { return pf_pflogd_start(); }
+function filter_flush_state_table()          { return pf_flush_state_table(); }
+function filter_flush_state_table_ipv6()     { return pf_flush_state_table(); }
+function filter_flush_nat_table()            { return pf_flush_nat_table(); }

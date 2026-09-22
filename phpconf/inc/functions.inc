@@ -35,6 +35,11 @@ require_once("system.inc");
 require_once("interfaces.inc");
 require_once("services.inc");
 require_once("filter.inc");
+/* MUST follow filter.inc. filter.inc's generators are renamed
+   _ipf_superseded; the canonical filter_configure() and friends live here and
+   resolve to pf. Without this line the canonical names do not exist at all
+   and every one of the 26 call sites is a fatal undefined-function error. */
+require_once("filter_pf.inc");
 require_once("shaper.inc");
 require_once("vpn.inc");
 require_once("wireguard.inc");
@@ -42,6 +47,7 @@ require_once("dhcp_dnsmasq.inc");
 require_once("webgui_lighttpd.inc");
 require_once("dyndns.inc");
 require_once("ipsec_strongswan.inc");
+require_once("captiveportal_lighttpd.inc");
 require_once("captiveportal.inc");
 require_once("voucher.inc");
 require_once("scheduler.inc");

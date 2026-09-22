@@ -107,9 +107,16 @@ function dyndns_http($url, $opts = array()) {
 	);
 
 	$body = @file_get_contents($url, false, stream_context_create($ctx));
+
+	/* PHP 8.4 deprecated the magic $http_response_header variable in favour
+	   of http_get_last_response_headers(). Note that merely MENTIONING the
+	   old variable raises the deprecation, even inside a branch that never
+	   runs -- so there is no version fallback here. The image ships PHP 8.4. */
+	$hdrs = http_get_last_response_headers();
+
 	$code = 0;
-	if (isset($http_response_header) && is_array($http_response_header)) {
-		foreach ($http_response_header as $h) {
+	if (is_array($hdrs)) {
+		foreach ($hdrs as $h) {
 			if (preg_match('|^HTTP/\S+\s+(\d{3})|', $h, $m)) $code = (int)$m[1];
 		}
 	}

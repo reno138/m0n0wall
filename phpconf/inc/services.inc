@@ -640,24 +640,43 @@ function services_snmpd_configure() {
 			$specplatform['name'] . " " . php_uname("s") . " " . php_uname("r") .
 			" " . php_uname("m");
 		
+		/* net-snmp replaces ucd-snmp, whose last release was 2002. It
+		   inherited the directive names, so most of this is unchanged, with
+		   two differences that matter:
+
+		     rocommunity   ucd-snmp accepted a quoted string; net-snmp parses
+		                   "rocommunity COMMUNITY [SOURCE [OID]]" and treats
+		                   the quotes as part of the community name -- so the
+		                   community silently becomes the wrong string and
+		                   every poll is rejected.
+		     agentaddress  ucd-snmp wrote "udp:161@ADDR"; net-snmp wants
+		                   "udp:ADDR:161". The old form is not an error, it
+		                   just does not bind where you asked. */
+		$community = preg_replace('/[^A-Za-z0-9_.-]/', '',
+		                          $config['snmpd']['rocommunity']);
 		$snmpdconf = <<<EOD
-sysdescr "$sysDescr"
-syslocation "{$config['snmpd']['syslocation']}"
-syscontact "{$config['snmpd']['syscontact']}"
-rocommunity "{$config['snmpd']['rocommunity']}"
+sysDescr "$sysDescr"
+sysLocation "{$config['snmpd']['syslocation']}"
+sysContact "{$config['snmpd']['syscontact']}"
+rocommunity {$community}
 
 EOD;
 
 		if (isset($config['snmpd']['bindlan'])) {
-			$snmpdconf .= "agentaddress udp:161@{$config['interfaces']['lan']['ipaddr']}\n";
+			$snmpdconf .= "agentaddress udp:{$config['interfaces']['lan']['ipaddr']}:161\n";
+		} else {
+			$snmpdconf .= "agentaddress udp:161\n";
 		}
 
 		fwrite($fd, $snmpdconf);
 		fclose($fd);
 
 		/* run snmpd */
+		/* net-snmp's pidfile flag is lowercase -p; -P means something else
+		   entirely (which MIB modules to load). With -P the daemon starts,
+		   writes no pidfile, and killbypid() can never stop it again. */
 		mwexec("/usr/local/sbin/snmpd -c {$g['varetc_path']}/snmpd.conf" .
-			" -P {$g['varrun_path']}/snmpd.pid");
+			" -p {$g['varrun_path']}/snmpd.pid");
 
 		if ($g['booting'])
 			echo "done\n";

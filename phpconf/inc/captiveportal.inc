@@ -51,6 +51,9 @@ function captiveportal_configure() {
             echo "Starting captive portal... ";
         
         /* kill any running mini_httpd */
+        killbypid("{$g['varrun_path']}/lighttpd.cp.pid");
+        killbypid("{$g['varrun_path']}/lighttpd.cps.pid");
+        /* stale pidfiles from a pre-upgrade configuration */
         killbypid("{$g['varrun_path']}/mini_httpd.cp.pid");
         killbypid("{$g['varrun_path']}/mini_httpd.cps.pid");
         
@@ -225,16 +228,10 @@ EOD;
         } else
             $maxperiparg = "-maxperip 4";
         
-        /* start web server */
-        $cpip = $config['interfaces'][$config['captiveportal']['interface']]['ipaddr'];
-        mwexec("/usr/local/sbin/mini_httpd -a -M 0 -u root -maxproc $maxproc $maxperiparg" .
-            " -p 8000 -i {$g['varrun_path']}/mini_httpd.cp.pid" .
-            " -cpelement {$g['captiveportal_element_path']} $cpip:8000");
-        
-        /* fire up another one for HTTPS if requested */
+        /* Write the portal certificate if HTTPS login is enabled; the
+           lighttpd instance on 8001 reads it from cert-portal.pem. */
         if (isset($config['captiveportal']['httpslogin']) &&
             $config['captiveportal']['certificate'] && $config['captiveportal']['private-key']) {
-            
             $cert = base64_decode($config['captiveportal']['certificate']);
             $key = base64_decode($config['captiveportal']['private-key']);
             
@@ -248,15 +245,14 @@ EOD;
             fwrite($fd, "\n");
             fwrite($fd, $key);
             fclose($fd);
-
-            $httpsname = ($config['captiveportal']['httpsname']) ? $config['captiveportal']['httpsname'] : $cpip;
-
-            mwexec("/usr/local/sbin/mini_httpd -S -a -M 0 -E {$g['varetc_path']}/cert-portal.pem" .
-                " -u root -maxproc $maxproc $maxperiparg -p 8001" .
-                " -i {$g['varrun_path']}/mini_httpd.cps.pid" .
-                " -cpelement {$g['captiveportal_element_path']} $httpsname:8001");
         }
-            
+
+        /* start the portal web servers.
+           mini_httpd is gone; the two features the local patch added for the
+           portal -- -maxperip and -cpelement -- are ordinary lighttpd
+           configuration. See captiveportal_lighttpd.inc. */
+        captiveportal_lighttpd_start();
+
         /* start pruning process (interval defaults to 60 seconds) */
         mwexec("/usr/local/bin/minicron $croninterval {$g['varrun_path']}/minicron.pid " .
             "/etc/rc.prunecaptiveportal");
@@ -307,6 +303,9 @@ EOD;
             echo "done\n";
         
     } else {
+        killbypid("{$g['varrun_path']}/lighttpd.cp.pid");
+        killbypid("{$g['varrun_path']}/lighttpd.cps.pid");
+        /* stale pidfiles from a pre-upgrade configuration */
         killbypid("{$g['varrun_path']}/mini_httpd.cp.pid");
         killbypid("{$g['varrun_path']}/mini_httpd.cps.pid");
         killbypid("{$g['varrun_path']}/minicron.pid");
