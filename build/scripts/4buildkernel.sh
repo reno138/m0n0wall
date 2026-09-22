@@ -1,61 +1,76 @@
-#!/usr/local/bin/bash
+#!/bin/sh
+#
+# Stage 4 -- build the kernel.
+#
+# Rewritten for FreeBSD 15.x. The old stage applied EIGHTEEN patches to the
+# kernel source before building. Every one of them is now either upstream or
+# irrelevant, so it applies none:
+#
+#   ipfilter_kernel_update_to_4.1.34, ip_ftp_pxy.c, ip_nat.c, fil.c,
+#   ip_state.c, mlfk_ipl.c, ip_fil_freebsd.c, dummynet_with_ipnat
+#                       -- all ipfilter. pf replaces it; ipfilter is not built.
+#   stf_6rd_20100923-1  -- 6rd support, upstream since FreeBSD 9.
+#   r222728_defroute    -- IPv6 default-route bug, fixed upstream.
+#   ip6_input.c         -- part of the same 6rd/defroute work.
+#   pfil.c              -- pfil hook ordering, superseded by pfilctl(8).
+#   g_part_bsd.c        -- BSD disklabel handling; the image is GPT now.
+#   vm_machdep.c, if_em.c, if_fxp.c, Makefile, options
+#                       -- FreeBSD 8-era fixes, all long since upstream.
+#   ipsec-tools.kern146190 -- for racoon, which strongSwan replaces.
+#
+# Not applying them is the point: the old stage could not survive a FreeBSD
+# upgrade, because every patch had to be rebased against new source. This one
+# builds stock source with a custom config, which is the supported path.
 
 set -e
 
-if [ -z "$MW_BUILDPATH" -o ! -d "$MW_BUILDPATH" ]; then
-	echo "\$MW_BUILDPATH is not set"
-	exit 1
+if [ -z "$MW_BUILDPATH" ] || [ ! -d "$MW_BUILDPATH" ]; then
+	echo "\$MW_BUILDPATH is not set"; exit 1
 fi
+: "${MW_ARCH:=amd64}"
+: "${MW_SRC:=/usr/src}"
+: "${MW_JOBS:=$(sysctl -n hw.ncpu 2>/dev/null || echo 2)}"
 
-# make our own copy of the kernel tree
-		rm -Rf $MW_BUILDPATH/tmp/sys
-		echo -n "Copying kernel sources..."
-		cp -Rp /usr/src/sys $MW_BUILDPATH/tmp
-		echo "done."
+SRC="$MW_BUILDPATH/freebsd15"
+FS="$MW_BUILDPATH/m0n0fs"
+CONFDIR="$MW_SRC/sys/$MW_ARCH/conf"
+KERNCONF=M0N0WALL_GENERIC
 
-# patch kernel / sources
-		cd $MW_BUILDPATH/tmp
-		patch < $MW_BUILDPATH/freebsd8/build/patches/kernel/ip6_input.c.patch
-		patch -p0 < $MW_BUILDPATH/freebsd8/build/patches/kernel/stf_6rd_20100923-1.diff
-		patch < $MW_BUILDPATH/freebsd8/build/patches/kernel/ipfilter_kernel_update_to_4.1.34.patch
-		patch < $MW_BUILDPATH/freebsd8/build/patches/kernel/Makefile.orig.patch
-		patch < $MW_BUILDPATH/freebsd8/build/patches/kernel/options.orig.patch
-		patch < $MW_BUILDPATH/freebsd8/build/patches/kernel/ip_ftp_pxy.c.orig.patch
-		patch < $MW_BUILDPATH/freebsd8/build/patches/kernel/ip_nat.c.orig.patch
-		patch < $MW_BUILDPATH/freebsd8/build/patches/kernel/fil.c.orig.patch
-		patch < $MW_BUILDPATH/freebsd8/build/patches/kernel/ip_state.c.orig.patch
-		patch < $MW_BUILDPATH/freebsd8/build/patches/kernel/mlfk_ipl.c.orig.patch
-		patch < $MW_BUILDPATH/freebsd8/build/patches/kernel/pfil.c.orig.patch 
-		patch < $MW_BUILDPATH/freebsd8/build/patches/kernel/g_part_bsd.c.orig.patch
-		patch < $MW_BUILDPATH/freebsd8/build/patches/kernel/r222728_defroute.patch
-		patch < $MW_BUILDPATH/freebsd8/build/patches/kernel/ip_fil_freebsd.c.patch
-		patch < $MW_BUILDPATH/freebsd8/build/patches/kernel/dummynet_with_ipnat.patch
-		patch < $MW_BUILDPATH/freebsd8/build/patches/kernel/vm_machdep.c.patch
-		patch < $MW_BUILDPATH/freebsd8/build/patches/kernel/if_em.c.patch
-		patch < $MW_BUILDPATH/freebsd8/build/patches/kernel/if_fxp.c.patch
-		patch < $MW_BUILDPATH/freebsd8/build/patches/kernel/ipsec-tools.kern146190.patch
-		
-# kernel compile
-        cd $MW_BUILDPATH/tmp/sys/$MW_ARCH/conf
-        cp $MW_BUILDPATH/freebsd8/build/kernelconfigs/M0N0WALL_GENERIC.$MW_ARCH $MW_BUILDPATH/tmp/sys/$MW_ARCH/conf/M0N0WALL_GENERIC
-		cp $MW_BUILDPATH/freebsd8/build/kernelconfigs/M0N0WALL_GENERIC.hints $MW_BUILDPATH/tmp/sys/$MW_ARCH/conf/
-        config M0N0WALL_GENERIC
-        cd $MW_BUILDPATH/tmp/sys/$MW_ARCH/compile/M0N0WALL_GENERIC/
-        make depend && make
-        strip kernel
-        strip --remove-section=.note --remove-section=.comment kernel
-        gzip -9 kernel
-        mv kernel.gz $MW_BUILDPATH/tmp/
-        cd modules/$MW_BUILDPATH/tmp/sys/modules
-        cp aesni/aesni.ko glxsb/glxsb.ko padlock/padlock.ko if_tap/if_tap.ko if_vlan/if_vlan.ko dummynet/dummynet.ko ipfw/ipfw.ko runfw/runfw.ko $MW_BUILDPATH/m0n0fs/boot/kernel
-		if [ $MW_ARCH = "i386" ]; then
-                cp acpi/acpi/acpi.ko $MW_BUILDPATH/tmp
-        fi
+[ -d "$CONFDIR" ] || { echo "$CONFDIR missing -- is /usr/src installed?"; exit 1; }
 
+echo "Installing the kernel configuration..."
+cp "$SRC/build/kernelconfigs/${KERNCONF}.${MW_ARCH}" "$CONFDIR/$KERNCONF"
+[ -f "$SRC/build/kernelconfigs/${KERNCONF}.hints" ] && \
+	cp "$SRC/build/kernelconfigs/${KERNCONF}.hints" "$CONFDIR/"
 
-# make libs
-		cd $MW_BUILDPATH/tmp
-		perl $MW_BUILDPATH/freebsd8/build/minibsd/mklibs.pl $MW_BUILDPATH/m0n0fs > m0n0wall.libs
-		perl $MW_BUILDPATH/freebsd8/build/minibsd/mkmini.pl m0n0wall.libs / $MW_BUILDPATH/m0n0fs
+echo "Running config(8)..."
+cd "$CONFDIR"
+config "$KERNCONF"
 
+echo "Compiling (-j$MW_JOBS) -- this is the slow stage..."
+cd "$MW_SRC/sys/$MW_ARCH/compile/$KERNCONF"
+make cleandepend > /dev/null 2>&1 || true
+make depend > /dev/null
+make -j"$MW_JOBS" > /dev/null
+
+echo "Stripping and compressing..."
+strip kernel
+strip --remove-section=.note --remove-section=.comment kernel 2>/dev/null || true
+rm -f "$MW_BUILDPATH/tmp/kernel" "$MW_BUILDPATH/tmp/kernel.gz"
+mkdir -p "$MW_BUILDPATH/tmp"
+cp kernel "$MW_BUILDPATH/tmp/kernel"
+gzip -9f "$MW_BUILDPATH/tmp/kernel"
+
+echo "Installing modules into the image..."
+mkdir -p "$FS/boot/kernel"
+MODDIR="$MW_SRC/sys/$MW_ARCH/compile/$KERNCONF/modules$MW_SRC/sys/modules"
+for m in dummynet ipfw if_vlan aesni padlock glxsb; do
+	find "$MODDIR/$m" -name '*.ko' 2>/dev/null | while read -r ko; do
+		strip "$ko" 2>/dev/null || true
+		cp "$ko" "$FS/boot/kernel/"
+	done
+done
+echo "  $(ls "$FS/boot/kernel"/*.ko 2>/dev/null | wc -l | tr -d ' ') modules"
+
+echo "  kernel: $(ls -la "$MW_BUILDPATH/tmp/kernel.gz" | awk '{printf "%.1f MB compressed", $5/1048576}')"
 echo "Finished Stage 4"
