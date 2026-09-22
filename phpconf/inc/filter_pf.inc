@@ -443,7 +443,7 @@ function pf_rule_endpoint($side, $ctx) {
  * pseudo-interfaces the caller loops and supplies ng0, l2tp0, enc0 and so on,
  * exactly as filter.inc did.
  */
-function pf_user_rule_generate($rule, $ctx, $iface) {
+function pf_user_rule_generate($rule, $ctx, $iface, $af = "") {
 	if (isset($rule['disabled']))
 		return "";
 
@@ -472,6 +472,12 @@ function pf_user_rule_generate($rule, $ctx, $iface) {
 
 	if ($iface)
 		$line .= " on $iface";
+
+	/* 'inet' / 'inet6'. ipf kept two separate rulesets; pf filters both
+	   families from one, so the family is stated per rule instead. It
+	   matters for rules that say "any", which would otherwise match both. */
+	if ($af !== "")
+		$line .= " " . $af;
 
 	$proto = pf_proto_spec($ruleproto);
 	if ($proto !== "")
@@ -609,7 +615,7 @@ function pf_rules_generate($ipv6 = false) {
 		$out .= "{$on}_if = \"{$oc['if']}\"\n";
 
 	/* --- tables --- */
-	$tables = pf_tables_generate();
+	$tables = pf_tables_generate() . pf_tables_v6_generate();
 	if ($tables !== "")
 		$out .= "\n# ---- tables ----\n" . $tables;
 
@@ -630,6 +636,10 @@ function pf_rules_generate($ipv6 = false) {
 
 	$out .= pf_base_rules_generate($ctx['lanif'], $ctx['wanif'], $ctx['lanip'],
 	                               $ctx['lansa'], $ctx['lansn'], $ctx['optcfg'], $log);
+
+	if (ipv6enabled())
+		$out .= pf_base_rules_v6_generate($ctx['lanif'], $ctx['wanif'],
+		                                  $ctx['optcfg'], $log);
 
 	/* anti-spoof, unless a bridge makes it meaningless */
 	$lanbridge = false;
@@ -663,15 +673,21 @@ function pf_rules_generate($ipv6 = false) {
 		        "to {$ctx['lanip']} keep state\n";
 	}
 
-	/* --- user rules --- */
+	/* --- user rules ---
+	 * Both families in one pass. ipf needed two rulesets and two pfctl-
+	 * equivalent loads; pf qualifies each rule with inet or inet6 instead. */
 	$out .= "\n# ---- user-defined rules ----\n";
-	$rulekey = $ipv6 ? 'rule6' : 'rule';
-	if (isset($config['filter'][$rulekey]) && is_array($config['filter'][$rulekey])) {
+	foreach (array('rule' => 'inet', 'rule6' => 'inet6') as $rulekey => $af) {
+		if ($af === 'inet6' && !ipv6enabled())
+			continue;
+		if (!isset($config['filter'][$rulekey]) || !is_array($config['filter'][$rulekey]))
+			continue;
+		$ctx6 = ($af === 'inet6') ? pf_build_context(true) : $ctx;
 		foreach ($config['filter'][$rulekey] as $rule) {
-			$iface = pf_rule_interface($rule, $ctx);
+			$iface = pf_rule_interface($rule, $ctx6);
 			if ($iface === null)
 				continue;
-			$out .= pf_user_rule_generate($rule, $ctx, $iface);
+			$out .= pf_user_rule_generate($rule, $ctx6, $iface, $af);
 		}
 	}
 
@@ -774,4 +790,75 @@ function pf_flush_nat_table() {
 	/* pf keeps translations in the state table; there is no separate NAT
 	   table to flush as there was with ipnat. */
 	return mwexec("/sbin/pfctl -F states");
+}
+
+/* ---------------------------------------------------------------------------
+ * IPv6
+ *
+ * A structural simplification, not just a translation. ipf needed a wholly
+ * separate ruleset for v6: filter_rules_generate_ipv6() built it,
+ * filter_configure6() piped it to 'ipf -6' behind its own lock file, and the
+ * rule-group numbers had to be shifted by 10000 so the two rulesets would not
+ * collide.
+ *
+ * pf filters both address families from one ruleset, with 'inet' and 'inet6'
+ * qualifying a rule where the family matters. So all of that machinery
+ * disappears: one file, one pfctl load, one lock.
+ * ------------------------------------------------------------------------ */
+
+function pf_base_rules_v6_generate($lanif, $wanif, $optcfg, $log) {
+	global $config;
+
+	$out  = "\n# ---- IPv6 base rules ----\n";
+
+	/* Neighbour discovery and the ICMPv6 types that must never be filtered,
+	   or IPv6 breaks in ways that look like routing faults. Types 133-136 are
+	   RS/RA/NS/NA; 1/2/3 are unreachable, packet-too-big (needed for PMTUD)
+	   and time-exceeded. */
+	$out .= "pass quick inet6 proto ipv6-icmp all icmp6-type { 133, 134, 135, 136 }\n";
+	$out .= "pass quick inet6 proto ipv6-icmp all icmp6-type { 1, 2, 3 }\n";
+
+	$out .= "\n# link-local\n";
+	$out .= "pass quick on $lanif inet6 from fe80::/10 to fe80::/10\n";
+	foreach ($optcfg as $oc)
+		$out .= "pass quick on {$oc['if']} inet6 from fe80::/10 to fe80::/10\n";
+
+	$out .= "\n# DHCPv6\n";
+	$out .= "pass in quick on $lanif inet6 proto udp from any port 546 to ff02::1:2 port 547\n";
+	foreach ($optcfg as $on => $oc) {
+		if ((isset($config['dhcpd'][$on]['v6enable']) && empty($oc['bridge'])) ||
+		    (!empty($oc['bridge']) && isset($config['dhcpd'][$oc['bridge_if']]['v6enable'])))
+			$out .= "pass in quick on {$oc['if']} inet6 proto udp from any port 546 to ff02::1:2 port 547\n";
+	}
+	/* our own DHCPv6 client. ipf noted it could not restrict this because it
+	   lacked ipfw's 'me'; pf has '(self)', so it can be tightened here. */
+	$out .= "pass out quick on $wanif inet6 proto udp from any port 546 to any port 547\n";
+	$out .= "pass in quick on $wanif inet6 proto udp from any to (self) port 546\n";
+
+	if (isset($config['interfaces']['wan']['blockpriv'])) {
+		$out .= "\n# reject IPv6 transition/site-local abuse on the WAN\n";
+		$out .= "block in $log quick on $wanif inet6 from <priv6> to any\n";
+		$out .= "block in $log quick on $wanif inet6 from any to <priv6>\n";
+	}
+
+	return $out;
+}
+
+/* The v6 table that goes with the rules above. Kept beside pf_tables_generate()
+ * so both land in the tables section.
+ *
+ * Contents follow FreeBSD's own /etc/rc.firewall6 and the list filter.inc
+ * blocked: site-local, IPv4-mapped and IPv4-compatible space, and the 6to4
+ * prefixes that embed private or reserved IPv4 addresses.
+ */
+function pf_tables_v6_generate() {
+	global $config;
+
+	if (!isset($config['interfaces']['wan']['blockpriv']))
+		return "";
+
+	return "table <priv6> const { fec0::/10, ::ffff:0.0.0.0/96, ::224.0.0.0/100, " .
+	       "::127.0.0.0/104, ::0.0.0.0/104, ::255.0.0.0/104, " .
+	       "2002:e000::/20, 2002:7f00::/24, 2002:0000::/24, 2002:ff00::/24, " .
+	       "2002:0a00::/24, 2002:ac10::/28, 2002:c0a8::/32 }\n";
 }
