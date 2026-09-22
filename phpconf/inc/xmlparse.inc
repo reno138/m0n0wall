@@ -142,6 +142,8 @@ function parse_xml_config($cffile, $rootobj) {
 		die("XML error: no $rootobj object found!\n");
 	}
 	
+	config_normalize_sections($config[$rootobj]);
+	
 	fclose($fp);
 	
 	return $config[$rootobj];
@@ -205,6 +207,35 @@ function dump_xml_config($arr, $rootobj) {
 	$xmlconfig .= "</$rootobj>\n";
 	
 	return $xmlconfig;
+}
+
+/* An XML element with no children and no text -- <nat></nat> or <nat/> --
+ * parses to an empty STRING, not an empty array. Under PHP 4 through 7,
+ * indexing that with a string key merely warned and yielded null, so code
+ * like is_array($config['nat']['rule']) quietly worked. PHP 8 turns it into
+ * a fatal TypeError: "Cannot access offset of type string on string", and
+ * is_array() does NOT protect the inner read because the read happens first.
+ *
+ * With the shipped default config that fatal fires in filter.inc before a
+ * single rule is generated, so the firewall never comes up.
+ *
+ * There are 60-odd such call sites. Rather than guard every one, normalise
+ * once here: every top-level section is a container, so an empty string in
+ * that position means "empty container" and becomes an empty array. The only
+ * genuine top-level scalars are version and lastchange.
+ */
+function config_normalize_sections(&$cfg) {
+	static $scalars = array('version', 'lastchange');
+
+	if (!is_array($cfg))
+		return;
+
+	foreach ($cfg as $key => $value) {
+		if (in_array($key, $scalars, true))
+			continue;
+		if ($value === "")
+			$cfg[$key] = array();
+	}
 }
 
 ?>
