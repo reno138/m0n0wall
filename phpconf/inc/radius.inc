@@ -134,9 +134,9 @@ class Auth_RADIUS extends PEAR {
      *
      * @return void
      */
-    function Auth_RADIUS() 
+    function __construct() 
     {
-        $this->PEAR();
+        parent::__construct();
     }
 
     /**
@@ -676,9 +676,9 @@ class Auth_RADIUS_PAP extends Auth_RADIUS
      * @param  string  $password   Password
      * @return void
      */
-    function Auth_RADIUS_PAP($username = null, $password = null)
+    function __construct($username = null, $password = null)
     {
-        $this->Auth_RADIUS();
+        parent::__construct();
         $this->username = $username;
         $this->password = $password;
     }
@@ -770,9 +770,9 @@ class Auth_RADIUS_CHAP_MD5 extends Auth_RADIUS_PAP
      * @param  integer $chapid     Requestnumber
      * @return void
      */
-    function Auth_RADIUS_CHAP_MD5($username = null, $challenge = null, $chapid = 1)
+    function __construct($username = null, $challenge = null, $chapid = 1)
     {
-        $this->Auth_RADIUS_PAP();
+        parent::__construct();
         $this->username = $username;
         $this->challenge = $challenge;
         $this->chapid = $chapid;
@@ -998,9 +998,9 @@ class Auth_RADIUS_Acct extends Auth_RADIUS
      *
      */
 
-    function Auth_RADIUS_Acct()
+    function __construct()
     {
-        $this->Auth_RADIUS();
+        parent::__construct();
     }
 
     /**
