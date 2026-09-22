@@ -77,25 +77,50 @@ EOD;
 
 		echo "Installing... ";
 		
-		/* mount CD-ROM */
+		/* Mount the CD. acd0 was the old ATAPI device node; that driver went
+		   away with the switch to CAM, so every optical drive is cd0/cd1 now.
+		   Try a couple in case of multiple drives or a USB image. */
 		@mkdir("/cdrom");
-		if (mwexec("/sbin/mount -r -t cd9660 /dev/acd0 /cdrom") != 0) {
-			if (mwexec("/sbin/mount -r -t cd9660 /dev/cd0 /cdrom") != 0) {
-				echo "failed! (cannot mount CD-ROM)";
+		$mounted = false;
+		foreach (array("cd0", "cd1", "iso9660/m0n0wall_cd") as $cddev) {
+			if (mwexec("/sbin/mount -r -t cd9660 /dev/$cddev /cdrom") == 0) {
+				$mounted = true;
+				break;
 			}
+		}
+		
+		if (!$mounted) {
+			echo "failed! (cannot mount CD-ROM)\n";
 		} else if (!file_exists("/cdrom/firmware.img")) {
 			echo "failed! (firmware not found)\n";
+			mwexec("/sbin/umount /cdrom");
 		} else {
 			mwexec("/usr/bin/gunzip -S \"\" -c /cdrom/firmware.img | dd of=/dev/$target_disk ibs=64k obs=64k");
 			echo "done\n";
 			
-			/* copy existing configuration */
+			/* The image is written byte-for-byte, so its GPT backup header
+			   lands where the IMAGE ends, not where the DISK ends. Every
+			   larger target therefore boots with a GPT that gpart reports as
+			   corrupt. 'gpart recover' rewrites the backup header at the end
+			   of the real disk. */
+			echo "Fixing up partition table... ";
+			mwexec("/sbin/gpart recover $target_disk");
+			echo "done\n";
+			
+			/* Copy the running configuration onto the new root.
+			   The image is GPT now: p1 is the ESP, p2 is freebsd-boot and p3
+			   is the UFS root. The old code mounted "{$target_disk}a", the
+			   BSD disklabel name, which no longer exists. */
 			echo "Copying configuration... ";
 			@mkdir("/mnttmp");
-			mwexec("/sbin/mount -w -o noatime /dev/{$target_disk}a /mnttmp");
-			copy("{$g['conf_path']}/config.xml", "/mnttmp/conf/config.xml");
-			mwexec("/sbin/umount /mnttmp");
-			echo "done\n";
+			if (mwexec("/sbin/mount -w -o noatime /dev/{$target_disk}p3 /mnttmp") == 0) {
+				copy("{$g['conf_path']}/config.xml", "/mnttmp/conf/config.xml");
+				mwexec("/sbin/umount /mnttmp");
+				echo "done\n";
+			} else {
+				echo "failed! (cannot mount {$target_disk}p3 -- the system will\n";
+				echo "boot with default settings)\n";
+			}
 			
 			mwexec("/sbin/umount /cdrom");
 			

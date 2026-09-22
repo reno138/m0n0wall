@@ -16,14 +16,17 @@ options 	SOFTUPDATES		# Enable FFS soft updates support
 options 	MD_ROOT			# MD is a potential root device
 options 	MSDOSFS			# MSDOS Filesystem
 options 	CD9660			# ISO 9660 Filesystem
-options 	COMPAT_43TTY		# BSD 4.3 TTY compat (sgtty)
+options 	GEOM_PART_GPT		# GPT partitioning (the new image layout)
+options 	GEOM_PART_MBR		# protective MBR / legacy BIOS boot
+options 	GEOM_LABEL		# provides /dev/ufs/m0n0wall
+# REMOVED (not in FreeBSD 15): options 	COMPAT_43TTY		# BSD 4.3 TTY compat (sgtty)
 options 	SCSI_DELAY=5000		# Delay (in ms) before probing SCSI
 options 	SYSVSHM			# SYSV-style shared memory
 options 	SYSVMSG			# SYSV-style message queues
 options 	SYSVSEM			# SYSV-style semaphores
 options 	_KPOSIX_PRIORITY_SCHEDULING # POSIX P1003_1B real-time extensions
-options 	KBD_INSTALL_CDEV	# install a CDEV entry in /dev
-options 	FLOWTABLE		# per-cpu routing cache
+# REMOVED (not in FreeBSD 15): options 	KBD_INSTALL_CDEV	# install a CDEV entry in /dev
+# REMOVED (not in FreeBSD 15): options 	FLOWTABLE		# per-cpu routing cache
 
 # To make an SMP kernel, the next line is needed
 options 	SMP			# Symmetric MultiProcessor Kernel
@@ -35,15 +38,28 @@ options		NO_SWAPPING
 options         DEVICE_POLLING
 
 options		IPSEC
-options		IPSEC_NAT_T
+
+# --- packet filter -------------------------------------------------------
+# pf replaces ipfilter, which upstream abandoned in 2014 and which nothing
+# new is built on. ALTQ is not used: shaping stays on ipfw + dummynet.
+device		pf
+device		pflog
+device		pfsync
+
+# ipfw stays for the traffic shaper and the captive portal. Both filters
+# register on the same pfil hooks -- see the ordering note in filter_pf.inc.
+options		IPFIREWALL
+options		IPFIREWALL_DEFAULT_TO_ACCEPT
+options		DUMMYNET
+# REMOVED (not in FreeBSD 15): options		IPSEC_NAT_T
 device		enc
 
-options		IPFILTER
-options		IPFILTER_LOG
-options		IPFILTER_DEFAULT_BLOCK
-options		IPSTATE_SIZE=42859
-options		IPSTATE_MAX=30000
-options		IPFIREWALL_FORWARD
+# REMOVED (not in FreeBSD 15): options		IPFILTER
+# REMOVED (not in FreeBSD 15): options		IPFILTER_LOG
+# REMOVED (not in FreeBSD 15): options		IPFILTER_DEFAULT_BLOCK
+# REMOVED (not in FreeBSD 15): options		IPSTATE_SIZE=42859
+# REMOVED (not in FreeBSD 15): options		IPSTATE_MAX=30000
+# REMOVED (not in FreeBSD 15): options		IPFIREWALL_FORWARD
 options		IPSTEALTH
 
 # Bus support.
@@ -55,10 +71,10 @@ device		fdc
 
 # ATA and ATAPI devices
 device		ata
-device		atadisk		# ATA disk drives
-device		ataraid		# ATA RAID drives
-device		atapicd		# ATAPI CDROM drives
-device		atapifd		# ATAPI floppy drives
+# REMOVED (not in FreeBSD 15): device		atadisk		# ATA disk drives
+# REMOVED (not in FreeBSD 15): device		ataraid		# ATA RAID drives
+# REMOVED (not in FreeBSD 15): device		atapicd		# ATAPI CDROM drives
+# REMOVED (not in FreeBSD 15): device		atapifd		# ATAPI floppy drives
 options 	ATA_STATIC_ID	# Static device numbering
 
 # SCSI Controllers
@@ -76,12 +92,12 @@ device		mpt		# LSI-Logic MPT-Fusion
 device		mps		# LSI-Logic MPT-Fusion 2
 #device		ncr		# NCR/Symbios Logic
 device		sym		# NCR/Symbios Logic (newer chipsets + those of `ncr')
-device		trm		# Tekram DC395U/UW/F DC315U adapters
+# REMOVED (not in FreeBSD 15): device		trm		# Tekram DC395U/UW/F DC315U adapters
 
-device		adv		# Advansys SCSI adapters
-device		adw		# Advansys wide SCSI adapters
-device		aic		# Adaptec 15[012]x SCSI adapters, AIC-6[23]60.
-device		bt		# Buslogic/Mylex MultiMaster SCSI adapters
+# REMOVED (not in FreeBSD 15): device		adv		# Advansys SCSI adapters
+# REMOVED (not in FreeBSD 15): device		adw		# Advansys wide SCSI adapters
+# REMOVED (not in FreeBSD 15): device		aic		# Adaptec 15[012]x SCSI adapters, AIC-6[23]60.
+# REMOVED (not in FreeBSD 15): device		bt		# Buslogic/Mylex MultiMaster SCSI adapters
 device		isci		# Intel C600 SAS controller
 
 device		ncv		# NCR 53C500
@@ -89,7 +105,24 @@ device		nsp		# Workbit Ninja SCSI-3
 device		stg		# TMC 18C30/18C50
 
 # SCSI peripherals
-device		scbus		# SCSI bus (required for SCSI)
+# --- modern storage ------------------------------------------------------
+# None of this existed in m0n0wall's 8.4 config, which is why a build from it
+# cannot see a disk on anything made in the last decade.
+device		ahci		# AHCI SATA -- every modern SATA controller
+device		nvme		# NVMe controller
+device		nvd		# NVMe namespaces as disks (nvd0, nvd1, ...)
+
+# --- virtio --------------------------------------------------------------
+# Required to run as a VM guest at all (Proxmox, bhyve, KVM, QEMU). The first
+# test target for this build is a Proxmox VM, so this is not optional.
+device		virtio
+device		virtio_pci
+device		vtnet		# VirtIO network
+device		virtio_blk	# VirtIO block (vtbd0)
+device		virtio_scsi
+device		virtio_balloon
+
+device		scbus		# SCSI bus (required for ATA/SCSI)
 device		ch		# SCSI media changers
 device		da		# Direct Access (disks)
 device		sa		# Sequential Access (tape etc)
