@@ -895,3 +895,19 @@ function pf_tables_v6_generate() {
  * them. This cannot be settled by reading manuals -- it needs a box with
  * shaping and the portal both enabled, and a packet capture.
  * ------------------------------------------------------------------------ */
+
+/* Start pflogd, which writes the pflog0 capture to a file the GUI reads.
+ *
+ * Replaces ipmon, which belonged to ipfilter. pf logs via a pseudo-interface
+ * rather than a daemon reading a device, so pflogd is a plain tcpdump-style
+ * writer rather than a log parser.
+ */
+function pf_pflogd_start() {
+	global $g;
+
+	killbypid("{$g['varrun_path']}/pflogd.pid");
+	mwexec("/sbin/ifconfig pflog0 create 2>/dev/null");
+	mwexec("/sbin/ifconfig pflog0 up");
+	return mwexec("/sbin/pflogd -f {$g['varlog_path']}/pflog.cap " .
+	              "-p {$g['varrun_path']}/pflogd.pid");
+}

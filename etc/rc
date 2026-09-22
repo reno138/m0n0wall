@@ -39,11 +39,12 @@ if [ -e /dev/md2 ]; then
 fi
 
 # generate circular logfiles
-clog -i -s 262144 /var/log/system.log
-clog -i -s 262144 /var/log/filter.log
-clog -i -s 65536 /var/log/vpn.log
-clog -i -s 32768 /var/log/portalauth.log
-clog -i -s 32768 /var/log/dhcpd.log
+# Logs are ordinary files bounded by newsyslog(8). The old build created
+# circular ("ring buffer") logs here with clog(8), which required a patched
+# syslogd and a bundled clog that had to be rebuilt for every FreeBSD release.
+for l in system filter vpn portalauth dhcpd lighttpd; do
+	/usr/bin/touch /var/log/$l.log
+done
 chmod 0600 /var/log/*.log
 
 adjkerntz -i

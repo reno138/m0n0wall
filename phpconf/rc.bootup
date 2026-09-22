@@ -75,8 +75,8 @@
 	/* generate resolv.conf */
 	system_resolvconf_generate();
 	
-	/* establish ipfilter ruleset */
-	filter_configure();
+	/* establish the pf ruleset */
+	pf_filter_configure();
 	
 	/* configure loopback interface */
 	interfaces_loopback_configure();
@@ -96,11 +96,12 @@
 	/* set up Optional interfaces */
 	interfaces_optional_configure();
 	
-	/* resync ipfilter */
-	filter_resync();
+	/* refresh addresses baked into rules */
+	pf_filter_resync();
 	
-	/* start ipmon */
-	filter_ipmon_start();
+	/* start pflogd -- writes the pflog0 capture that the filter log reads.
+	   Replaces ipmon, which belonged to ipfilter. */
+	pf_pflogd_start();
 	
 	/* set up static routes */
 	system_routing_configure();

@@ -383,8 +383,10 @@ function system_webgui_start() {
 	if ($g['booting'])
 		echo "Starting webGUI... ";
 	
-	/* kill any running mini_httpd */
+	/* kill any running server. mini_httpd is gone, but stop a stale pidfile
+	   from a pre-upgrade config from leaving an orphan behind. */
 	killbypid("{$g['varrun_path']}/mini_httpd.pid");
+	killbypid("{$g['varrun_path']}/lighttpd.pid");
 	
 	/* generate password file */
 	system_password_configure();
@@ -470,12 +472,11 @@ EOD;
 		fwrite($fd, $key);
 		fclose($fd);
 	
-		$res = mwexec("/usr/local/sbin/mini_httpd -S -E {$g['varetc_path']}/cert.pem" .
-			" -c \"**.php|**.cgi\" -u root -maxproc 16 $portarg" .
-			" -i {$g['varrun_path']}/mini_httpd.pid");
+		/* The certificate was written to cert.pem just above; lighttpd
+		   reads it from there. */
+		$res = webgui_lighttpd_start();
 	} else {
-		$res = mwexec("/usr/local/sbin/mini_httpd -c \"**.php|**.cgi\" -u root" .
-			" -maxproc 16 $portarg -i {$g['varrun_path']}/mini_httpd.pid");
+		$res = webgui_lighttpd_start();
 	}
 	
 	if ($g['booting']) {
