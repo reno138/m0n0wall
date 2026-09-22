@@ -701,3 +701,75 @@ function pf_rule_interface($rule, $ctx) {
 	}
 	return null;
 }
+
+/* ---------------------------------------------------------------------------
+ * Loading the ruleset
+ *
+ * Replaces filter_configure(). The shape differs from the ipf version in one
+ * important way: ipf and ipnat were loaded through two separate pipes, so a
+ * syntax error in the filter rules still left the NAT rules applied and the
+ * box in a half-configured state. pf takes one file containing every section,
+ * and pfctl validates the whole thing before committing, so the ruleset is
+ * applied atomically or not at all.
+ * ------------------------------------------------------------------------ */
+
+function pf_filter_configure($ipv4only = false) {
+	global $config, $g;
+
+	if ($g['booting'])
+		echo "Configuring firewall... ";
+
+	lock_file("{$g['varrun_path']}/filter.lock");
+
+	/* m0n0wall keeps few ports for itself so that NAT has the rest to
+	   randomise from. Unchanged from the ipf path. */
+	mwexec("/sbin/sysctl net.inet.ip.portrange.first=64536");
+	mwexec("/sbin/sysctl net.inet.ip.portrange.hifirst=64536");
+
+	$rules = pf_rules_generate(false);
+	$rulefile = "{$g['varetc_path']}/pf.conf";
+
+	if (file_put_contents($rulefile, $rules) === false) {
+		printf("Cannot write %s in pf_filter_configure()\n", $rulefile);
+		unlock_file("{$g['varrun_path']}/filter.lock");
+		return 1;
+	}
+
+	/* Validate before loading. A firewall that fails to parse its ruleset
+	   must keep the previous one, not end up with nothing. */
+	$out = array();
+	$rc = 0;
+	exec("/sbin/pfctl -n -f " . escapeshellarg($rulefile) . " 2>&1", $out, $rc);
+	if ($rc != 0) {
+		printf("Generated pf ruleset is invalid, keeping the previous one:\n%s\n",
+		       implode("\n", $out));
+		unlock_file("{$g['varrun_path']}/filter.lock");
+		return 1;
+	}
+
+	mwexec("/sbin/pfctl -f " . escapeshellarg($rulefile));
+	mwexec("/sbin/pfctl -e");           /* harmless if already enabled */
+
+	if ($g['booting'])
+		echo "done\n";
+
+	unlock_file("{$g['varrun_path']}/filter.lock");
+	return 0;
+}
+
+/* ipf needed an explicit resync after an interface changed address. pf
+   re-reads '($if)' targets by itself, so this only has to reload the ruleset
+   so that literal addresses baked into rules are refreshed. */
+function pf_filter_resync() {
+	return pf_filter_configure();
+}
+
+function pf_flush_state_table() {
+	return mwexec("/sbin/pfctl -F states");
+}
+
+function pf_flush_nat_table() {
+	/* pf keeps translations in the state table; there is no separate NAT
+	   table to flush as there was with ipnat. */
+	return mwexec("/sbin/pfctl -F states");
+}
