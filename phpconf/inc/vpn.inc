@@ -31,7 +31,22 @@
 /* include all configuration functions */
 require_once("functions.inc");
 	
-function vpn_ipsec_configure($ipchg = false) {
+/* SUPERSEDED by ipsec_strongswan.inc.
+ *
+ * racoon came from ipsec-tools, last released 0.8.2 in 2014. The FreeBSD port
+ * was marked for expiry in January 2025 as "deprecated by upstream in 2014,
+ * contains security issues" and survives only because one volunteer adopted
+ * it. strongSwan is the maintained implementation.
+ *
+ * The whole setkey/spd.conf apparatus goes with it: strongSwan installs its
+ * own policies, so there is no separate SPD step.
+ *
+ * Kept commented for reference while the algorithm mapping is verified
+ * against real peers -- racoon's names and strongSwan's differ, and a wrong
+ * one produces a tunnel that negotiates nothing rather than an error.
+ */
+function vpn_ipsec_configure_racoon_superseded($ipchg = false) {
+
 	global $config, $g;
 	
 	$curwanip = get_current_wan_address();

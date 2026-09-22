@@ -41,6 +41,7 @@ require_once("wireguard.inc");
 require_once("dhcp_dnsmasq.inc");
 require_once("webgui_lighttpd.inc");
 require_once("dyndns.inc");
+require_once("ipsec_strongswan.inc");
 require_once("captiveportal.inc");
 require_once("voucher.inc");
 require_once("scheduler.inc");
