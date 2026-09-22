@@ -29,6 +29,12 @@
 */
 
 $g = array(
+    /* Overridden to TRUE by rc.bootup, which requires globals.inc first and
+       sets it before requiring config.inc. Defaulted here because every
+       other entry point (rc.banner, rc.initial.*, the webGUI) reaches
+       config.inc without ever setting it, and PHP 8 warns on the
+       undefined key on a path that runs on every console menu redraw. */
+    "booting" => false,
     "varrun_path" => "/var/run",
     "varetc_path" => "/var/etc",
     "vardb_path" => "/var/db",

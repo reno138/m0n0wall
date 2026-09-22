@@ -182,7 +182,9 @@ EOD;
 }
 
 /* parse configuration */
-if (!$noparseconfig) {
+/* empty() not !: callers that want the config parsed simply never define
+   $noparseconfig, and reading an undefined variable warns in PHP 8. */
+if (empty($noparseconfig)) {
 	
 	config_lock();
 	

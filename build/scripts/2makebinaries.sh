@@ -52,7 +52,7 @@ FS="$MW_BUILDPATH/m0n0fs"
 STAGE="$MW_BUILDPATH/tmp/pkgstage"
 [ -d "$FS" ] || { echo "$FS does not exist -- run stage 1 first"; exit 1; }
 
-PKGS="php84 php84-filter php84-mbstring php84-session php84-sockets
+PKGS="php84 php84-filter php84-session php84-sockets
       php84-xml php84-zlib php84-pcntl php84-posix
       lighttpd dnsmasq mpd5 strongswan net-snmp wol
       dhcp6 isc-dhcp44-relay
