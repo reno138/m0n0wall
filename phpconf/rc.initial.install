@@ -107,6 +107,42 @@ EOD;
 			mwexec("/sbin/gpart recover $target_disk");
 			echo "done\n";
 			
+			/* Register the image with UEFI firmware.
+			 *
+			 * The loader sits at /EFI/BOOT/BOOTX64.EFI, which is the
+			 * REMOVABLE MEDIA fallback path. Most firmware also tries it
+			 * for a fixed disk, but that is a convention rather than a
+			 * guarantee, and some machines will simply report no bootable
+			 * device. FreeBSD's own installer creates an NVRAM entry
+			 * instead of relying on the fallback, so do the same.
+			 *
+			 * Only meaningful when this installer is itself running under
+			 * UEFI -- machdep.bootmethod reports UEFI or BIOS. On a BIOS
+			 * machine there is no NVRAM to write to, and the pmbr/gptboot
+			 * path in the protective MBR is what boots the disk. */
+			$bootmethod = trim(exec("/sbin/sysctl -n machdep.bootmethod 2>/dev/null"));
+			if ($bootmethod == "UEFI") {
+				echo "Registering with UEFI firmware... ";
+				/* Drop any stale entry of ours first, or repeated installs
+				   accumulate duplicates in the boot menu. */
+				$entries = array();
+				exec("/usr/sbin/efibootmgr 2>/dev/null", $entries);
+				foreach ($entries as $line) {
+					if (preg_match('/^Boot([0-9A-Fa-f]{4})\*?\s+m0n0wall\s*$/', $line, $m))
+						mwexec("/usr/sbin/efibootmgr -B -b " . escapeshellarg($m[1]));
+				}
+				$rc = mwexec("/usr/sbin/efibootmgr --create --activate " .
+				             "--label m0n0wall " .
+				             "--loader /dev/{$target_disk}p1:/EFI/BOOT/BOOTX64.EFI");
+				if ($rc == 0) {
+					echo "done\n";
+				} else {
+					echo "failed.\n";
+					echo "The disk should still boot via the removable-media path\n";
+					echo "(/EFI/BOOT/BOOTX64.EFI), which most firmware tries anyway.\n";
+				}
+			}
+			
 			/* Copy the running configuration onto the new root.
 			   The image is GPT now: p1 is the ESP, p2 is freebsd-boot and p3
 			   is the UFS root. The old code mounted "{$target_disk}a", the

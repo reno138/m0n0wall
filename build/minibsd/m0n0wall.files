@@ -84,6 +84,10 @@ usr/sbin/arp
 # syslogd patch added circular-log support for the GUI log viewer; the rtadvd
 # patch only quietened DHCP-PD logging. Both use the base binaries now --
 # see stage 3 for what became of the circular logging.
+# UEFI NVRAM management: the installer registers the ESP as a boot entry
+# rather than relying on the removable-media fallback path.
+usr/sbin/efibootmgr
+usr/sbin/efivar
 usr/sbin/syslogd
 usr/sbin/rtadvd
 usr/sbin/tcpdump
