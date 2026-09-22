@@ -1115,7 +1115,7 @@ EOD;
 							$dst = "$pptpsa/$pptpsn";
 							break;
 						case 'l2tp':
-							$src = "$l2tpsa/$l2tpsn";
+							$dst = "$l2tpsa/$l2tpsn";
 							break;
 					}
 				}
