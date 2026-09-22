@@ -103,7 +103,7 @@ EOD;
 					
 					mwexec("/sbin/umount -f {$g['cf_path']}");
 					
-					if ($cfgdevice)
+					if (!empty($cfgdevice))
 						break;
 				}
 			}
@@ -119,23 +119,32 @@ EOD;
 					/* skip mfs mounted filesystems */
 					if (strstr($mountdisk, "md"))
 						continue;
-					if (mwexec("/sbin/mount -r /dev/{$mountdisk}a {$g['cf_path']}") == 0) {
+					/* Try each partition layout in turn. The image is GPT -- p1 is the ESP,
+					   p2 freebsd-boot and p3 the UFS root that carries /conf. "a"
+					   (disklabel) and "s1a" (MBR slice) are kept so a disk written by an
+					   older m0n0wall still boots. rc.initial.install writes p3, so probing
+					   only "a" here is exactly why a freshly installed system halted with
+					   "The device that contains the configuration file could not be found". */
+					foreach (array("p3", "a", "s1a") as $cfgsuffix) {
+						if (mwexec("/sbin/mount -r /dev/{$mountdisk}{$cfgsuffix} {$g['cf_path']}") != 0)
+							continue;
+						
 						if (file_exists("{$g['cf_conf_path']}/config.xml")) {
 							/* found it */
 							$cfgdevice = $mountdisk;
-							$cfgpartition = $cfgdevice . "a";
+							$cfgpartition = $cfgdevice . $cfgsuffix;
 							$cfgfstype = "ufs";
-							echo "Found configuration on $cfgdevice.\n";
+							echo "Found configuration on {$cfgpartition}.\n";
 						}
-					
+						
 						mwexec("/sbin/umount -f {$g['cf_path']}");
-					
-						if ($cfgdevice)
+						
+						if (!empty($cfgdevice))
 							break;
 					}
 				}
 				
-				if ($cfgdevice)
+				if (!empty($cfgdevice))
 					break;
 				
 				if ($ntries < ($maxtries-1)) {
@@ -145,7 +154,7 @@ EOD;
 			}
 		}
 		
-		if (!$cfgdevice) {
+		if (empty($cfgdevice)) {
 			/* no device found, print an error and die */
 			echo <<<EOD
 
