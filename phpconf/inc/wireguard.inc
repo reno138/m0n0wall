@@ -280,3 +280,66 @@ function wg_get_peer_status($if) {
 	}
 	return $out;
 }
+
+/* ---------------------------------------------------------------------------
+ * Client config export: file and QR code
+ * ------------------------------------------------------------------------ */
+
+/* qrencode(1) from the graphics/libqrencode port. Chosen over a pure-PHP
+ * encoder because it is about 40 KB, is the reference implementation, and
+ * writing a QR encoder is not a thing a firewall project should be doing.
+ */
+define('WG_QRENCODE', '/usr/local/bin/qrencode');
+
+function wg_qrencode_available() {
+	return is_executable(WG_QRENCODE);
+}
+
+/* Render a client config as a QR code.
+ *
+ * $format is 'PNG' or 'SVG'. Returns the image bytes, or null if qrencode is
+ * missing so the caller can fall back to offering the file only.
+ *
+ * The config is passed on stdin, never as an argument: it contains a private
+ * key when m0n0wall generated the pair, and argv is world-readable through
+ * ps(1).
+ *
+ * -l M gives medium error correction, which survives a phone camera at an
+ * angle without inflating the symbol the way -l H does.
+ */
+function wg_config_qrcode($conftext, $format = 'PNG') {
+	if (!wg_qrencode_available())
+		return null;
+
+	$format = ($format === 'SVG') ? 'SVG' : 'PNG';
+	$cmd = WG_QRENCODE . " -t " . $format . " -l M -s 6 -m 2 -o -";
+
+	$desc = array(0 => array("pipe", "r"), 1 => array("pipe", "w"), 2 => array("pipe", "w"));
+	$proc = proc_open($cmd, $desc, $pipes);
+	if (!is_resource($proc))
+		return null;
+
+	fwrite($pipes[0], $conftext);
+	fclose($pipes[0]);
+	$img = stream_get_contents($pipes[1]);
+	fclose($pipes[1]);
+	fclose($pipes[2]);
+	proc_close($proc);
+
+	return ($img !== false && $img !== '') ? $img : null;
+}
+
+/* A filename for the downloaded config.
+ *
+ * Peer names are already restricted by wg_is_valid_peername(), but this is
+ * what ends up in a Content-Disposition header, so it gets sanitised again
+ * rather than trusted. Belt and braces on the one value that crosses into a
+ * header.
+ */
+function wg_config_filename($tunnel, $peer) {
+	$if   = preg_replace('/[^a-zA-Z0-9]/', '', $tunnel['if']);
+	$name = preg_replace('/[^a-zA-Z0-9._-]/', '', $peer['name']);
+	if ($name === '')
+		$name = 'peer';
+	return "{$if}-{$name}.conf";
+}

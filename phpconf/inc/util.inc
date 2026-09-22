@@ -768,6 +768,30 @@ function check_v6dhcp_range($if_ipaddr6, $if_subnet6, $v6range_from, $v6range_to
 	}
 	return $input_errors;
 }
+/* Render an elapsed interval as something a human reads at a glance.
+ *
+ * Used by the WireGuard peer list for "last handshake". Deliberately coarse:
+ * the operator wants to know whether a peer is alive, not the second it last
+ * spoke, so anything past a day reads as days.
+ */
+function format_duration($seconds) {
+	$seconds = (int)$seconds;
+	if ($seconds < 0)
+		return "in the future";
+	if ($seconds < 60)
+		return $seconds . " second" . ($seconds == 1 ? "" : "s");
+	if ($seconds < 3600) {
+		$m = (int)($seconds / 60);
+		return $m . " minute" . ($m == 1 ? "" : "s");
+	}
+	if ($seconds < 86400) {
+		$h = (int)($seconds / 3600);
+		return $h . " hour" . ($h == 1 ? "" : "s");
+	}
+	$d = (int)($seconds / 86400);
+	return $d . " day" . ($d == 1 ? "" : "s");
+}
+
 function format_bytes($bytes) {
 	if ($bytes >= 1073741824) {
 		return sprintf("%.2f GB", $bytes/1073741824);

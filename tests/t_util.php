@@ -49,4 +49,14 @@ is_true ('is_numericint',        is_numericint('42'));
 is_false('is_numericint float',  is_numericint('4.2'));
 is_true ('is_validaliasname',    is_validaliasname('myalias'));
 
+/* duration formatting (WireGuard last-handshake column) */
+is_same('duration seconds',  format_duration(1),      '1 second');
+is_same('duration plural',   format_duration(45),     '45 seconds');
+is_same('duration minutes',  format_duration(60),     '1 minute');
+is_same('duration minutes+', format_duration(3599),   '59 minutes');
+is_same('duration hours',    format_duration(3600),   '1 hour');
+is_same('duration days',     format_duration(86400),  '1 day');
+is_same('duration days+',    format_duration(259200), '3 days');
+is_same('duration negative', format_duration(-5),     'in the future');
+
 exit(mw_report('util.inc'));

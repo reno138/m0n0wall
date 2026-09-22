@@ -57,6 +57,7 @@ require_once("csrf-magic.inc");
 $d_natconfdirty_path = $g['varrun_path'] . "/nat.conf.dirty";
 $d_filterconfdirty_path = $g['varrun_path'] . "/filter.conf.dirty";
 $d_ipsecconfdirty_path = $g['varrun_path'] . "/ipsec.conf.dirty";
+$d_wireguardconfdirty_path = $g['varrun_path'] . "/wireguard.conf.dirty";
 $d_shaperconfdirty_path = $g['varrun_path'] . "/shaper.conf.dirty";
 $d_pptpuserdirty_path = $g['varrun_path'] . "/pptpd.user.dirty";
 $d_l2tpuserdirty_path = $g['varrun_path'] . "/l2tpd.user.dirty";

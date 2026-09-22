@@ -158,6 +158,11 @@ $menu['VPN']['L2TP/IPsec']  		= array('vpn_ipsec_l2tp.php',
 											'vpn_l2tp_users.php');
 $menu['VPN']['PPTP']  				= array('vpn_pptp.php',
 											'vpn_pptp_users.php');
+$menu['VPN']['WireGuard']			= array('vpn_wireguard.php',
+											'vpn_wireguard_edit.php',
+											'vpn_wireguard_peers.php',
+											'vpn_wireguard_peer_edit.php',
+											'vpn_wireguard_export.php');
 											
 $menu['Status']['System']			= array('index.php');
 $menu['Status']['Interfaces']		= array('status_interfaces.php');
