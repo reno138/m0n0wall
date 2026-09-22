@@ -704,7 +704,10 @@ function system_set_harddisk_standby() {
 		// Check for a numeric value
 		if (is_numeric($standby)) {
 			$device = trim(file_get_contents("{$g['varetc_path']}/cfdevice"));
-			mwexec("/sbin/atacontrol spindown $device " . ($standby*60));
+			/* atacontrol went away with the old ATA driver. camcontrol drives
+			   the CAM stack, which now handles ATA as well as SCSI. The idle
+			   timer is in seconds here too. */
+			mwexec("/sbin/camcontrol standby $device -t " . ($standby*60));
 			mwexec("/bin/dd if=/dev/$device of=/dev/null count=1");
 			if ($g['booting']) {
 				echo "done\n";

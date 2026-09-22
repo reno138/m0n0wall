@@ -340,6 +340,6 @@ function vpn_ipsec_configure($ipchg = false) {
 
 function is_process_running($name) {
 	$out = array();
-	exec("/bin/pgrep -x " . escapeshellarg($name) . " 2>/dev/null", $out);
+	exec("/usr/bin/pgrep -x " . escapeshellarg($name) . " 2>/dev/null", $out);
 	return !empty($out);
 }

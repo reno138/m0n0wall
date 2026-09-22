@@ -29,6 +29,8 @@
 #   ucd-snmp-4.2.7.1         net-snmp               2002 vintage
 #   ez-ipupdate-3.0.11b8     (none -- PHP over HTTPS) dead 2002; see dyndns.inc
 #   isc-dhcp41-server        dnsmasq --dhcp         see below
+#   isc-dhcp41-relay         isc-dhcp44-relay       still maintained
+#   dhcp6 (wide-dhcpv6)      dhcp6                  unchanged; DHCPv6 only
 #   racoon / ipsec-tools     strongswan             upstream dead 2014
 #   dnsmasq-2.66             dnsmasq                alive; just newer
 #
@@ -52,7 +54,8 @@ STAGE="$MW_BUILDPATH/tmp/pkgstage"
 
 PKGS="php84 php84-filter php84-mbstring php84-session php84-sockets
       php84-xml php84-zlib php84-pcntl php84-posix
-      lighttpd dnsmasq mpd5 strongswan net-snmp
+      lighttpd dnsmasq mpd5 strongswan net-snmp wol
+      dhcp6 isc-dhcp44-relay
       bind-tools wireguard-tools libqrencode"
 
 # ---------------------------------------------------------------------------
@@ -86,6 +89,10 @@ usr/local/sbin/pkg-static
 usr/local/bin/wg
 usr/local/bin/wg-quick
 usr/local/bin/qrencode
+usr/local/bin/wol
+usr/local/sbin/dhcp6c
+usr/local/sbin/dhcp6s
+usr/local/sbin/dhcrelay
 usr/local/bin/nsupdate
 usr/local/bin/dig
 usr/local/bin/host

@@ -746,7 +746,10 @@ EOD;
 				fwrite($fd, $aiccuconf);
 				fclose($fd);
 			
-				mwexec("/usr/local/sbin/sixxs-aiccu start {$g['varetc_path']}/aiccu.conf");
+				/* SixXS shut down in June 2017 and aiccu has nothing to talk to.
+				   The config option is left in place so an existing config.xml
+				   still parses, but nothing is started and the GUI says so. */
+				log_error("IPv6: the SixXS/AICCU tunnel type no longer works -- SixXS shut down in 2017. Use a 6in4 tunnel or native IPv6.");
 			
 				/* at this point, it can take anywhere from a millisecond to forever
 				   until gif0 has been configured by AICCU. Unfortunately, the

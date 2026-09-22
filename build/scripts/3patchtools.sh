@@ -38,12 +38,57 @@ fi
 SRC="$MW_BUILDPATH/freebsd15"
 FS="$MW_BUILDPATH/m0n0fs"
 
-echo "Installing m0n0wall's own helper scripts..."
-if [ -f "$SRC/build/tools/dhclient-script" ]; then
-	cp "$SRC/build/tools/dhclient-script" "$FS/sbin/"
-	chmod a+rx "$FS/sbin/dhclient-script"
-	echo "  sbin/dhclient-script"
-fi
+# ---------------------------------------------------------------------------
+# m0n0wall's own tools.
+#
+# These are small C programs and scripts that live in this tree, not packages.
+# The old build compiled them in stage 2 alongside the third-party ports; they
+# belong here, with the other things that are ours.
+#
+#   minicron   a tiny periodic runner -- drives the captive portal pruner
+#   croen      the scheduler behind the Services > Scheduler pages
+#   voucher    captive portal voucher generation and validation
+#   dnswatch   re-resolves dynamic IPsec peer names
+#   verifysig  checks the firmware signature on upgrade
+#   choparp    proxy ARP, for the Services > Proxy ARP pages
+#   stats      the throughput figures on the status page
+# ---------------------------------------------------------------------------
+echo "Building m0n0wall's own tools..."
+mkdir -p "$FS/usr/local/bin" "$FS/usr/local/sbin" "$FS/sbin"
+
+build_tool() {
+	src="$SRC/build/tools/$1.c"
+	dest="$2"
+	extra="$3"
+	[ -f "$src" ] || { echo "  $1: source missing, skipped"; return 0; }
+	if cc -O2 -pipe -o "$FS/$dest/$1" "$src" $extra 2>/tmp/mw-$1.log; then
+		strip "$FS/$dest/$1" 2>/dev/null || true
+		echo "  $dest/$1"
+	else
+		echo "  $1: FAILED to build"
+		sed 's/^/      /' /tmp/mw-$1.log | head -5
+		return 1
+	fi
+}
+
+build_tool minicron  usr/local/bin
+build_tool croen     usr/local/bin
+build_tool voucher   usr/local/bin  "-lcrypto"
+build_tool dnswatch  usr/local/bin
+build_tool verifysig usr/local/bin  "-lcrypto"
+build_tool stats     usr/local/bin
+build_tool choparp   usr/local/sbin
+
+echo "Installing m0n0wall's own scripts..."
+for s in dhclient-script; do
+	[ -f "$SRC/build/tools/$s" ] && { cp "$SRC/build/tools/$s" "$FS/sbin/"; chmod a+rx "$FS/sbin/$s"; echo "  sbin/$s"; }
+done
+for s in ppp-linkup vpn-linkup vpn-linkdown; do
+	[ -f "$SRC/build/tools/$s" ] && { cp "$SRC/build/tools/$s" "$FS/usr/local/sbin/"; chmod a+rx "$FS/usr/local/sbin/$s"; echo "  usr/local/sbin/$s"; }
+done
+for s in runsntp.sh; do
+	[ -f "$SRC/build/tools/$s" ] && { cp "$SRC/build/tools/$s" "$FS/usr/local/bin/"; chmod a+rx "$FS/usr/local/bin/$s"; echo "  usr/local/bin/$s"; }
+done
 
 # Strip anything stages 1 and 2 left unstripped. Harmless errors are expected
 # on scripts and data files.

@@ -74,13 +74,24 @@ int main(int argc, char *argv[]) {
 	long		nread, ndata;
 	char		*sigbuf, *inbuf;
 	EVP_PKEY	*pkey;
-	EVP_MD_CTX	ctx;
+	/* OpenSSL 1.1 made EVP_MD_CTX opaque: it can no longer be a stack
+	   variable and must be allocated with EVP_MD_CTX_new(). FreeBSD 15 ships
+	   OpenSSL 3, so the original "EVP_MD_CTX ctx;" fails to compile with
+	   "variable has incomplete type". */
+	EVP_MD_CTX	*ctx;
 	int			err, retval;
 	
 	if (argc != 3)
 		usage();
 	
-	ERR_load_crypto_strings();
+	/* ERR_load_crypto_strings() is a no-op deprecated in OpenSSL 1.1; error
+	   strings load on demand now. */
+
+	ctx = EVP_MD_CTX_new();
+	if (ctx == NULL) {
+		fprintf(stderr, "unable to allocate a digest context\n");
+		exit(4);
+	}
 	
 	/* open file and check for magic */
 	fin = fopen(argv[2], "r+");
@@ -135,7 +146,7 @@ int main(int argc, char *argv[]) {
 	ftruncate(fileno(fin), ndata);
 	
 	/* verify the signature now */
-	EVP_VerifyInit(&ctx, EVP_sha1());
+	EVP_VerifyInit(ctx, EVP_sha1());
 	
 	/* allocate data buffer */
 	inbuf = malloc(SIG_INBUFLEN);
@@ -152,10 +163,11 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		
-		EVP_VerifyUpdate(&ctx, inbuf, nread);
+		EVP_VerifyUpdate(ctx, inbuf, nread);
 	}
 	
-	err = EVP_VerifyFinal(&ctx, sigbuf, siglen, pkey);
+	err = EVP_VerifyFinal(ctx, sigbuf, siglen, pkey);
+	EVP_MD_CTX_free(ctx);
 	EVP_PKEY_free(pkey);
 	
 	if (err == 1)
