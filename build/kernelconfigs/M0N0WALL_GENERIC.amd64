@@ -1,7 +1,7 @@
 cpu		HAMMER	
 ident		M0N0WALL_GENERIC64
 
-makeoptions	MODULES_OVERRIDE="dummynet glxsb aesni padlock ipfw if_tap if_vlan runfw"
+makeoptions	MODULES_OVERRIDE="dummynet glxsb aesni padlock ipfw if_vlan"	# if_tap merged into tuntap (compiled in); runfw removed from the tree
 
 options		HZ=1000
 
@@ -173,6 +173,11 @@ device		uart		# Generic UART driver
 
 # PCI Ethernet NICs.
 # REMOVED-15.1: device		de		# DEC/Intel DC21x4x (``Tulip'')
+# PCI/PCIe Ethernet NICs that use the iflib infrastructure.
+# em(4) moved to iflib, which generates ifdi_if.h -- without this the build
+# fails with 'ifdi_if.h file not found'.
+device		iflib
+
 device		em		# Intel PRO/1000 Gigabit Ethernet Family
 # REMOVED-15.1: device		igb		# Intel PRO/1000 PCIE Server Gigabit Family
 # REMOVED-15.1: device		ixgb		# Intel PRO/10GbE Ethernet Card
