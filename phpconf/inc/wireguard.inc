@@ -285,7 +285,7 @@ function wg_get_peer_status($if) {
  * Client config export: file and QR code
  * ------------------------------------------------------------------------ */
 
-/* qrencode(1) from the graphics/libqrencode port. Chosen over a pure-PHP
+/* qrencode(1) from the graphics/libqrencode (package: libqrencode) port. Chosen over a pure-PHP
  * encoder because it is about 40 KB, is the reference implementation, and
  * writing a QR encoder is not a thing a firewall project should be doing.
  */
