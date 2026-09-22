@@ -1522,7 +1522,7 @@ function get_dhcppd_address($if) {
 function suggest_ipv6_lan_addr(){
 	$sugipv6lan = "No RA found! Maybe try again in a few minutes.";
 	 /* get the prefix */
-	exec("/usr/sbin/clog /var/log/system.log", $logarr);
+	exec("/usr/bin/tail -n 1000 /var/log/system.log", $logarr);
 	
 	foreach ($logarr as $logent) {
 		$logent = preg_split("/\s+/", $logent, 6);

@@ -23,8 +23,25 @@ bin/sync
 
 # contents of /sbin
 sbin/adjkerntz
-sbin/atacontrol
+# atacontrol was removed with the old ATA driver; CAM replaced it
+sbin/camcontrol
 sbin/dmesg
+# --- added for FreeBSD 15 -------------------------------------------------
+# ifconfig was previously BUILT by stage 3, patched for a FreeBSD 8 IPv6
+# default-route bug (r222728) that has long since been fixed upstream. The
+# base binary is used now, so the manifest has to list it -- without this the
+# image has no ifconfig at all, and interfaces.inc calls it 59 times.
+sbin/ifconfig
+# pf replaces ipfilter. pfctl configures it; pflogd writes the pflog0 capture.
+sbin/pfctl
+sbin/pflogd
+# GPT tooling: the installer runs 'gpart recover' after dd'ing the image onto
+# a larger disk, and diag pages report partitioning.
+sbin/gpart
+sbin/kldstat
+sbin/dhclient
+sbin/devd
+# --------------------------------------------------------------------------
 sbin/fastboot:sbin/fasthalt:sbin/halt:sbin/reboot
 sbin/init
 sbin/ipfw
@@ -51,7 +68,7 @@ usr/bin/gzip:usr/bin/gunzip
 usr/bin/killall
 usr/bin/logger
 usr/bin/netstat
-usr/bin/nsupdate
+# usr/bin/nsupdate -- now from the bind-tools package, see stage 2
 usr/bin/nohup
 usr/bin/su
 usr/bin/tail
@@ -61,8 +78,15 @@ usr/bin/touch
 usr/bin/uptime:usr/bin/w
 
 # contents of usr/sbin
-usr/sbin/ancontrol
+# usr/sbin/ancontrol -- Aironet driver removed from FreeBSD
 usr/sbin/arp
+# syslogd and rtadvd were also built by stage 3 from patched sources. The
+# syslogd patch added circular-log support for the GUI log viewer; the rtadvd
+# patch only quietened DHCP-PD logging. Both use the base binaries now --
+# see stage 3 for what became of the circular logging.
+usr/sbin/syslogd
+usr/sbin/rtadvd
+usr/sbin/tcpdump
 usr/sbin/chown
 usr/sbin/chroot
 usr/sbin/diskinfo

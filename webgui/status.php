@@ -156,8 +156,8 @@ defCmdT("racoon.conf","cat /var/etc/racoon.conf");
 defCmdT("SPD","/usr/local/sbin/setkey -DP");
 defCmdT("SAD","/usr/local/sbin/setkey -D");
 
-defCmdT("last 200 system log entries","/usr/sbin/clog /var/log/system.log 2>&1 | tail -n 200");
-defCmdT("last 50 filter log entries","/usr/sbin/clog /var/log/filter.log 2>&1 | tail -n 50");
+defCmdT("last 200 system log entries","/usr/bin/tail -n 200 /var/log/system.log 2>&1");
+defCmdT("last 50 filter log entries","/usr/bin/tail -n 50 /var/log/filter.log 2>&1");
 
 defCmd("ls /conf");
 defCmd("ls /var/run");

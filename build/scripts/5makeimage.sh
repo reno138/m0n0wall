@@ -62,10 +62,22 @@ makemfsroot() {
 	printf 'Making mfsroot for %s...' "$platform"
 	echo "$platform" > "$MW_BUILDPATH/m0n0fs/etc/platform"
 
-	# -b: free space to leave. -o version=2: UFS2.
+	# -b/-f are free blocks and free inodes, as PERCENTAGES. Two traps, both
+	# of which present identically as
+	#   "makefs: Writing inode N (...): No space left on device"
+	# naming whichever file happened to be next -- so it reads like
+	# corruption rather than a sizing problem.
+	#
+	# 1. An absolute suffix ("4096k") is not interpreted the way you would
+	#    expect and silently under-sizes the filesystem.
+	# 2. 10% is not enough margin. With optimization=space, 1K fragments and
+	#    several hundred small files, real overhead exceeds makefs's own
+	#    estimate. 25% builds reliably; 10% started failing once the tree
+	#    passed ~65 MB, which made it look intermittent.
+	rm -f "$TMP/mfsroot-$platform" "$TMP/mfsroot-$platform.gz"
 	makefs -t ffs \
 	    -o version=2,bsize=8192,fsize=1024,optimization=space \
-	    -b "${spare}k" -f 512 \
+	    -b 25% -f 25% \
 	    "$TMP/mfsroot-$platform" "$MW_BUILDPATH/m0n0fs" > /dev/null
 
 	gzip -9f "$TMP/mfsroot-$platform"
@@ -127,16 +139,19 @@ makeimage() {
 	fi
 	cp "$MW_BUILDPATH/m0n0fs/conf.default/config.xml" "$root/conf/"
 
+	rm -f "$TMP/root-$platform.ufs"
 	makefs -t ffs \
 	    -o version=2,bsize=8192,fsize=1024,optimization=space,label=m0n0wall \
-	    -b "${spare}k" -f 512 \
+	    -b 25% -f 25% \
 	    "$TMP/root-$platform.ufs" "$root" > /dev/null
 	rm -rf "$root"
 
+	rm -f "$TMP/esp-$platform.img"
 	makeesp "$TMP/esp-$platform.img"
 
 	# -b pmbr: protective MBR carrying the BIOS bootstrap that chains to the
 	# freebsd-boot partition. Without it a GPT disk is UEFI-only.
+	rm -f "$TMP/image-$platform.bin" "$TMP/image-$platform.bin.gz"
 	mkimg -s gpt \
 	    -b /boot/pmbr \
 	    -p efi:="$TMP/esp-$platform.img" \
@@ -172,8 +187,10 @@ makeiso() {
 	cp "$TMP/mfsroot-generic-pc-cdrom.gz" "$cdroot/mfsroot.gz"
 	cp "$IMAGES/generic-pc-$VERSION.img"  "$cdroot/firmware.img"
 
+	rm -f "$TMP/efiboot.img"
 	makeesp "$TMP/efiboot.img"
 
+	rm -f "$TMP/m0n0wall.iso"
 	makefs -t cd9660 \
 	    -o rockridge \
 	    -o label="m0n0wall_cd" \

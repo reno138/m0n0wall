@@ -41,7 +41,8 @@ if (!$nentries)
 	$nentries = 50;
 
 if ($_POST['clear']) {
-	exec("/usr/sbin/clog -i -s 262144 /var/log/filter.log");
+	/* Ring-buffer init removed: logs are ordinary files bounded by
+	   newsyslog(8). See build/files/newsyslog.conf. */
 	/* redirect to avoid reposting form data on refresh */
 	header("Location: diag_logs_filter.php");
 	exit;
@@ -94,7 +95,7 @@ function dump_clog($logfile, $tail, $withorig = true) {
 
 	$sor = isset($config['syslog']['reverse']) ? "-r" : "";
 
-	exec("/usr/sbin/clog " . $logfile . " | tail {$sor} -n " . $tail, $logarr);
+	exec("/usr/bin/tail {$sor} -n " . $tail . " " . escapeshellarg($logfile), $logarr);
 	
 	foreach ($logarr as $logent) {
 		$logent = preg_split("/\s+/", $logent, 6);
@@ -122,7 +123,7 @@ function conv_clog($logfile, $tail) {
 
 	$sor = isset($config['syslog']['reverse']) ? "-r" : "";
 
-	exec("/usr/sbin/clog " . $logfile . " | tail {$sor} -n " . $tail, $logarr);
+	exec("/usr/bin/tail {$sor} -n " . $tail . " " . escapeshellarg($logfile), $logarr);
 	
 	$filterlog = array();
 
