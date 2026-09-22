@@ -26,4 +26,13 @@ is_same('pstr_split 8x16',   count(Net_IPv6::pstr_split(str_repeat('0', 128), 16
 is_true ('isInNetmask hit',  Net_IPv6::isInNetmask('fe80::1', 'fe80::', 10));
 is_false('isInNetmask miss', Net_IPv6::isInNetmask('2001:db8::1', 'fe80::', 10));
 
+/* Regression: SplitV64() on a bare IPv4 address. It contains '.' so it takes
+   the v4-mapped branch, but has no ':' -- strrpos() then returned false and
+   PHP read $ip[false] as $ip[0], silently eating the first character and
+   emitting a "String offset cast" warning. */
+is_same('SplitV64 on bare IPv4 keeps every digit',
+        Net_IPv6::SplitV64('10.77.0.1'), array('', '10.77.0.1'));
+is_same('SplitV64 still splits a v4-mapped address',
+        Net_IPv6::SplitV64('::ffff:10.0.0.1'), array('0:0:0:0:0:ffff', '10.0.0.1'));
+
 exit(mw_report('IPv6.php'));

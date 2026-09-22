@@ -438,7 +438,15 @@ class Net_IPv6 {
         $ip = Net_IPv6::removeNetmaskSpec($ip);
         $ip = Net_IPv6::Uncompress($ip);
         if (strstr($ip, '.')) {
+            /* A bare IPv4 address reaches here (it contains '.' but no ':'),
+               and strrpos() then returns false. PHP treats $ip[false] as
+               $ip[0], so the original silently overwrote the FIRST character
+               and returned garbage -- plus a "String offset cast" warning
+               under PHP 8. No colon means there is no v6 part to split off. */
             $pos = strrpos($ip, ':');
+            if ($pos === false) {
+                return array("", $ip);
+            }
             $ip[$pos] = '_';
             $ipPart = explode('_', $ip);
             return $ipPart;

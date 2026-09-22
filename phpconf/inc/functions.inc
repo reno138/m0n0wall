@@ -37,6 +37,7 @@ require_once("services.inc");
 require_once("filter.inc");
 require_once("shaper.inc");
 require_once("vpn.inc");
+require_once("wireguard.inc");
 require_once("captiveportal.inc");
 require_once("voucher.inc");
 require_once("scheduler.inc");
