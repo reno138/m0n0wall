@@ -82,7 +82,11 @@ echo "Copying base-system support files..."
 cp /usr/share/misc/termcap usr/share/misc/ 2>/dev/null || true
 [ -f "$SRC/build/files/zoneinfo.tgz" ] && cp "$SRC/build/files/zoneinfo.tgz" usr/share/
 [ -f "$SRC/build/files/login.conf" ]   && cp "$SRC/build/files/login.conf" etc/
-[ -f "$SRC/build/files/php.ini" ]      && { mkdir -p usr/local/lib; cp "$SRC/build/files/php.ini" usr/local/lib/; }
+# php.ini goes in /usr/local/etc, which is where the php84 PACKAGE looks.
+# The old build put it in /usr/local/lib because PHP 4 was compiled from
+# source with a default prefix. Wrong place means no configuration at all --
+# see the header of build/files/php.ini.
+[ -f "$SRC/build/files/php.ini" ]      && { mkdir -p usr/local/etc; cp "$SRC/build/files/php.ini" usr/local/etc/; }
 [ -f "$SRC/build/files/etcadditional.tgz" ] && tar -xzf "$SRC/build/files/etcadditional.tgz" -C "$FS/"
 [ -f "$SRC/build/files/mpd-modem.script" ]  && cp "$SRC/build/files/mpd-modem.script" etc/mpd-modem/mpd.script
 # Log rotation replaces the old circular-log scheme -- see the file's header.

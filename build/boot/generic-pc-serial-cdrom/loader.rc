@@ -1,0 +1,7 @@
+set hw.usb.no_pf="1"
+set kern.ipc.maxpipekva=10485760
+set console="comconsole"
+set comconsole_speed="115200"
+load /kernel
+load -t mfs_root /mfsroot
+boot -h

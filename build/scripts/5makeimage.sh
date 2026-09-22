@@ -90,14 +90,28 @@ makemfsroot() {
 # A small FAT image holding the UEFI bootloader at the removable-media path
 # the firmware looks for without any NVRAM entry: /EFI/BOOT/BOOTX64.EFI.
 # ---------------------------------------------------------------------------
+# WHICH LOADER.
+#
+# FreeBSD's /boot/loader and /boot/loader.efi are the LUA loader (confirmed by
+# inode: they are hardlinks to loader_lua). It reads /boot/lua/loader.lua and
+# ignores loader.rc, so booting m0n0wall with it stops at
+#
+#     ERROR: cannot open /boot/lua/loader.lua: no such file or directory
+#
+# m0n0wall's loader.rc is Forth -- "load /kernel", "load -t mfs_root /mfsroot",
+# "boot -h" -- so the image ships loader_4th and loader_4th.efi instead. Both
+# are in FreeBSD 15 base. The alternative would be rewriting the boot
+# configuration as loader.conf and shipping the whole /boot/lua tree, which is
+# more moving parts for no gain: the Forth loader does exactly what is needed
+# and is still supported.
+
 makeesp() {
 	out=$1
 	espdir="$TMP/espstage"
 
 	rm -rf "$espdir"
 	mkdir -p "$espdir/EFI/BOOT"
-	cp "$MW_SRC/../boot/loader.efi" "$espdir/EFI/BOOT/BOOTX64.EFI" 2>/dev/null \
-	    || cp /boot/loader.efi "$espdir/EFI/BOOT/BOOTX64.EFI"
+	cp /boot/loader_4th.efi "$espdir/EFI/BOOT/BOOTX64.EFI"
 
 	# 2 MB, matching what FreeBSD's own release build uses. FAT12 below 4 MB
 	# is what firmware expects on a partition this size.
@@ -131,9 +145,13 @@ makeimage() {
 
 	cp "$TMP/kernel.gz"                      "$root/"
 	cp "$TMP/mfsroot-$platform.gz"           "$root/mfsroot.gz"
-	cp /boot/loader                          "$root/boot/"
-	cp /boot/loader.efi                      "$root/boot/" 2>/dev/null || true
+	cp /boot/loader_4th                      "$root/boot/loader"
+	cp /boot/loader_4th.efi                  "$root/boot/loader.efi" 2>/dev/null || true
 	cp "$SRCROOT/build/boot/$platform/loader.rc" "$root/boot/"
+	# loader.efi refuses a device without one of a few marker files -- see
+	# build/boot/defaults/loader.conf for why this must exist.
+	mkdir -p "$root/boot/defaults"
+	cp "$SRCROOT/build/boot/defaults/loader.conf" "$root/boot/defaults/"
 	if [ -r "$SRCROOT/build/boot/$platform/boot.config" ]; then
 		cp "$SRCROOT/build/boot/$platform/boot.config" "$root/"
 	fi
@@ -173,18 +191,31 @@ makeimage() {
 # platformid=efi for UEFI. firmware.img rides along so that console menu
 # option 7 ("Install on Hard Drive") has something to write to the disk.
 # ---------------------------------------------------------------------------
+# $1 is the platform whose mfsroot and loader.rc go on the CD:
+#   generic-pc-cdrom         console on VGA (the normal image)
+#   generic-pc-serial-cdrom  console on COM1 at 115200
+#
+# A serial install image is the normal thing to want for a headless appliance,
+# and it is what lets a boot be read over a VM's serial port rather than a
+# framebuffer -- which matters when the thing being tested has no keyboard.
 makeiso() {
-	printf 'Making ISO...'
+	platform=${1:-generic-pc-cdrom}
+	suffix=""
+	[ "$platform" = "generic-pc-serial-cdrom" ] && suffix="-serial"
+
+	printf 'Making ISO (%s)...' "$platform"
 
 	cdroot="$TMP/cdroot"
 	rm -rf "$cdroot"
 	mkdir -p "$cdroot/boot/kernel"
 
 	cp /boot/cdboot                     "$cdroot/boot/"
-	cp /boot/loader                     "$cdroot/boot/"
-	cp "$SRCROOT/build/boot/generic-pc/loader.rc" "$cdroot/boot/"
+	cp /boot/loader_4th                 "$cdroot/boot/loader"
+	cp "$SRCROOT/build/boot/$platform/loader.rc" "$cdroot/boot/"
+	mkdir -p "$cdroot/boot/defaults"
+	cp "$SRCROOT/build/boot/defaults/loader.conf" "$cdroot/boot/defaults/"
 	cp "$TMP/kernel.gz"                 "$cdroot/"
-	cp "$TMP/mfsroot-generic-pc-cdrom.gz" "$cdroot/mfsroot.gz"
+	cp "$TMP/mfsroot-$platform.gz" "$cdroot/mfsroot.gz"
 	cp "$IMAGES/generic-pc-$VERSION.img"  "$cdroot/firmware.img"
 
 	rm -f "$TMP/efiboot.img"
@@ -201,7 +232,7 @@ makeiso() {
 
 	rm -f "$TMP/efiboot.img"
 	rm -rf "$cdroot"
-	mv "$TMP/m0n0wall.iso" "$IMAGES/generic-pc-$VERSION.iso"
+	mv "$TMP/m0n0wall.iso" "$IMAGES/generic-pc${suffix}-$VERSION.iso"
 
 	echo ' done'
 }
@@ -210,13 +241,15 @@ makeiso() {
 makemfsroot generic-pc-cdrom  4096
 makemfsroot generic-pc        4096
 makemfsroot generic-pc-serial 4096
+makemfsroot generic-pc-serial-cdrom 4096
 
 # --- disk images, 2 MB spare ---
 makeimage generic-pc        2048
 makeimage generic-pc-serial 2048
 
-# --- the installable ISO ---
-makeiso
+# --- the installable ISOs: VGA and serial console ---
+makeiso generic-pc-cdrom
+makeiso generic-pc-serial-cdrom
 
 echo "Finished Stage 5"
 echo

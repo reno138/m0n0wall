@@ -65,7 +65,7 @@ note "makefs, mkimg, pkg, perl present"
 
 # --- boot components stage 5 copies from the HOST -------------------------
 # These end up IN the image, so the host's versions are what ship.
-for f in /boot/loader.efi /boot/gptboot /boot/pmbr /boot/cdboot /boot/loader; do
+for f in /boot/loader_4th.efi /boot/loader_4th /boot/gptboot /boot/pmbr /boot/cdboot; do
 	[ -f "$f" ] || fail "$f missing.
        Stage 5 copies the boot chain from the running system into the image."
 done

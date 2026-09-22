@@ -691,6 +691,8 @@ function system_dmesg_save() {
 function system_set_harddisk_standby() {
 	global $g, $config;
 
+	/* Only meaningful where we run from a disk. A CD platform has no disk
+	   of its own to spin down. */
 	if ($g['platform'] != "generic-pc" && $g['platform'] != "generic-pc-serial")
 		return;
 
@@ -855,6 +857,10 @@ function system_identify_specific_platform() {
 	
 	if ($g['platform'] == 'generic-pc-cdrom')
 		return array('name' => 'generic-pc-cdrom', 'descr' => "Generic PC (CD-ROM)");
+
+	if ($g['platform'] == 'generic-pc-serial-cdrom')
+		return array('name' => 'generic-pc-serial-cdrom',
+		             'descr' => "Generic PC (CD-ROM, serial console)");
 	
 	/* unknown platform */
 	return array('name' => $g['platform'], 'descr' => $g['platform']);

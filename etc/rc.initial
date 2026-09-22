@@ -44,11 +44,16 @@ echo "3) Reset webGUI password"
 echo "4) Reset to factory defaults"
 echo "5) Reboot system"
 echo "6) Ping host"
-# need an install option?
+# Offer the installer on any CD platform. This used to test for exactly
+# "generic-pc-cdrom"; adding the serial-console ISO introduced a second CD
+# platform, "generic-pc-serial-cdrom", and an exact match silently dropped
+# option 7 from the menu -- the installer was present and simply unreachable.
 PLATFORM=`cat /etc/platform`
-if [ "$PLATFORM" = "generic-pc-cdrom" ]; then
-echo "7) Install on Hard Drive";
-fi
+case "$PLATFORM" in
+*-cdrom)
+	echo "7) Install on Hard Drive"
+	;;
+esac
 echo
 
 read -p "Enter a number: " opmode
@@ -74,9 +79,11 @@ case ${opmode} in
 	/etc/rc.initial.ping
 	;;
 7)
-	if [ "$PLATFORM" = "generic-pc-cdrom" ]; then
+	case "$PLATFORM" in
+	*-cdrom)
 		/etc/rc.initial.install
-	fi
+		;;
+	esac
 	;;
 esac
 
