@@ -172,8 +172,14 @@ function enable_change(enable_change) {
                   <td width="22%" valign="top" class="vncellreq">Service type</td>
                   <td width="78%" class="vtable">
 					<select name="type" class="formfld" id="type">
-                      <?php $types = explode(",", "DynDNS,DHS,ODS,DyNS,HN.ORG,ZoneEdit,GNUDip,DynDNS (static),DynDNS (custom),easyDNS,EZ-IP,TZO");
-					        $vals = explode(" ", "dyndns dhs ods dyns hn zoneedit gnudip dyndns-static dyndns-custom easydns ezip tzo");
+                      <?php
+					  /* Driven from dyndns_providers() so the list cannot drift
+					     from what is actually implemented. The old list -- DHS,
+					     ODS, DyNS, HN.ORG, EZ-IP, TZO -- was 2003-era and is
+					     almost entirely dead or now paid. */
+					  $provs = dyndns_providers();
+					  $types = array(); $vals = array();
+					  foreach ($provs as $k => $v) { $vals[] = $k; $types[] = $v['name']; }
 					  $j = 0; for ($j = 0; $j < count($vals); $j++): ?>
                       <option value="<?=$vals[$j];?>" <?php if ($vals[$j] == $pconfig['type']) echo "selected";?>> 
                       <?=htmlspecialchars($types[$j]);?>
@@ -217,7 +223,13 @@ function enable_change(enable_change) {
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">Username</td>
                   <td width="78%" class="vtable"> 
-                    <?=$mandfldhtml;?><input name="username" type="text" class="formfld" id="username" size="20" value="<?=htmlspecialchars($pconfig['username']);?>"> 
+                    <?=$mandfldhtml;?><input name="username" type="text" class="formfld" id="username" size="20" value="<?=htmlspecialchars($pconfig['username']);?>">
+                    <br><span class="vexpl">For <strong>Cloudflare</strong>, put the
+                    <strong>Zone ID</strong> here and an API token scoped to DNS:Edit in
+                    the password field. For <strong>deSEC</strong>, <strong>Duck DNS</strong>,
+                    <strong>dynv6</strong> and <strong>FreeDNS</strong> the username is not
+                    used &mdash; only the token. Everything else takes the account
+                    username.</span>
                   </td>
                 </tr>
                 <tr> 

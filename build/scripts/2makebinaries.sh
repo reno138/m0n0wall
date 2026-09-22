@@ -27,7 +27,7 @@
 #   ip_fil4.1.34             (none -- pf in base)   upstream dead 2014
 #   mini_httpd-1.21 +patch   lighttpd               563-line local patch gone
 #   ucd-snmp-4.2.7.1         net-snmp               2002 vintage
-#   ez-ipupdate-3.0.11b8     inadyn                 dead 2002
+#   ez-ipupdate-3.0.11b8     (none -- PHP over HTTPS) dead 2002; see dyndns.inc
 #   isc-dhcp41-server        dnsmasq --dhcp         see below
 #   racoon / ipsec-tools     strongswan             upstream dead 2014
 #   dnsmasq-2.66             dnsmasq                alive; just newer
@@ -52,7 +52,7 @@ STAGE="$MW_BUILDPATH/tmp/pkgstage"
 
 PKGS="php84 php84-filter php84-mbstring php84-session php84-sockets
       php84-xml php84-zlib php84-pcntl php84-posix
-      lighttpd dnsmasq mpd5 strongswan net-snmp inadyn
+      lighttpd dnsmasq mpd5 strongswan net-snmp
       bind-tools wireguard-tools libqrencode"
 
 # ---------------------------------------------------------------------------
@@ -81,7 +81,6 @@ usr/local/sbin/swanctl
 usr/local/bin/pki
 usr/local/sbin/snmpd
 usr/local/sbin/snmptrapd
-usr/local/sbin/inadyn
 usr/local/sbin/pkg
 usr/local/sbin/pkg-static
 usr/local/bin/wg

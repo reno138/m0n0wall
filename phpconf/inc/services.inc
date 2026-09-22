@@ -520,98 +520,13 @@ function services_dhcrelay_configure() {
 	return 0;
 }
 
-function services_dyndns_reset() {
-	global $config, $g;
+/* SUPERSEDED by dyndns.inc: services_dyndns_reset() now sends the update over
+   HTTPS from PHP instead of writing a config for ez-ipupdate,
+   whose last release was 2002 and whose provider list is dead. */
 
-	if (file_exists("{$g['vardb_path']}/ez-ipupdate.cache")) {
-		unlink("{$g['vardb_path']}/ez-ipupdate.cache");
-	}	
-	
-	if (file_exists("{$g['conf_path']}/ez-ipupdate.cache")) {
-		conf_mount_rw();
-		unlink("{$g['conf_path']}/ez-ipupdate.cache");
-		conf_mount_ro();
-	}
-	
-	return 0;
-}
-
-function services_dyndns_configure() {
-	global $config, $g;
-	
-	/* kill any running ez-ipupdate */
-	/* ez-ipupdate needs SIGQUIT instead of SIGTERM */
-	sigkillbypid("{$g['varrun_path']}/ez-ipupdate.pid", "QUIT");
-	
-	$dyndnscfg = $config['dyndns'];
-	
-	if (isset($dyndnscfg['enable'])) {
-	
-		if ($g['booting'])
-			echo "Starting DynDNS client... ";
-		else
-			sleep(1);
-		
-		/* determine WAN interface name */
-		$wanif = get_real_wan_interface();
-		
-		/* write ez-ipupdate.conf */
-		$fd = fopen("{$g['varetc_path']}/ez-ipupdate.conf", "w");
-		if (!$fd) {
-			printf("Error: cannot open ez-ipupdate.conf in services_dyndns_configure().\n");
-			return 1;
-		}
-			
-		$ezipupdateconf = <<<EOD
-service-type={$dyndnscfg['type']}
-user={$dyndnscfg['username']}:{$dyndnscfg['password']}
-host={$dyndnscfg['host']}
-interface=$wanif
-max-interval=2073600
-pid-file={$g['varrun_path']}/ez-ipupdate.pid
-cache-file={$g['vardb_path']}/ez-ipupdate.cache
-execute=/etc/rc.dyndns.storecache
-daemon
-
-EOD;
-
-		/* enable server[:port]? */
-		if ($dyndnscfg['server']) {
-			if ($dyndnscfg['port'])
-				$ezipupdateconf .= "server={$dyndnscfg['server']}:{$dyndnscfg['port']}\n";
-			else
-				$ezipupdateconf .= "server={$dyndnscfg['server']}\n";
-		}
-
-		/* enable MX? */
-		if ($dyndnscfg['mx']) {
-			$ezipupdateconf .= "mx={$dyndnscfg['mx']}\n";
-		}
-		
-		/* enable wildcards? */
-		if (isset($dyndnscfg['wildcard'])) {
-			$ezipupdateconf .= "wildcard\n";
-		}
-
-		fwrite($fd, $ezipupdateconf);
-		fclose($fd);
-		
-		/* if we're booting, copy the cache file from /conf */
-		if ($g['booting']) {
-			if (file_exists("{$g['conf_path']}/ez-ipupdate.cache")) {
-				copy("{$g['conf_path']}/ez-ipupdate.cache", "{$g['vardb_path']}/ez-ipupdate.cache");
-			}
-		}
-		
-		/* run ez-ipupdate */
-		mwexec("/usr/local/bin/ez-ipupdate -c {$g['varetc_path']}/ez-ipupdate.conf");
-		
-		if ($g['booting'])
-			echo "done\n";
-	}
-	
-	return 0;
-}
+/* SUPERSEDED by dyndns.inc: services_dyndns_configure() now sends the update over
+   HTTPS from PHP instead of writing a config for ez-ipupdate,
+   whose last release was 2002 and whose provider list is dead. */
 
 function services_dnsmasq_configure() {
 	global $config, $g;

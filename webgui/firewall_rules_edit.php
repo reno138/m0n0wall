@@ -475,7 +475,7 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
 					  if ($ipv6rules)
 					      $interfaces = array('wan' => 'WAN', 'lan' => 'LAN', 'ipsec' => 'IPsec');
 					  else
-					      $interfaces = array('wan' => 'WAN', 'lan' => 'LAN', 'pptp' => 'PPTP', 'l2tp' => 'L2TP', 'ipsec' => 'IPsec');
+					      $interfaces = array('wan' => 'WAN', 'lan' => 'LAN', 'l2tp' => 'L2TP', 'ipsec' => 'IPsec');
 					  for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
 					  	$interfaces['opt' . $i] = $config['interfaces']['opt' . $i]['descr'];
 					  }
@@ -581,8 +581,6 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
                             <option value="lan" <?php if ($pconfig['src'] == "lan") { echo "selected"; } ?>>
                             LAN subnet</option>
 							<?php if (!$ipv6rules): ?>
-                            <option value="pptp" <?php if ($pconfig['src'] == "pptp") { echo "selected"; } ?>>
-                            PPTP clients</option>
                             <option value="l2tp" <?php if ($pconfig['src'] == "l2tp") { echo "selected"; } ?>>
                             L2TP clients</option>
 							<?php endif; ?>
@@ -671,8 +669,6 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
                             <option value="lan" <?php if ($pconfig['dst'] == "lan") { echo "selected"; } ?>>
                             LAN subnet</option>
 							<?php if (!$ipv6rules): ?>
-                            <option value="pptp" <?php if ($pconfig['dst'] == "pptp") { echo "selected"; } ?>>
-                            PPTP clients</option>
                             <option value="l2tp" <?php if ($pconfig['dst'] == "l2tp") { echo "selected"; } ?>>
                             L2TP clients</option>
 							<?php endif; ?>

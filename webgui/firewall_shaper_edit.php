@@ -37,7 +37,7 @@ if (!is_array($config['shaper']['rule'])) {
 }
 $a_shaper = &$config['shaper']['rule'];
 
-$specialsrcdst = explode(" ", "any lan pptp");
+$specialsrcdst = explode(" ", "any lan");
 
 $id = $_GET['id'];
 if (isset($_POST['id']))
@@ -490,7 +490,7 @@ function dst_rep_change() {
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">Interface</td>
                   <td width="78%" class="vtable"><select name="interface" class="formfld">
-                      <?php $interfaces = array('lan' => 'LAN', 'wan' => 'WAN', 'pptp' => 'PPTP');
+                      <?php $interfaces = array('lan' => 'LAN', 'wan' => 'WAN');
 					  for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
 					  	$interfaces['opt' . $i] = $config['interfaces']['opt' . $i]['descr'];
 					  }
@@ -534,8 +534,6 @@ function dst_rep_change() {
                             Network</option>
                             <option value="lan" <?php if ($pconfig['src'] == "lan") { echo "selected"; } ?>> 
                             LAN subnet</option>
-                            <option value="pptp" <?php if ($pconfig['src'] == "pptp") { echo "selected"; } ?>> 
-                            PPTP clients</option>
                             <?php for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++): ?>
                             <option value="opt<?=$i;?>" <?php if ($pconfig['src'] == "opt" . $i) { echo "selected"; } ?>> 
                             <?=htmlspecialchars($config['interfaces']['opt' . $i]['descr']);?>
@@ -616,8 +614,6 @@ function dst_rep_change() {
                             Network</option>
                             <option value="lan" <?php if ($pconfig['dst'] == "lan") { echo "selected"; } ?>> 
                             LAN subnet</option>
-                            <option value="pptp" <?php if ($pconfig['dst'] == "pptp") { echo "selected"; } ?>> 
-                            PPTP clients</option>
                             <?php for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++): ?>
                             <option value="opt<?=$i;?>" <?php if ($pconfig['dst'] == "opt" . $i) { echo "selected"; } ?>> 
                             <?=htmlspecialchars($config['interfaces']['opt' . $i]['descr']);?>

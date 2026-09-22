@@ -149,8 +149,11 @@
 	/* start proxy ARP service */
 	services_proxyarp_configure();
 	
-	/* start pptpd */
-	vpn_pptpd_configure();
+	/* PPTP VPN server removed: MS-CHAPv2 and MPPE are broken, and the
+	   upstream project said so in its own final commit when it added
+	   L2TP/IPsec "as PPTP is not deemed secure anymore". PPTP as a WAN LINK
+	   TYPE is a different thing and is retained -- some ISPs still deliver
+	   service that way. */
 
 	/* start l2tp */
 	vpn_ipsec_l2tp_configure();
