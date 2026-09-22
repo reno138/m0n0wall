@@ -1,3 +1,30 @@
+#
+# M0N0WALL_GENERIC -- amd64
+#
+# Derived from m0n0wall's FreeBSD 8.4 config and brought forward to FreeBSD
+# 15.1. The original is kept beside this file as M0N0WALL_GENERIC.amd64.freebsd8.
+#
+# A NOTE FOR ANYONE TRIMMING THIS FILE.
+#
+# Three entries here are declared by NO driver line and look unused. They are
+# not. FreeBSD has progressively split shared infrastructure out of the drivers
+# that use it, and the dependency is invisible at the point of use:
+#
+#   device iflib   -- em(4) and friends moved to the iflib framework, which
+#                     generates ifdi_if.h at build time. Without it the build
+#                     dies with "'ifdi_if.h' file not found" from inside
+#                     dev/e1000, naming nothing useful.
+#   device hid     -- uhid(4) and ukbd(4) link against the HID subsystem. Without
+#   device hidbus     hid/hidbus/usbhid the kernel COMPILES and then fails to
+#   device usbhid     LINK with undefined hid_locate, hid_is_keyboard and so on.
+#
+# Both were found by compiling, not by reading GENERIC, because GENERIC lists
+# them under their own headings far from the drivers that need them. Delete
+# them only after a clean build proves they are genuinely unused.
+#
+# Lines marked "# REMOVED-15.1:" were rejected by config(8) on 15.1 and are
+# kept commented for provenance rather than deleted.
+#
 cpu		HAMMER	
 ident		M0N0WALL_GENERIC64
 
@@ -294,6 +321,13 @@ device		uhci		# UHCI PCI->USB interface
 device		ohci		# OHCI PCI->USB interface
 device		ehci		# EHCI PCI->USB interface (USB 2.0)
 device		usb		# USB Bus (required)
+# HID was split into its own subsystem: uhid/ukbd now link against hid(4),
+# so the bus and transport must be declared or the kernel fails to LINK with
+# undefined hid_locate/hid_is_keyboard/etc. Nothing in the uhid line says so.
+device		hid		# generic HID support
+device		hidbus		# generic HID bus
+device		usbhid		# USB HID transport
+
 device		uhid		# "Human Interface Devices"
 device		ukbd		# Keyboard
 device		umass		# Disks/Mass storage - Requires scbus and da
