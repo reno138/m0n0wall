@@ -862,3 +862,36 @@ function pf_tables_v6_generate() {
 	       "2002:e000::/20, 2002:7f00::/24, 2002:0000::/24, 2002:ff00::/24, " .
 	       "2002:0a00::/24, 2002:ac10::/28, 2002:c0a8::/32 }\n";
 }
+
+/* ---------------------------------------------------------------------------
+ * Coexisting with ipfw
+ *
+ * m0n0wall keeps ipfw for two things the pf move does not touch: traffic
+ * shaping via dummynet (shaper.inc) and the captive portal
+ * (captiveportal.inc). So after this change the box runs TWO packet filters
+ * at once, and both register on the same pfil hooks.
+ *
+ * FreeBSD does not merge them. pfil calls each registered filter in the order
+ * they are linked, and pfilctl(8) controls that order. By default a newly
+ * registered hook is PREPENDED -- it becomes the first filter on input and
+ * the last on output -- so the order depends on module load order, which is
+ * not something to leave to chance on a firewall.
+ *
+ * What we want on input is pf first, then dummynet: there is no sense shaping
+ * a packet that is about to be dropped. Concretely:
+ *
+ *     pfilctl heads                  # the filtering points
+ *     pfilctl hooks                  # the registered filters
+ *     pfilctl link -i pf inet        # pf first on input
+ *     pfilctl link -o -a pf inet     # ...and appended on output
+ *
+ * shaper.inc additionally sets net.inet.ip.fw.one_pass=1 so that ipfw stops
+ * evaluating once a packet has been handed to a pipe. That stays correct
+ * here: it concerns ipfw's own rule evaluation, not its position relative
+ * to pf.
+ *
+ * XXX-VERIFY: the exact link order, and whether the captive portal's ipfw
+ * rules still see the addresses they expect once pf has already translated
+ * them. This cannot be settled by reading manuals -- it needs a box with
+ * shaping and the portal both enabled, and a packet capture.
+ * ------------------------------------------------------------------------ */
