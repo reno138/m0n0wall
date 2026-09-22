@@ -53,7 +53,7 @@ if ($_POST) {
 		$reqdfields = explode(" ", "rocommunity");
 		$reqdfieldsn = explode(",", "Community");
 		
-		do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+		do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	}
 
 	if (!$input_errors) {

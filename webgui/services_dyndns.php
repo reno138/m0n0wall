@@ -71,7 +71,7 @@ if ($_POST) {
 		$reqdfields = array_merge($reqdfields, explode(" ", "dnsupdate_host dnsupdate_ttl dnsupdate_keyname dnsupdate_keydata"));
 		$reqdfieldsn = array_merge($reqdfieldsn, explode(",", "Hostname,TTL,Key name,Key"));
 	}
-	do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
 	if (($_POST['host'] && !is_domain($_POST['host']))) {
 		$input_errors[] = "The host name contains invalid characters.";

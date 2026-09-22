@@ -90,7 +90,7 @@ if ($_POST) {
     $reqdfields = explode(" ", "interface source source_subnet destination destination_subnet");
     $reqdfieldsn = explode(",", "Interface,Source,Source bit count,Destination,Destination bit count");
     
-    do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+    do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 
     if ($_POST['source'] && !is_ipaddr($_POST['source'])) {
         $input_errors[] = "A valid source must be specified.";

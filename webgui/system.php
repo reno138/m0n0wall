@@ -72,7 +72,7 @@ if ($_POST) {
 	$reqdfields = split(" ", "hostname domain username");
 	$reqdfieldsn = split(",", "Hostname,Domain,Username");
 	
-	do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
 	if ($_POST['hostname'] && !is_hostname($_POST['hostname'])) {
 		$input_errors[] = "The hostname may only contain the characters a-z, 0-9 and '-'.";

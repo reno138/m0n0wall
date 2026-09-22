@@ -54,7 +54,7 @@ if ($_POST) {
 	$reqdfields = explode(" ", "weight");
 	$reqdfieldsn = explode(",", "Weight");
 	
-	do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
 	if ($_POST['weight'] && (!is_numericint($_POST['weight'])
 			|| ($_POST['weight'] < 1) || ($_POST['weight'] > 100))) {

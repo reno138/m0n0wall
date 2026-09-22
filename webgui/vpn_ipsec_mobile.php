@@ -93,7 +93,7 @@ if ($_POST) {
 	$reqdfields = explode(" ", "p2ealgos p2halgos");
 	$reqdfieldsn = explode(",", "P2 Encryption Algorithms,P2 Hash Algorithms");
 	
-	do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
 	if (($_POST['dpddelay'] && !is_numeric($_POST['dpddelay']))) {
 		$input_errors[] = "The DPD interval must be an integer.";

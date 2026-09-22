@@ -63,7 +63,7 @@ if ($_POST) {
     $reqdfields = explode(" ", "number count minutes");
     $reqdfieldsn = explode(",", "Number,Count,minutes");
 
-    do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+    do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 
     if (!is_numeric($_POST['number']) || $_POST['number'] >= $maxnumber) 
         $input_errors[] = "Roll number must be numeric and less than $maxnumber";

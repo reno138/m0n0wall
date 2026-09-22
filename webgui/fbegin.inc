@@ -84,7 +84,7 @@ function dynamic_menu(&$menu, $menu_title) {
 				// Below lines are spaced out oddly to help improve the look of resulting HTML code.
 				?>
 
-				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="/<?=$link?>" class="navlnk"><?=$desc?></a><br><?
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="/<?=$link?>" class="navlnk"><?=$desc?></a><br><?php 
 	   			// Only need the first one, so break out of foreach
 	   			break;
 			}

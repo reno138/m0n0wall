@@ -84,7 +84,7 @@ if ($_SERVER['REMOTE_USER'] === $config['system']['username']) {
 	    		$reqdfieldsn = explode(",", "Username,Password");
 	    	}
     	
-	    	do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+	    	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
     	
 	    	if (preg_match("/[^a-zA-Z0-9\.\-_]/", $_POST['username']))
 	    		$input_errors[] = "The username contains invalid characters.";
@@ -262,7 +262,7 @@ if($_GET['act']=="new" || $_GET['act']=="edit" || $input_errors){
    		$reqdfields = explode(" ", "password");
    		$reqdfieldsn = explode(",", "Password");
     	
-    	do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+    	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
     	
     	if ($_POST['password'] != $_POST['password2'])
       		$input_errors[] = "The passwords do not match.";

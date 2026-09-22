@@ -70,7 +70,7 @@ if ($_POST) {
 	$reqdfields = explode(" ", "interface network network_subnet gateway");
 	$reqdfieldsn = explode(",", "Interface,Destination network,Destination network bit count,Gateway");
 	
-	do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
 	if (($_POST['network'] && !($ipv6routes ? is_ipaddr6($_POST['network']) : is_ipaddr($_POST['network'])))) {
 		$input_errors[] = "A valid destination network must be specified.";

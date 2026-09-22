@@ -90,7 +90,7 @@ if ($_POST) {
 		$reqdfields = explode(" ", "server");
 		$reqdfieldsn = explode(",", "Destination Server");
 		
-		do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+		do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 		
 		if (($_POST['server'] && !is_ipaddr($_POST['server']))) 
 			$input_errors[] = "A valid Destination Server IP address  must be specified.";

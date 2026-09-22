@@ -60,7 +60,7 @@ if ($_POST) {
 	$reqdfields = explode(" ", "domain ip");
 	$reqdfieldsn = explode(",", "Domain,IP address");
 	
-	do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
 	if (($_POST['host'] && (!is_hostname($_POST['host'])) && ($_POST['host'] != '*') )) {
 		$input_errors[] = "A valid host must be specified.";

@@ -57,7 +57,7 @@ if ($_POST) {
 	$reqdfields = explode(" ", "domain ip");
 	$reqdfieldsn = explode(",", "Domain,IP address");
 	
-	do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
 	if (($_POST['domain'] && !is_domain($_POST['domain']))) {
 		$input_errors[] = "A valid domain must be specified.";

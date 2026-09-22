@@ -47,7 +47,7 @@
 			// 1: Input validation (required fields exist)
 			$reqdfields = Array('interval');
 			$reqdfieldsn = Array('Loop interval');
-			do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+			do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 			
 			// 2: Input validation (field values)
 			if (!$input_errors) {

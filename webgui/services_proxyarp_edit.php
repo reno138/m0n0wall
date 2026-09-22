@@ -77,7 +77,7 @@ if ($_POST) {
 		$reqdfieldsn = explode(",", "Range start,Range end");
 	}
 	
-	do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
 	if ((($_POST['type'] != "range") && $_POST['subnet'] && !is_ipaddr($_POST['subnet']))) {
 		$input_errors[] = "A valid address must be specified.";

@@ -439,7 +439,7 @@ class Net_IPv6 {
         $ip = Net_IPv6::Uncompress($ip);
         if (strstr($ip, '.')) {
             $pos = strrpos($ip, ':');
-            $ip{$pos} = '_';
+            $ip[$pos] = '_';
             $ipPart = explode('_', $ip);
             return $ipPart;
         } else {

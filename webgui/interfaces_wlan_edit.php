@@ -121,7 +121,7 @@ if ($_POST) {
 			}
 		}
 	
-		do_input_validation($_POST, explode(" ", $reqdfields), explode(",", $reqdfieldsn), &$input_errors);
+		do_input_validation($_POST, explode(" ", $reqdfields), explode(",", $reqdfieldsn), $input_errors);
 	
 		if ($_POST['radiusip'] && !is_ipaddr($_POST['radiusip']))
 			$input_errors[] = "A valid RADIUS IP address must be specified.";

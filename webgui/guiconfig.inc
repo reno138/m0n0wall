@@ -128,7 +128,7 @@ $p2_pfskeygroups = array('0' => 'off', '1' => '1 (768 bit)', '2' => '2 (1024 bit
 $pptpd_subnet_sizes = array(16 => 28, 32 => 27, 64 => 26, 128 => 25, 256 => 24);
 $ipsec_l2tp_subnet_sizes = array(16 => 28, 32 => 27, 64 => 26, 128 => 25, 256 => 24);
 
-function do_input_validation($postdata, $reqdfields, $reqdfieldsn, $input_errors) {
+function do_input_validation($postdata, $reqdfields, $reqdfieldsn, &$input_errors) {
 	
 	/* check for bad control characters */	
 	foreach ($postdata as $pn => $pd) {

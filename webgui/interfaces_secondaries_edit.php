@@ -66,7 +66,7 @@ if ($_POST) {
 	$reqdfields = explode(" ", "ipaddr prefix");
 	$reqdfieldsn = explode(",", "IP Address,subnet/prefix");
 	
-	do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
 	if ($_POST['prefix'] && (!is_numericint($_POST['prefix']) || ($_POST['prefix'] < '1') || ($_POST['prefix'] > '128'))) {
 		$input_errors[] = "The subnet/prefix must be an integer between 1 and 128.";

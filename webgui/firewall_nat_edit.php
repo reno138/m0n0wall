@@ -75,7 +75,7 @@ if ($_POST) {
 	$reqdfields = explode(" ", "interface proto beginport localip localbeginport");
 	$reqdfieldsn = explode(",", "Interface,Protocol,Start port,NAT IP,Local port");
 	
-	do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
 	if ($_POST['extaddr'] == 'wan' && $_POST['interface'] == 'wan') {
 		$input_errors[] = "The interface must not be WAN if the External Address is set to WAN.";

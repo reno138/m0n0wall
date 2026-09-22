@@ -109,13 +109,13 @@
 					if (is_array($data['values'])) {
 						foreach ($data['values'] AS $k => $v) {
 							if (isset($v['name']) && isset($v['type'])) {
-								croen_get_job_row($v, &$form, &$save, &$js, &$input_errors, $pre, $pconfig, $jobC, $tree.$data['name']);
+								croen_get_job_row($v, $form, $save, $js, $input_errors, $pre, $pconfig, $jobC, $tree.$data['name']);
 							}
 						}
 
 					// values (String) children
 					} elseif (isset($data['child']) && is_array($data['child'])) {
-						croen_get_job_row($data['child'], &$form, &$save, &$js, &$input_errors, $pre, $pconfig, $jobC, $tree.$data['name']);
+						croen_get_job_row($data['child'], $form, $save, $js, $input_errors, $pre, $pconfig, $jobC, $tree.$data['name']);
 					}
 				}
 				
@@ -236,7 +236,7 @@
 		$jobs_form[$job_id] = '';
 		$jobs_save[$job_id] = Array();
 		$tmpjs = (empty($jobs_js) ? '' : FALSE);
-		croen_get_job_row($data['job'], &$jobs_form[$job_id], &$jobs_save[$job_id], &$tmpjs, &$input_errors, 'job', $job_data, $job_id);
+		croen_get_job_row($data['job'], $jobs_form[$job_id], $jobs_save[$job_id], $tmpjs, $input_errors, 'job', $job_data, $job_id);
 		if (empty($jobs_js)) {
 			$jobs_js = $tmpjs;
 		}

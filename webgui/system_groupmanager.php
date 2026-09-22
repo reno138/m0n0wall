@@ -147,7 +147,7 @@ if ($_POST) {
 		$reqdfields = explode(" ", "groupname");
 		$reqdfieldsn = explode(",", "Group Name");
 	
-		do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+		do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
 		if (preg_match("/[^a-zA-Z0-9\.\-_ ]/", $_POST['groupname']))
 			$input_errors[] = "The group name contains invalid characters.";
@@ -254,7 +254,7 @@ if($_GET['act']=="new" || $_GET['act']=="edit"){
               	<td class="listr"><?=$title?></td>
               	<td class="listr"><?=$fname?></td>
               	</tr>
-              	<?
+              	<?php 
               } ?>
               </table>
               </td>

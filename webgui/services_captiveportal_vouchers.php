@@ -147,7 +147,7 @@ if ($_POST) {
 		$reqdfields = explode(" ", "charset rollbits ticketbits checksumbits publickey magic saveinterval");
 		$reqdfieldsn = explode(",", "charset,rollbits,ticketbits,checksumbits,publickey,magic,saveinterval");
 		
-		do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+		do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	}
 	
 	if ($_POST['charset'] && (strlen($_POST['charset'] < 2))) {

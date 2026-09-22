@@ -67,7 +67,7 @@ if ($_POST) {
 		$reqdfieldsn[] = "Subnet bit count";
 	}
 	
-	do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
 	if (($_POST['name'] && !is_validaliasname($_POST['name']))) {
 		$input_errors[] = "The alias name may only consist of the characters a-z, A-Z, 0-9 and '-' (dash).";

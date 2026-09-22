@@ -42,7 +42,7 @@ if ($_POST) {
 	/* input validation */
 	$reqdfields = explode(" ", "host count");
 	$reqdfieldsn = explode(",", "Host,Count");
-	do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 
 	if (!is_numericint($_POST['count']) || ($_POST['count'] < 1) || ($_POST['count'] > MAX_COUNT)) {
 		$input_errors[] = "Count must be between 1 and {MAX_COUNT}";
@@ -149,7 +149,7 @@ function get_interface_addr($ifdescr, $ipv6 = false) {
 				</tr>
 				<tr>
 				<td valign="top" colspan="2">
-				<? if ($do_ping) {
+				<?php  if ($do_ping) {
 					echo("<strong>Ping output:</strong><br>");
 					echo('<pre>');
 					ob_end_flush();

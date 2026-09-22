@@ -56,7 +56,7 @@ if ($_POST) {
 	$reqdfields = explode(" ", "bandwidth");
 	$reqdfieldsn = explode(",", "Bandwidth");
 	
-	do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
 	if (($_POST['bandwidth'] && !is_numericint($_POST['bandwidth']))) {
 		$input_errors[] = "The bandwidth must be an integer.";

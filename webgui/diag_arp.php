@@ -210,7 +210,7 @@ if (ipv6enabled()){
 	}
 }
 
-function getHostName($mac,$ip)
+function arp_get_hostname($mac,$ip)
 {
 	global $dhcpmac, $dhcpip, $resolve;
 	
@@ -241,7 +241,7 @@ function getHostName($mac,$ip)
 	<td class="listt"><input type="checkbox" name="entries[]" value="<?=$entry['ip'];?>" style="margin: 0; padding: 0; width: 15px; height: 15px;"></td>
     <td class="listlr"><?=$entry['ip'];?></td>
     <td class="listr"><?=$entry['mac'];?></td>
-    <td class="listr"><?=getHostName($entry['mac'], $entry['ip']);?></td>
+    <td class="listr"><?=arp_get_hostname($entry['mac'], $entry['ip']);?></td>
     <td class="listr"><?=$hwif[$entry['interface']];?></td>
   </tr>
 <?php $i++; endforeach; ?>

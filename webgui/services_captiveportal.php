@@ -96,7 +96,7 @@ if ($_POST) {
 		$reqdfields = explode(" ", "cinterface");
 		$reqdfieldsn = explode(",", "Interface");
 		
-		do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+		do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 		
 		/* make sure no interfaces are bridged */
 		for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {

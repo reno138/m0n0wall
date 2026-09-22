@@ -56,7 +56,7 @@ if ($_POST) {
 	$reqdfields = explode(" ", "mac");
 	$reqdfieldsn = explode(",", "MAC address");
 	
-	do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
 	$_POST['mac'] = str_replace("-", ":", $_POST['mac']);
 	

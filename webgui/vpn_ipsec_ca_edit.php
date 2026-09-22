@@ -66,7 +66,7 @@ if ($_POST) {
 		if (!strstr($_POST['crl'], "BEGIN X509 CRL") || !strstr($_POST['crl'], "END X509 CRL"))
 				$input_errors[] = "This CRL does not appear to be valid.";
 	
-	do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
 	if (preg_match("/[^a-zA-Z0-9@\.\-]/", $_POST['ident']))
 		$input_errors[] = "The identifier contains invalid characters.";

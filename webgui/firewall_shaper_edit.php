@@ -246,7 +246,7 @@ if ($_POST) {
 		$reqdfieldsn[] = "Destination bit count";
 	}
 	
-	do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
 	if (!$_POST['srcbeginport']) {
 		$_POST['srcbeginport'] = 0;
@@ -698,7 +698,7 @@ function dst_rep_change() {
 				  foreach ($iptos as $tos): $dontcare = true; ?>
                       <tr> 
                         <td width="80" nowrap><strong> 
-			  <?echo $tos;?>
+			  <?php echo $tos;?>
                           </strong></td>
                         <td nowrap> <input type="radio" name="iptos_<?=$tos;?>" value="on" <?php if (array_search($tos, $iniptos) !== false) { echo "checked"; $dontcare = false; }?>>
                           yes&nbsp;&nbsp;&nbsp;</td>

@@ -305,7 +305,7 @@ if ($_POST) {
         $pconfig = $_POST;
         $reqdfields = explode(" ", "maxup maxdown");
         $reqdfieldsn = explode(",", "Max. Upload,Max.Download");
-        do_input_validation($_POST,$reqdfields, $reqdfieldsn, &$input_errors);
+        do_input_validation($_POST,$reqdfields, $reqdfieldsn, $input_errors);
         if (($_POST['maxup'] && !is_numericint($_POST['maxup']))) {
             $input_errors[] = "The max upload bandwidth must be an integer.";
         }

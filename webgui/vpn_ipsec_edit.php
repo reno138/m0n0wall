@@ -172,7 +172,7 @@ if ($_POST) {
 			$input_errors[] = "This peer certificate does not appear to be valid.";	
 	}
 	
-	do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
 	if (($_POST['dpddelay'] && !is_numeric($_POST['dpddelay']))) {
 		$input_errors[] = "The DPD interval must be an integer.";

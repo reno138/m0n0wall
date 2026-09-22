@@ -56,7 +56,7 @@ if ($_POST) {
 	$reqdfields = explode(" ", "ident psk");
 	$reqdfieldsn = explode(",", "Identifier,Pre-shared key");
 	
-	do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
 	if (preg_match("/[^a-zA-Z0-9@\.\-]/", $_POST['ident']))
 		$input_errors[] = "The identifier contains invalid characters.";

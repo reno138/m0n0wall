@@ -111,19 +111,19 @@ if ($_POST) {
 	if ($_POST['type'] == "Static") {
 		$reqdfields = explode(" ", "ipaddr subnet gateway");
 		$reqdfieldsn = explode(",", "IP address,Subnet bit count,Gateway");
-		do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+		do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	} else if ($_POST['type'] == "PPPoE") {
 		$reqdfields = explode(" ", "username password");
 		$reqdfieldsn = explode(",", "PPPoE username,PPPoE password");
-		do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+		do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	} else if ($_POST['type'] == "PPTP") {
 		$reqdfields = explode(" ", "pptp_username pptp_password pptp_local pptp_subnet pptp_remote");
 		$reqdfieldsn = explode(",", "PPTP username,PPTP password,PPTP local IP address,PPTP subnet,PPTP remote IP address");
-		do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+		do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	} else if ($_POST['type'] == "Modem") {
 		$reqdfields = explode(" ", "modem_username modem_password modem_apn");
 		$reqdfieldsn = explode(",", "Modem username,Modem password,Modem APN");
-		do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+		do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	}
 	
 	$_POST['spoofmac'] = str_replace("-", ":", $_POST['spoofmac']);

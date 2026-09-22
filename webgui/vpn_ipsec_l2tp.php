@@ -68,7 +68,7 @@ if ($_POST) {
 				explode(",", "RADIUS server address,RADIUS shared secret"));
 		}
 		
-		do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+		do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 		
 		if (($_POST['localip'] && !is_ipaddr($_POST['localip']))) {
 			$input_errors[] = "A valid server address must be specified.";
@@ -97,7 +97,7 @@ if ($_POST) {
 		$reqdfields = explode(" ", "redir");
 		$reqdfieldsn = explode(",", "IPsec/L2TP redirection target address");
 		
-		do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+		do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 		
 		if (($_POST['redir'] && !is_ipaddr($_POST['redir']))) {
 			$input_errors[] = "A valid target address must be specified.";

@@ -43,7 +43,7 @@ if ($_POST) {
 	/* input validation */
 	$reqdfields = explode(" ", "host ttl");
 	$reqdfieldsn = explode(",", "Host,ttl");
-	do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 
 	if (!is_numericint($_POST['ttl']) || ($_POST['ttl'] < 1) || ($_POST['ttl'] > MAX_TTL)) {
 		$input_errors[] = "Maximum number of hops must be between 1 and {MAX_TTL}";
@@ -114,7 +114,7 @@ if (!isset($do_traceroute)) {
 				<tr>
 				<td valign="top" colspan="2">
 				<p><span class="vexpl"><span class="red"><strong>Note: </strong></span> Traceroute may take a while to complete.  You may hit the Stop button on your browser at any time to see the progress of failed traceroutes.<p>
-				<? if ($do_traceroute) {
+				<?php  if ($do_traceroute) {
 					echo("<br><strong>Traceroute output:</strong><br>");
 					echo('<pre>');
 					ob_end_flush();

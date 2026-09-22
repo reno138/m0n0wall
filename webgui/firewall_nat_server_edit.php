@@ -56,7 +56,7 @@ if ($_POST) {
 	$reqdfields = explode(" ", "ipaddr");
 	$reqdfieldsn = explode(",", "External IP address");
 	
-	do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 
 	if (($_POST['ipaddr'] && !is_ipaddr($_POST['ipaddr']))) {
 		$input_errors[] = "A valid external IP address must be specified.";

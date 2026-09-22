@@ -67,7 +67,7 @@ if ($_POST) {
 	$reqdfields = explode(" ", "interface external internal");
 	$reqdfieldsn = explode(",", "Interface,External subnet,Internal subnet");
 	
-	do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 
 	if (($_POST['external'] && !is_ipaddr($_POST['external']))) {
 		$input_errors[] = "A valid external subnet must be specified.";

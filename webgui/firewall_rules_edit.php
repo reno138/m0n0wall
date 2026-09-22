@@ -237,7 +237,7 @@ if ($_POST) {
 		$reqdfieldsn[] = "Destination bit count";
 	}
 	
-	do_input_validation($_POST, $reqdfields, $reqdfieldsn, &$input_errors);
+	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
 	if (!$_POST['srcbeginport']) {
 		$_POST['srcbeginport'] = 0;
