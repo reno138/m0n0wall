@@ -470,7 +470,6 @@
 	
 	// Write syslog entry
 	function croen_syslog($m) {
-		define_syslog_variables();
 		openlog("croen", FALSE, LOG_NOTICE);
 		syslog(LOG_NOTICE, trim($m));
 		closelog();

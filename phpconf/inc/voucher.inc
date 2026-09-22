@@ -57,7 +57,7 @@ function voucher_auth($voucher_received, $test = 0) {
     }
 
     // split into an array. Useful for multiple vouchers given
-    $a_vouchers_received = split("[\t\n\r ]+",$voucher_received); 
+    $a_vouchers_received = preg_split("/[\t\n\r ]+/",$voucher_received); 
     $error = 0;
     $test_result = array();     // used to display for voucher test option in GUI
     $total_minutes = 0;
@@ -385,7 +385,6 @@ function voucher_unlink_db($roll) {
 /* we share the log with captiveportal for now */
 function voucher_log($priority, $message) {
 
-    define_syslog_variables();
     $message = trim($message);
     openlog("logportalauth", LOG_PID, LOG_LOCAL4);
     syslog($priority, "Voucher: " . $message);
@@ -410,7 +409,7 @@ function voucher_save_db_to_config() {
     // walk all active rolls and save runtime DB's to flash
     $a_roll = &$config['voucher']['roll'];
 //    foreach ($a_roll as $rollent) {
-    while (list($key, $value) = each($a_roll)) {
+    foreach ($a_roll as $key => $value) {
         $rollent = &$a_roll[$key];
         $roll = $rollent['number'];
         $bitmask = voucher_read_used_db($roll);

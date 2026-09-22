@@ -171,7 +171,7 @@ if ($clientmac && portal_mac_fixed($clientmac)) {
     // $timecredit contains either a credit in minutes or an error message
     if ($timecredit > 0) {  // voucher is valid. Remaining minutes returned
         // if multiple vouchers given, use the first as username
-        $a_vouchers = split("[\t\n\r ]+",$voucher);
+        $a_vouchers = preg_split("/[\t\n\r ]+/",$voucher);
         $voucher = $a_vouchers[0];
         $attr = array( 'voucher' => 1,
                 'session_timeout' => $timecredit*60,

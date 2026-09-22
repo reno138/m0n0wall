@@ -590,7 +590,7 @@ function ndp_get_mac_by_ip($ip) {
 	exec("/usr/sbin/ndp -n {$ip}", $ndpoutput);
 	
 	if ($ndpoutput[1]) {
-		$ndpi = explode(" ", eregi_replace(" +", " ",$ndpoutput[1]));
+		$ndpi = explode(" ", preg_replace("/ +/", " ",$ndpoutput[1]));
 		$macaddr =  $ndpi[1];
 		if (is_macaddr($macaddr))
 			return $macaddr;

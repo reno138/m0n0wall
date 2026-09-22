@@ -123,7 +123,7 @@ if (isset($_POST['del_x']) && is_array($_POST['entries'])) {
                   </td>
                   <td class="listr">
                     <?php 
-						list($beginport, $endport) = split("-", $natent['external-port']);
+						list($beginport, $endport) = explode("-", $natent['external-port']);
 						if ((!$endport) || ($beginport == $endport)) {
 				  			echo $beginport;
 							if ($wkports[$beginport])

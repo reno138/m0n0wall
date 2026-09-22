@@ -196,7 +196,7 @@ if (ipv6enabled()){
 	array_shift($ndprawdata);
 	
 	foreach ($ndprawdata as $line) {
-		$elements = explode(" ", eregi_replace(" +", " ",$line));
+		$elements = explode(" ", preg_replace("/ +/", " ",$line));
 		//check if linklocal and remove %if		
 		$ip6element = explode("%", $elements[0]);
 		

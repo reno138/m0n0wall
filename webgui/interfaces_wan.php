@@ -402,7 +402,7 @@ function type_change() {
                 <tr> 
                   <td valign="middle"><strong>Type</strong></td>
                   <td><select name="type" class="formfld" id="type" onchange="type_change()">
-                      <?php $opts = split(" ", "Static DHCP PPPoE PPTP Modem");
+                      <?php $opts = explode(" ", "Static DHCP PPPoE PPTP Modem");
 				foreach ($opts as $opt): ?>
                       <option <?php if ($opt == $pconfig['type']) echo "selected";?>> 
                       <?=htmlspecialchars($opt);?>

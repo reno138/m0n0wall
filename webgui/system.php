@@ -69,8 +69,8 @@ if ($_POST) {
 	$pconfig = $_POST;
 
 	/* input validation */
-	$reqdfields = split(" ", "hostname domain username");
-	$reqdfieldsn = split(",", "Hostname,Domain,Username");
+	$reqdfields = explode(" ", "hostname domain username");
+	$reqdfieldsn = explode(",", "Hostname,Domain,Username");
 	
 	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	

@@ -866,7 +866,6 @@ function captiveportal_logportalauth($user,$mac,$ip,$status, $message = null) {
 
 /* log simple messages to syslog */
 function captiveportal_syslog($message) {
-    define_syslog_variables();
     $message = trim($message);
     openlog("logportalauth", LOG_PID, LOG_LOCAL4);
     // Log it

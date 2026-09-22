@@ -986,7 +986,7 @@ class Auth_RADIUS_Acct extends Auth_RADIUS
         if (isset($_SERVER)) {
             $var = &$_SERVER;
         } else {
-            $var = &$GLOBALS['HTTP_SERVER_VARS'];
+            $var = $_SERVER;
         }
 
         $this->session_id = sprintf("%s:%d-%s", isset($var['REMOTE_ADDR']) ? $var['REMOTE_ADDR'] : '127.0.0.1' , getmypid(), get_current_user());

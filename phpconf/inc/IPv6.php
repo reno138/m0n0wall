@@ -125,7 +125,7 @@ class Net_IPv6 {
      * @access public
      * @static
      */
-    function removeNetmaskSpec($ip) {
+    static function removeNetmaskSpec($ip) {
         $addr = $ip;
         if(false !== strpos($ip, '/')) {
             $elements = explode('/', $ip);
@@ -145,7 +145,7 @@ class Net_IPv6 {
      * @access public
      * @static
      */
-    function getNetmaskSpec($ip) {
+    static function getNetmaskSpec($ip) {
         $spec = '';
         if(false !== strpos($ip, '/')) {
             $elements = explode('/', $ip);
@@ -170,7 +170,7 @@ class Net_IPv6 {
      * @access public
      * @static
      */
-    function getNetmask($ip, $bits = null) {
+    static function getNetmask($ip, $bits = null) {
         if(null==$bits) {
             $elements = explode('/', $ip);
             if(2 == count($elements)) {
@@ -204,7 +204,7 @@ class Net_IPv6 {
      * @access public
      * @static
      */
-    function isInNetmask($ip, $netmask, $bits=null) {
+    static function isInNetmask($ip, $netmask, $bits=null) {
         // try to get the bit count
         if(null == $bits) {
             $elements = explode('/', $ip);
@@ -259,7 +259,7 @@ class Net_IPv6 {
      * @see NET_IPV6_LOCAL_SITE
      * @see NET_IPV6_UNKNOWN_TYPE
      */
-    function getAddressType($ip) {
+    static function getAddressType($ip) {
         $ip = Net_IPv6::removeNetmaskSpec($ip);
         $binip = Net_IPv6::_ip2Bin($ip);
         if(0 == strncmp('1111111010', $binip, 10)) {
@@ -317,7 +317,7 @@ class Net_IPv6 {
      * @param string $ip	a valid IPv6-adress (hex format)
      * @return string	the uncompressed IPv6-adress (hex format)
 	 */
-    function Uncompress($ip) {
+    static function Uncompress($ip) {
         $netmask = Net_IPv6::getNetmaskSpec($ip);
         $uip = Net_IPv6::removeNetmaskSpec($ip);
 
@@ -389,7 +389,7 @@ class Net_IPv6 {
      * @return string	the compressed IPv6-adress (hex format)
      * @author elfrink at introweb dot nl
      */
-    function Compress($ip)	{
+    static function Compress($ip)	{
 
         $netmask = Net_IPv6::getNetmaskSpec($ip);
         $ip = Net_IPv6::removeNetmaskSpec($ip);
@@ -434,7 +434,7 @@ class Net_IPv6 {
      * @param string $ip	a valid IPv6-adress (hex format)
      * @return array		[0] contains the IPv6 part, [1] the IPv4 part (hex format)
      */
-    function SplitV64($ip) {
+    static function SplitV64($ip) {
         $ip = Net_IPv6::removeNetmaskSpec($ip);
         $ip = Net_IPv6::Uncompress($ip);
         if (strstr($ip, '.')) {
@@ -460,14 +460,14 @@ class Net_IPv6 {
      * @param string $ip	a valid IPv6-adress
      * @return boolean	true if $ip is an IPv6 adress
      */
-    function checkIPv6($ip) {
+    static function checkIPv6($ip) {
         $ip = Net_IPv6::removeNetmaskSpec($ip);
         $ipPart = Net_IPv6::SplitV64($ip);
         $count = 0;
         if (!empty($ipPart[0])) {
             $ipv6 =explode(':', $ipPart[0]);
             for ($i = 0; $i < count($ipv6); $i++) {
-                $dec = hexdec($ipv6[$i]);
+                $dec = ctype_xdigit($ipv6[$i]) ? hexdec($ipv6[$i]) : -1;
                 $hex = strtoupper(preg_replace("/^[0]{1,3}(.*[0-9a-fA-F])$/", "\\1", $ipv6[$i]));
                 if ($ipv6[$i] >= 0 && $dec <= 65535 && $hex == strtoupper(dechex($dec))) {
                     $count++;
@@ -479,7 +479,7 @@ class Net_IPv6 {
                 $ipv4 = explode('.',$ipPart[1]);
                 $count = 0;
                 for ($i = 0; $i < count($ipv4); $i++) {
-                    if ($ipv4[$i] >= 0 && (integer)$ipv4[$i] <= 255 && preg_match("/^\d{1,3}$/", $ipv4[$i])) {
+                    if ($ipv4[$i] >= 0 && (int)$ipv4[$i] <= 255 && preg_match("/^\d{1,3}$/", $ipv4[$i])) {
                         $count++;
                     }
                 }
@@ -506,7 +506,7 @@ class Net_IPv6 {
      * @access private
      @ @since 1.1.0
      */
-    function _ip2Bin($ip) {
+    static function _ip2Bin($ip) {
         $binstr = '';
         $ip = Net_IPv6::removeNetmaskSpec($ip);
         $ip = Net_IPv6::Uncompress($ip);
@@ -529,7 +529,7 @@ class Net_IPv6 {
      * @access private
      @ @since 1.1.0
      */
-    function _bin2Ip($bin) {
+    static function _bin2Ip($bin) {
         $ip = "";
         if(strlen($bin)<128) {
             $bin = str_pad($bin, 128, '0', STR_PAD_LEFT);
@@ -543,18 +543,16 @@ class Net_IPv6 {
         return $ip;
     }
 
-	function pstr_split($string,$string_length=1)
+	static function pstr_split($string,$string_length=1)
 	{
-        if($string >= 1) {
-            do {
-                $c = strlen($string);
-                $parts[] = substr($string,0,$string_length);
-                $string = substr($string,$string_length);
-            } while($string !== false);
-        } else {
-            $parts = false;
+        /* Was a PHP 4 stand-in for str_split(), which arrived in PHP 5.0. The
+           original terminated on substr() returning false; since PHP 8.0
+           substr() returns "" instead, so that loop never ended. Delegate to
+           the native function, which has the identical contract. */
+        if ($string === '' || $string_length < 1) {
+            return false;
         }
-        return $parts;
+        return str_split($string, $string_length);
     }
 
     // }}}

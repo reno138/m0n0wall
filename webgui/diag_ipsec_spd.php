@@ -53,7 +53,7 @@ if (isset($_POST['del_x']) && is_array($_POST['entries'])) {
 	$fd = @popen("/usr/local/sbin/setkey -c > /dev/null 2>&1", "w");
 	if ($fd) {
 		foreach ($_POST['entries'] as $entry) {
-			list ($src,$dst,$dir) = split(";", $entry);
+			list ($src,$dst,$dir) = explode(";", $entry);
 			fwrite($fd, "spddelete $src $dst any -P $dir ;\n");
 		}
 		pclose($fd);

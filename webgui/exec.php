@@ -64,7 +64,7 @@ if (($_POST['submit'] == "Download") && file_exists($_POST['dlPath'])) {
 // Function: is Blank
 // Returns true or false depending on blankness of argument.
 
-function isBlank( $arg ) { return ereg( "^\s*$", $arg ); }
+function isBlank( $arg ) { return preg_match( '/^\s*$/', $arg ); }
 
 
 // Function: Puts
@@ -76,7 +76,7 @@ function puts( $arg ) { echo "$arg\n"; }
 // "Constants".
 
 $Version    = '';
-$ScriptName = $HTTP_SERVER_VARS['SCRIPT_NAME'];
+$ScriptName = $_SERVER['SCRIPT_NAME'];
 $Title      = 'm0n0wall: execute command';
 
 // Get year.
