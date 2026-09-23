@@ -724,6 +724,14 @@ class PEAR
             } else {
                 $suffix = '.so';
             }
+            /* dl() exists only in the CLI SAPI. In php-cgi it is undefined and
+               the call is a fatal error -- which took every webGUI page down,
+               because radius.inc runs PEAR::loadExtension('radius') at load
+               time and is required by captiveportal.inc on every entry point.
+               Loading extensions at runtime is pointless on a read-only
+               image anyway: what php.ini lists is what there is. */
+            if (!function_exists('dl'))
+                return false;
             return @dl('php_'.$ext.$suffix) || @dl($ext.$suffix);
         }
         return true;

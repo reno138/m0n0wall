@@ -28,8 +28,9 @@
 	POSSIBILITY OF SUCH DAMAGE.
 */
 
-/* make sure nothing is cached */
-if (!$omit_nocacheheaders) {
+/* make sure nothing is cached. empty(), not !: only three pages define
+   $omit_nocacheheaders, and a warning here is output BEFORE header(). */
+if (empty($omit_nocacheheaders)) {
 	header("Expires: 0");
 	header("Last-Modified: " . gmdate("D, d M Y H:i:s") . " GMT");
 	header("Cache-Control: no-store, no-cache, must-revalidate");

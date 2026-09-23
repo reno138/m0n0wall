@@ -52,7 +52,7 @@ function dump_clog($logfile, $tail, $withorig = true) {
 	exec("/usr/bin/tail {$sor} -n " . $tail . " " . escapeshellarg($logfile), $logarr);
 	
 	foreach ($logarr as $logent) {
-		$logent = preg_split("/\s+/", $logent, 6);
+		$logent = array_pad(preg_split("/\s+/", $logent, 6), 6, "");	/* short lines (continuations) */
 		echo "<tr valign=\"top\">\n";
 		
 		if ($withorig) {

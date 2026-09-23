@@ -130,16 +130,13 @@ defCmdT("Kernel parameters", "/sbin/sysctl -a");
 defCmdT("Kernel modules loaded", "/sbin/kldstat");
 
 defCmdT("ipfw show", "/sbin/ipfw show");
-defCmdT("ipnat -lv", "/sbin/ipnat -lv");
-defCmdT("ipfstat -v", "/sbin/ipfstat -v");
-defCmdT("ipfstat -nio", "/sbin/ipfstat -nio");
-if (ipv6enabled())
-	defCmdT("ipfstat -6 -nio", "/sbin/ipfstat -6 -nio");
+defCmdT("pfctl -si -vv (status and counters)", "/sbin/pfctl -si -vv");
+defCmdT("pfctl -sr -vv (filter rules)", "/sbin/pfctl -sr -vv");
+defCmdT("pfctl -sn -vv (NAT rules)", "/sbin/pfctl -sn -vv");
+defCmdT("pfctl -s Tables -vv", "/sbin/pfctl -s Tables -vv");
+defCmdT("pfctl -ss (states)", "/sbin/pfctl -ss");
 
-defStrT("unparsed ipnat rules", filter_nat_rules_generate());
-defStrT("unparsed ipfilter rules", filter_rules_generate());
-if (ipv6enabled())
-	defStrT("unparsed IPv6 ipfilter rules", filter_rules_generate_ipv6());
+defCmdT("pf.conf as loaded", "/bin/cat /var/etc/pf.conf");
 defStrT("unparsed ipfw rules", shaper_rules_generate());
 
 defCmdT("resolv.conf","cat /etc/resolv.conf");

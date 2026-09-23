@@ -107,6 +107,8 @@ cp /etc/pf.os etc/ || { echo "ERROR: /etc/pf.os missing on the build host"; exit
 [ -f "$SRC/build/files/mpd-modem.script" ]  && cp "$SRC/build/files/mpd-modem.script" etc/mpd-modem/mpd.script
 # Log rotation replaces the old circular-log scheme -- see the file's header.
 [ -f "$SRC/build/files/newsyslog.conf" ]    && cp "$SRC/build/files/newsyslog.conf" etc/
+# After the tarball on purpose: it replaces the clog-era syslog.conf in there.
+[ -f "$SRC/build/files/syslog.conf" ]       && cp "$SRC/build/files/syslog.conf" etc/
 
 echo "Populating the base system from the manifest..."
 perl "$SRC/build/minibsd/mkmini.pl" "$SRC/build/minibsd/m0n0wall.files" / "$FS/"

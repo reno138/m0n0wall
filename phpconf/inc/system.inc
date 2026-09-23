@@ -70,6 +70,8 @@ function enable_cpuhwcrypto() {
 
 /* Additional kernel modules that have been activated */
 function load_kernel_modules() {
+	global $config;
+
 	/* Load Ralink firmware */
 	if (isset($config['system']['ralink'])) {
 		mwexec("/sbin/kldload runfw");
@@ -295,7 +297,10 @@ function system_syslogd_start() {
 			
 	if (isset($syslogcfg['enable'])) {
 
-		/* write syslog.conf */
+		/* write syslog.conf. Plain file targets: the leading '%' the original
+		   used marked a clog circular log, which only m0n0wall's patched syslogd
+		   understood. Stock syslogd reads '%/var/log/x' as a USER NAME and every
+		   message silently went nowhere. newsyslog rotates the files now. */
 		$fd = fopen("{$g['varetc_path']}/syslog.conf", "w");
 		if (!$fd) {
 			printf("Error: cannot open syslog.conf in system_syslogd_start().\n");
@@ -311,13 +316,13 @@ function system_syslogd_start() {
 			$syslogserver .= ":" . $syslogcfg['remoteport'];
 		
 		$syslogconf = <<<EOD
-local0.*					%/var/log/filter.log
-local3.*					%/var/log/vpn.log
-local4.*					%/var/log/portalauth.log
-local7.*					%/var/log/dhcpd.log
-*.notice;kern.debug;lpr.info;mail.crit;news.err;daemon.none;local0.none;local3.none;local4.none;local6.none;local7.none %/var/log/system.log
-security.*					%/var/log/system.log
-auth.info;authpriv.info;daemon.info		%/var/log/system.log
+local0.*					/var/log/filter.log
+local3.*					/var/log/vpn.log
+local4.*					/var/log/portalauth.log
+local7.*					/var/log/dhcpd.log
+*.notice;kern.debug;lpr.info;mail.crit;news.err;daemon.none;local0.none;local3.none;local4.none;local6.none;local7.none /var/log/system.log
+security.*					/var/log/system.log
+auth.info;authpriv.info;daemon.info		/var/log/system.log
 *.emerg						*
 
 EOD;

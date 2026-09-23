@@ -30,6 +30,7 @@
 
 /* include globals/utility/XML parser files */
 require_once("globals.inc");
+require_once("php8compat.inc");	/* first: every entry point comes through here */
 require_once("util.inc");
 require_once("xmlparse.inc");
 require_once("functions.inc");

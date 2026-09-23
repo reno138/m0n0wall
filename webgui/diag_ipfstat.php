@@ -31,413 +31,317 @@
 
 $pgtitle = array("Diagnostics", "Firewall states");
 require("guiconfig.inc");
-?>
-<?php
 
-flush();
+/*
+ * pf states, from pfctl -vss. Same page as the ipfilter version -- IPv4/IPv6
+ * tabs, click an address to filter on it, sortable columns, the row limit
+ * from System: Advanced, and the packets/bytes snapshot delta -- with one
+ * addition, the pf state (ESTABLISHED:ESTABLISHED, NO_TRAFFIC:SINGLE ...).
+ *
+ * ipfstat printed one tab-separated line per state. pfctl prints a state
+ * line followed by one (udp, icmp) or two (tcp) indented detail lines:
+ *
+ *   all tcp 192.0.2.240:65420 -> 192.0.2.30:8765       FIN_WAIT_2:FIN_WAIT_2
+ *      [2496804046 + 65536] wscale 8  [1289104897 + 65792] wscale 10
+ *      age 00:00:02, expires in 00:01:28, 6:6 pkts, 394:2525 bytes, rule 12
+ *
+ * "<-" marks a state created by an inbound packet, and pfctl then prints the
+ * local end first, so the endpoints are reversed to keep Source on the left.
+ * A state through NAT has three endpoints; the outer two are shown. IPv6
+ * ports are printed in brackets: 2001:db8::1[53]. Packets and bytes are the
+ * in:out pair summed, as ipfstat's single figures were; TTL is pf's
+ * "expires in".
+ */
 
-function natsort2d( &$arrIn, $index = null )
+function natsort2d(&$arrIn, $index = null)
 {
-   
-   $arrTemp = array();
-   $arrOut = array();
-   
-   if (is_array($arrIn)) {
-	   foreach ( $arrIn as $key=>$value ) {
-		   
-		   reset($value);
-		   $arrTemp[$key] = is_null($index)
-							   ? current($value)
-							   : $value[$index];
-	   }
-   }
-   
-   natsort($arrTemp);
-   
-   foreach ( $arrTemp as $key=>$value ) {
-       $arrOut[$key] = $arrIn[$key];
-   }
-   
-   $arrIn = $arrOut;
-   
-}
+	$arrTemp = array();
+	$arrOut = array();
 
-// sfilter and dfilter allow setting of source and dest IP filters
-// on the output.  $filterPassThru allows these source and dest 
-// filters to be passed on in the column sorting links.
-if (($_GET['sfilter']) or ($_GET['dfilter'])) {
-	
-	$filter = '';
-	if ($_GET['sfilter']) {
-		if (is_ipaddr4or6($_GET['sfilter'])) {
-			$filter = ' -S ' . $_GET['sfilter'];
-			$filterPassThru = '&sfilter=' . urlencode($_GET['sfilter']);
-		}
-		else 
-			unset ($_GET['sfilter']);
-	}
-	if ($_GET['dfilter']) {
-		if (is_ipaddr4or6($_GET['dfilter']))
-		{
-			$filter = ' -D ' . $_GET['dfilter'];
-			$filterPassThru = '&dfilter=' . urlencode($_GET['dfilter']);
-		}
-		else 
-			unset ($_GET['dfilter']);
-	}
-	
-}
-
-if ($_GET['ip']=='6') {
-	$fd = popen("/sbin/ipfstat -t -6" . $filter, "r");
-	$filterPassThru .= "&ip=6";
-} else {
-	$fd = popen("/sbin/ipfstat -t " . $filter, "r");
-}
-
-// See if the user has set a limit to the number of entries...  
-if (isset($config['diag']['ipfstatentries']))
-	$linelimit = $config['diag']['ipfstatentries']; 
-else
-	$linelimit = 300;
-
-$count = 0;
-while (!feof($fd)) {
-	$line = trim(fgets($fd));
-	if (!$line)
-		continue;
-	
-//Source IP             Destination IP         ST   PR   #pkts    #bytes       ttl
-//68.16.26.144,1633     167.219.90.224,443    4/4  tcp  366724 370351656   2:30:00
-//      0                        1              2   3      4       5          6
-	$split = explode("\t", trim($line));				
-	$srcTmp = $split[0];
-	$data[$count]['srcip'] = stripPort($srcTmp);
-	$data[$count]['srcport'] = stripPort($srcTmp,true);
-	$dstTmp = $split[1];
-	$data[$count]['dstip'] = stripPort($dstTmp);
-	$data[$count]['dstport'] = stripPort($dstTmp,true);
-	$data[$count]['protocol'] = $split[3];
-	$data[$count]['packets'] = $split[4];
-	$data[$count]['bytes'] = $split[5];
-	$timeTmp = trim($split[6]);
-	$timeLen = strlen($timeTmp);
-	switch ($timeLen) {
-	case 4: 
-		$data[$count]['ttl'] = strtotime("0:0".$timeTmp);
-		break;
-	case 5: 
-		$data[$count]['ttl'] = strtotime("0:".$timeTmp);
-		break;
-	case 7: 
-		$data[$count]['ttl'] = strtotime($timeTmp);
-		break;
-	default :
-	// Debug logic, in case there is an unforseen issue
-		/*echo $line . "<br>";
-		echo $linelimit . "<br>";
-		echo $timeTmp . "<br>";*/
-		break;
-	}
-	$count++;
-	if ($linelimit == $count) {
-		// We've got all the data the user wanted to see - drop out of the foreach.
-		break;
-	}
-}
-
-pclose($fd);
-
-// Clear the statistics snapshot files, which track the packets and bytes of connections
-
-if (isset($_GET['clear']))
-{
-	if ($_GET['ip']=='6') {
-		if (file_exists('/tmp/packets6'))
-			unlink('/tmp/packets6');
-		if (file_exists('/tmp/bytes6'))
-			unlink('/tmp/bytes6');
-	} else {
-		if (file_exists('/tmp/packets'))
-			unlink('/tmp/packets');
-		if (file_exists('/tmp/bytes'))
-			unlink('/tmp/bytes');
-	}
-		
-	// Redirect so we don't hit "clear" every time we refresh the screen.
-	header("Location: diag_ipfstat.php?".$filterPassThru);
-	exit;
-}
-
-// Create a new set of stats snapshot files
-if (isset($_GET['new']))
-{
-	$packets = array();
-	$bytes = array();
-	
-	// Create variables to let us later quickly access this data
-	if (is_array($data)) {
-		foreach ($data as $row) {
-			$packets[$row['srcip']][$row['srcport']][$row['dstip']][$row['dstport']][$row['protocol']] = $row['packets'];
-			$bytes[$row['srcip']][$row['srcport']][$row['dstip']][$row['dstport']][$row['protocol']] = $row['bytes'];
+	if (is_array($arrIn)) {
+		foreach ($arrIn as $key => $value) {
+			reset($value);
+			$arrTemp[$key] = is_null($index) ? current($value) : $value[$index];
 		}
 	}
 
-	// Write the files out
-	writeStats("packets",$packets);
-	writeStats("bytes",$bytes);
-	
-	// If we're in view mode, pass that on.
-	if (isset($_GET['view']))
-		$filterPassThru .= "&view=1";
-	
-	// Redirect so we don't hit "new" every time we refresh the screen.
-	header("Location: diag_ipfstat.php?order=bytes&sort=des".$filterPassThru);
-	exit;
+	natsort($arrTemp);
+
+	foreach ($arrTemp as $key => $value)
+		$arrOut[$key] = $arrIn[$key];
+
+	$arrIn = $arrOut;
 }
-	
-// View the delta from the last snapshot against the current data.
-if (isset($_GET['view']))
-{
 
-	// Read the stats data files
-	readStats("packets",$packets);
-	readStats("bytes",$bytes);
+/* "192.0.2.30:8765" -> (192.0.2.30, 8765); "2001:db8::1[53]" -> (2001:db8::1, 53);
+   no port -> (addr, "") */
+function pf_split_endpoint($s) {
+	if (($p = strrpos($s, '[')) !== false)
+		return array(substr($s, 0, $p), rtrim(substr($s, $p + 1), ']'));
+	if (substr_count($s, ':') == 1) {
+		$p = strpos($s, ':');
+		return array(substr($s, 0, $p), substr($s, $p + 1));
+	}
+	return array($s, "");
+}
 
-	if (is_array($data)) {
-		foreach ($data as $key => $row) {
-			if (isset($packets[$row['srcip']][$row['srcport']][$row['dstip']][$row['dstport']][$row['protocol']]))
-			{
-				if (isset($bytes[$row['srcip']][$row['srcport']][$row['dstip']][$row['dstport']][$row['protocol']]))
-				{
-					$tempPackets = $data[$key]['packets'] - $packets[$row['srcip']][$row['srcport']][$row['dstip']][$row['dstport']][$row['protocol']];
-					$tempBytes = $data[$key]['bytes'] - $bytes[$row['srcip']][$row['srcport']][$row['dstip']][$row['dstport']][$row['protocol']];
-					if (($tempPackets > -1) && ($tempBytes > -1))
-					{
-						$data[$key]['packets'] = $tempPackets;
-						$data[$key]['bytes'] = $tempBytes;
-					}
-				}
+/* "01:02:03" -> seconds; hours may exceed 24 */
+function pf_hms_to_seconds($t) {
+	$secs = 0; $mult = 1;
+	foreach (array_reverse(explode(':', $t)) as $part) {
+		$secs += (int)$part * $mult;
+		$mult *= 60;
+	}
+	return $secs;
+}
+
+function pf_seconds_to_hms($s) {
+	return sprintf("%d:%02d:%02d", intdiv($s, 3600), intdiv($s % 3600, 60), $s % 60);
+}
+
+/* All states of one address family, as rows the rest of the page understands. */
+function pf_states_read($want6) {
+	exec("/sbin/pfctl -vss 2>/dev/null", $out);
+
+	$states = array();
+	$cur = null;		/* row being assembled; false while skipping the other family */
+
+	foreach ($out as $line) {
+		if ($line === "")
+			continue;
+		if ($line[0] != ' ' && $line[0] != "\t") {
+			if (is_array($cur))
+				$states[] = $cur;
+			$cur = false;
+
+			$f = preg_split('/\s+/', trim($line));
+			if (count($f) < 5)
+				continue;
+			$iface = array_shift($f);
+			$proto = array_shift($f);
+			$state = array_pop($f);
+
+			$eps = array(); $inbound = false;
+			foreach ($f as $tok) {
+				if ($tok == '->') continue;
+				if ($tok == '<-') { $inbound = true; continue; }
+				$eps[] = $tok;
 			}
-			
+			if (count($eps) < 2)
+				continue;
+			if ($inbound)
+				$eps = array_reverse($eps);
+
+			list($sip, $sport) = pf_split_endpoint($eps[0]);
+			list($dip, $dport) = pf_split_endpoint($eps[count($eps) - 1]);
+			if ((strpos($sip, ':') !== false) != $want6)
+				continue;
+
+			$cur = array('srcip' => $sip, 'srcport' => $sport, 'dstip' => $dip, 'dstport' => $dport,
+			             'protocol' => $proto, 'state' => $state, 'iface' => $iface,
+			             'packets' => 0, 'bytes' => 0, 'ttl' => 0, 'age' => 0);
+		} else if (is_array($cur) &&
+		           preg_match('/age ([\d:]+), expires in ([\d:]+), (\d+):(\d+) pkts, (\d+):(\d+) bytes/', $line, $m)) {
+			$cur['age']     = pf_hms_to_seconds($m[1]);
+			$cur['ttl']     = pf_hms_to_seconds($m[2]);
+			$cur['packets'] = $m[3] + $m[4];
+			$cur['bytes']   = $m[5] + $m[6];
 		}
 	}
-	
+	if (is_array($cur))
+		$states[] = $cur;
+
+	return $states;
+}
+
+$is6     = (($_GET['ip'] ?? '') == '6');
+$ipArg   = $is6 ? '&ip=6' : '';
+$order   = $_GET['order'] ?? '';
+$sort    = $_GET['sort'] ?? '';
+$sfilter = $_GET['sfilter'] ?? '';
+$dfilter = $_GET['dfilter'] ?? '';
+$viewing = isset($_GET['view']);
+
+/* sfilter and dfilter filter on source and destination address; $filterPassThru
+   carries them (and the family) through every link on the page */
+$filterPassThru = $ipArg;
+if ($sfilter != '' && !is_ipaddr4or6($sfilter)) $sfilter = '';
+if ($dfilter != '' && !is_ipaddr4or6($dfilter)) $dfilter = '';
+if ($sfilter != '') $filterPassThru .= '&sfilter=' . urlencode($sfilter);
+if ($dfilter != '') $filterPassThru .= '&dfilter=' . urlencode($dfilter);
+
+$linelimit = !empty($config['diag']['ipfstatentries']) ? (int)$config['diag']['ipfstatentries'] : 300;
+
+$data = array();
+foreach (pf_states_read($is6) as $st) {
+	if ($sfilter != '' && $st['srcip'] != $sfilter) continue;
+	if ($dfilter != '' && $st['dstip'] != $dfilter) continue;
+	$data[] = $st;
+	if (count($data) >= $linelimit)
+		break;
+}
+
+/* --- packets/bytes snapshot: files hold a serialized map keyed by the 5-tuple --- */
+function snapshot_file($fname) {
+	global $is6;
+	return "/tmp/" . $fname . ($is6 ? "6" : "");
+}
+function writeStats($fname, &$data) {
+	@file_put_contents(snapshot_file($fname), serialize($data));
+}
+function readStats($fname, &$data) {
+	$data = array();
+	$f = snapshot_file($fname);
+	if (file_exists($f))
+		$data = unserialize(file_get_contents($f));
+	if (!is_array($data))
+		$data = array();
+}
+
+if (isset($_GET['clear'])) {
+	@unlink(snapshot_file("packets"));
+	@unlink(snapshot_file("bytes"));
+	header("Location: diag_ipfstat.php?" . ltrim($filterPassThru, '&'));
+	exit;
+}
+
+if (isset($_GET['new'])) {
+	$packets = array(); $bytes = array();
+	foreach ($data as $row) {
+		$packets[$row['srcip']][$row['srcport']][$row['dstip']][$row['dstport']][$row['protocol']] = $row['packets'];
+		$bytes[$row['srcip']][$row['srcport']][$row['dstip']][$row['dstport']][$row['protocol']] = $row['bytes'];
+	}
+	writeStats("packets", $packets);
+	writeStats("bytes", $bytes);
+	if ($viewing)
+		$filterPassThru .= "&view=1";
+	header("Location: diag_ipfstat.php?order=bytes&sort=des" . $filterPassThru);
+	exit;
+}
+
+$viewPassThru = "";
+if ($viewing) {
+	readStats("packets", $packets);
+	readStats("bytes", $bytes);
+	foreach ($data as $key => $row) {
+		$p = $packets[$row['srcip']][$row['srcport']][$row['dstip']][$row['dstport']][$row['protocol']] ?? null;
+		$b = $bytes[$row['srcip']][$row['srcport']][$row['dstip']][$row['dstport']][$row['protocol']] ?? null;
+		if ($p !== null && $b !== null && $row['packets'] - $p > -1 && $row['bytes'] - $b > -1) {
+			$data[$key]['packets'] = $row['packets'] - $p;
+			$data[$key]['bytes']   = $row['bytes'] - $b;
+		}
+	}
 	$filterPassThru .= "&view=1";
 	$viewPassThru = "&view=1";
 }
 
-// Sort it by the selected order
-if ($_GET['order']) {
-	natsort2d($data,$_GET['order']);
-	if ($_GET['sort'])
-	{
-		if ($_GET['sort'] == "des")
+if ($order != '' && in_array($order, array('srcip','srcport','dstip','dstport','protocol','state','packets','bytes','ttl'))) {
+	natsort2d($data, $order);
+	if ($sort == "des")
 		$data = array_reverse($data);
-	}
-}
-
-
-
-function writeStats($fname, &$data) {
-	if ($_GET['ip']=='6') {
-		$fname = "/tmp/" . $fname . "6";
-	} else {
-		$fname = "/tmp/" . $fname;
-	}
-	if (file_exists($fname))
-		unlink($fname);
-	$file = fopen($fname, 'a');
-	fwrite($file, serialize($data)); 
-	fclose($file);
-}
-
-function readStats($fname, &$data) {
-	if ($_GET['ip']=='6') {
-		$fname = "/tmp/" . $fname . "6";
-	} else {
-		$fname = "/tmp/" . $fname;
-	}
-	if (file_exists($fname))
-	{
-		$file = fopen($fname,'r');
-		$data = unserialize(fread($file, filesize($fname)));
-		fclose($file);			
-	}
 }
 
 function sortOrder($column) {
-	
-	if ($_GET['order'] == $column) {
-		if ($_GET['sort'] == 'des')
-			return "&amp;sort=asc";	
+	global $order, $sort;
+	if ($order == $column && $sort != 'des')
 		return "&amp;sort=des";
-	}
-	else 
-		return "&amp;sort=asc";	
-}
-
-function stripPort($ip, $showPort = false) {
-	if (!$showPort) {
-		if (strpos($ip,',') > 0)
-			return substr($ip,0,strpos($ip,","));
-		else 
-			return ($ip);
-	}
-	else {
-		if (strpos($ip,',') > 0) {
-			return substr($ip,(strpos($ip,",")+1));
-		}
-		else 
-			return "&nbsp;";
-	}
+	return "&amp;sort=asc";
 }
 
 function displayIP($ip, $col) {
-	
-	global $viewPassThru;
-	
-	switch ($col) {
-		case 'srcip':
-			if ($_GET['sfilter']) {
-				if ($_GET['sfilter'] == $ip)
-					return $ip;
-			}
-			else {
-				if ($_GET['ip']=='6') {
-					return '<a href="?ip=6&sfilter='.$ip.$viewPassThru.'">'. $ip .'</a>';
-				} else {
-					return '<a href="?sfilter='.$ip.$viewPassThru.'">'. $ip .'</a>';
-				}
-			}
-			break;
-	
-		case 'dstip':
-			if ($_GET['dfilter']) {
-				if ($_GET['dfilter'] == $ip)
-					return $ip;				
-			}
-			else {
-				if ($_GET['ip']=='6') {
-					return '<a href="?ip=6&dfilter='.$ip.$viewPassThru.'">'. $ip .'</a>';
-				} else {
-					return '<a href="?dfilter='.$ip.$viewPassThru.'">'. $ip .'</a>';
-				}
-			}			
-			break;
+	global $viewPassThru, $sfilter, $dfilter, $ipArg;
+	$h = htmlspecialchars($ip);
+	if ($col == 'srcip') {
+		if ($sfilter != '') return $h;
+		return '<a href="?' . ltrim($ipArg, '&') . ($ipArg ? '&amp;' : '') . 'sfilter=' . urlencode($ip) . htmlspecialchars($viewPassThru) . '">' . $h . '</a>';
 	}
-	
+	if ($dfilter != '') return $h;
+	return '<a href="?' . ltrim($ipArg, '&') . ($ipArg ? '&amp;' : '') . 'dfilter=' . urlencode($ip) . htmlspecialchars($viewPassThru) . '">' . $h . '</a>';
 }
 
-// Get timestamp of snapshot file, if it exists, for display later.
-if ($_GET['ip']=='6') {
-	$fname = "/tmp/packets6";
-} else {
-	$fname = "/tmp/packets";
-}
-if (!(file_exists($fname))) {
-	$lastSnapshot = "Never"; 
-}
-else { 
-	$lastSnapshot = strftime("%m/%d/%y %H:%M:%S",filectime($fname));
-}
+$snap = snapshot_file("packets");
+$lastSnapshot = file_exists($snap) ? date("m/d/y H:i:s", filectime($snap)) : "Never";
 
-// Moved this down here due to the potential for redirects, up above.
 include("fbegin.inc");
-
-// Produce proper HTML
 $filterPassThru = str_replace("&", "&amp;", $filterPassThru);
-if (ipv6enabled()) {
-
+if (ipv6enabled()):
 ?>
 	<table width="100%" border="0" cellpadding="0" cellspacing="0" summary="tab pane">
 	  <tr><td class="tabnavtbl">
 	  <ul id="tabnav">
-<?php
-if ($_GET['ip'] == '6') { 
-?>
+<?php if ($is6): ?>
 	    <li class="tabinact1"><a href="diag_ipfstat.php">IPv4</a></li>
-		<li class="tabact">IPv6</li>
-<?php 
-} else {
-?>
+	    <li class="tabact">IPv6</li>
+<?php else: ?>
 	    <li class="tabact">IPv4</li>
-		<li class="tabinact1"><a href="diag_ipfstat.php?ip=6">IPv6</a></li>	
-	<?php	
-}
-?>
+	    <li class="tabinact1"><a href="diag_ipfstat.php?ip=6">IPv6</a></li>
+<?php endif; ?>
 	  </ul>
 	  </td></tr>
-	  <tr> 
+	  <tr>
 	    <td class="tabcont">
-<?php
-}
-?>
-
+<?php endif; ?>
 <table width="100%" border="0" cellpadding="0" cellspacing="0">
   <tr>
-  	<td class="listhdrr" colspan="8">Statistics snapshot control</td>
+  	<td class="listhdrr" colspan="9">Statistics snapshot control</td>
   </tr>
   <tr>
-    <?php if (($lastSnapshot!='Never') && (!isset($_GET['view']))) :?>  
+    <?php if ($lastSnapshot != 'Never' && !$viewing): ?>
     <td class="listlr"><a href="?view=1&amp;order=bytes&amp;sort=des<?=$filterPassThru;?>">View delta</a></td>
     <td class="listr"><a href="?new=1<?=$filterPassThru;?>">Start new</a></td>
     <td class="listr"><a href="?clear=1<?=$filterPassThru;?>">Clear snapshot</a></td>
-	<td class="listr" colspan="5" align="right">Last statistics snapshot: <?=$lastSnapshot;?></td>    
-    <?php endif ?>
-    <?php if (($lastSnapshot!='Never') && (isset($_GET['view']))) :?>  
+    <td class="listr" colspan="6" align="right">Last statistics snapshot: <?=$lastSnapshot;?></td>
+    <?php elseif ($lastSnapshot != 'Never'): ?>
     <td class="listlr"><a href="?new=1<?=$filterPassThru;?>">Start new</a></td>
     <td class="listr"><a href="?clear=1<?=$filterPassThru;?>">Clear</a></td>
-	<td class="listr" colspan="6" align="right"><span class="red">Viewing delta of statistics snapshot: <?=$lastSnapshot;?></span></td>    
-    <?php endif ?>    
-    <?php if ($lastSnapshot=='Never') :?>
+    <td class="listr" colspan="7" align="right"><span class="red">Viewing delta of statistics snapshot: <?=$lastSnapshot;?></span></td>
+    <?php else: ?>
     <td class="listlr"><a href="?new=1<?=$filterPassThru;?>">Start new</a></td>
-    <td class="listr" colspan="7" align="right">Last statistics snapshot: <?=$lastSnapshot;?></td>    
-    <?php endif ?>
+    <td class="listr" colspan="8" align="right">Last statistics snapshot: <?=$lastSnapshot;?></td>
+    <?php endif; ?>
   </tr>
   <tr>
-  	<td colspan="8">&nbsp;</td>
+  	<td colspan="9">&nbsp;</td>
   </tr>
   <tr>
-    <td class="listhdrr"><a href="?order=srcip<?=sortOrder('srcip');echo $filterPassThru;?>">Source</a></td>
-    <td class="listhdrr" align="right"><a href="?order=srcport<?=sortOrder('srcport');echo $filterPassThru;?>">Port</a></td>
-    <td class="listhdrr"><a href="?order=dstip<?=sortOrder('dstip');echo $filterPassThru;?>">Destination</a></td>
-    <td class="listhdrr" align="right"><a href="?order=dstport<?=sortOrder('dstport');echo $filterPassThru;?>">Port</a></td>
-    <td class="listhdrr"><a href="?order=protocol<?=sortOrder('protocol');echo $filterPassThru;?>">Protocol</a></td>
-    <td class="listhdrr" align="right"><a href="?order=packets<?=sortOrder('packets');echo $filterPassThru;?>">Packets</a></td>
-    <td class="listhdrr" align="right"><a href="?order=bytes<?=sortOrder('bytes');echo $filterPassThru;?>">Bytes</a></td>
-    <td class="listhdr" align="right"><a href="?order=ttl<?=sortOrder('ttl');echo $filterPassThru;?>">TTL</a></td>
-    <td class="list"></td>
+    <td class="listhdrr"><a href="?order=srcip<?=sortOrder('srcip') . $filterPassThru;?>">Source</a></td>
+    <td class="listhdrr" align="right"><a href="?order=srcport<?=sortOrder('srcport') . $filterPassThru;?>">Port</a></td>
+    <td class="listhdrr"><a href="?order=dstip<?=sortOrder('dstip') . $filterPassThru;?>">Destination</a></td>
+    <td class="listhdrr" align="right"><a href="?order=dstport<?=sortOrder('dstport') . $filterPassThru;?>">Port</a></td>
+    <td class="listhdrr"><a href="?order=protocol<?=sortOrder('protocol') . $filterPassThru;?>">Protocol</a></td>
+    <td class="listhdrr"><a href="?order=state<?=sortOrder('state') . $filterPassThru;?>">State</a></td>
+    <td class="listhdrr" align="right"><a href="?order=packets<?=sortOrder('packets') . $filterPassThru;?>">Packets</a></td>
+    <td class="listhdrr" align="right"><a href="?order=bytes<?=sortOrder('bytes') . $filterPassThru;?>">Bytes</a></td>
+    <td class="listhdr" align="right"><a href="?order=ttl<?=sortOrder('ttl') . $filterPassThru;?>">TTL</a></td>
   </tr>
-<?php if (is_array($data)): foreach ($data as $entry): ?>
+<?php foreach ($data as $entry): ?>
   <tr>
-    <td class="listlr"><?=displayIP($entry['srcip'],'srcip');?></td>
-    <td class="listr"><?=$entry['srcport'];?></td>
-    <td class="listr"><?=displayIP($entry['dstip'],'dstip');?></td>
-    <td class="listr"><?=$entry['dstport'];?></td>
-    <td class="listr"><?=$entry['protocol'];?></td>
+    <td class="listlr"><?=displayIP($entry['srcip'], 'srcip');?></td>
+    <td class="listr" align="right"><?=htmlspecialchars($entry['srcport']);?>&nbsp;</td>
+    <td class="listr"><?=displayIP($entry['dstip'], 'dstip');?></td>
+    <td class="listr" align="right"><?=htmlspecialchars($entry['dstport']);?>&nbsp;</td>
+    <td class="listr"><?=htmlspecialchars($entry['protocol']);?></td>
+    <td class="listr"><?=htmlspecialchars($entry['state']);?></td>
     <td class="listr" align="right"><?=$entry['packets'];?></td>
     <td class="listr" align="right"><?=$entry['bytes'];?></td>
-    <td class="listr" align="right"><?=preg_replace("/^((00:0)|(00:)|(0))/","",strftime('%H:%M:%S',$entry['ttl']));?></td>    
+    <td class="listr" align="right"><?=pf_seconds_to_hms($entry['ttl']);?></td>
   </tr>
-<?php endforeach; endif; ?>
+<?php endforeach; ?>
 </table>
 <br><strong>Firewall connection states displayed: <?=count($data);?></strong>
-<?php if ($filterPassThru): ?>
+<?php if ($sfilter != '' || $dfilter != ''): ?>
 <p>
 <form action="diag_ipfstat.php" method="GET">
 <input type="hidden" name="order" value="bytes">
 <input type="hidden" name="sort" value="des">
-<input type="submit" class="formbtn" value="Unfilter View">
+<?php if ($is6): ?><input type="hidden" name="ip" value="6"><?php endif; ?>
+<?php if ($viewing): ?><input type="hidden" name="view" value="1"><?php endif; ?>
+<input type="submit" class="formbtn" value="Remove address filter">
 </form>
-</p>
-
-<?php endif;
-if (ipv6enabled()) {
-?>
-	</td>
-	</tr>
+<?php endif; ?>
+<?php if (ipv6enabled()): ?>
+	    </td>
+	  </tr>
 	</table>
-<?php
-}?>
+<?php endif; ?>
 <?php include("fend.inc"); ?>

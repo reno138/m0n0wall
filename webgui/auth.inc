@@ -40,7 +40,7 @@ function index_groups() {
 	        $i++;
 	    }
 	}
-	return ($groupindex);
+	return (isset($groupindex) ? $groupindex : array());	/* no groups configured -> empty, not null */
 }
 
 function index_users() {
@@ -53,7 +53,7 @@ function index_users() {
 	       $i++;
 	   }
     }
-    return ($userindex);
+    return (isset($userindex) ? $userindex : array());	/* no users configured -> empty, not null */
 }
 
 $groupindex = index_groups();

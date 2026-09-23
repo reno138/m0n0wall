@@ -95,7 +95,7 @@ function dynamic_menu(&$menu, $menu_title) {
 // Check for issues when changing the web admin username
 // $allowed is set in auth.inc *IF* the user is not the webGUI admin
 // so, if it's not set here, they were the admin user when they submited the admin username change.
-if ((!is_array($allowed)) and 
+if ((!isset($allowed) || !is_array($allowed)) and 
     ($_SERVER['PHP_SELF'] == '/system.php') and 
     ($_SERVER['REMOTE_USER'] != $config['system']['username'])) {
 	// webGUI username was just changed, let us change what PHP sees the remote user as so
@@ -316,7 +316,7 @@ dynamic_menu($menu['Diagnostics'], 'Diagnostics');
         </tr></table></td>
     <td width="600"><table width="100%" border="0" cellpadding="10" cellspacing="0" summary="outer content pane">
         <tr><td>
-<?php if (!$pgtitle_omit): ?>
+<?php if (empty($pgtitle_omit)): ?>
       <p class="pgtitle"><?=gentitle($pgtitle);?></p>
 <?php endif; ?>
 
