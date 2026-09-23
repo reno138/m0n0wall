@@ -144,8 +144,8 @@ function interfaces_lan_configure() {
 		/* reload dhcp6s (gateway may have changed) */
 		services_dhcp6s_configure();
 		
-		/* reload dnsmasq */
-		services_dnsmasq_configure();
+		/* dnsmasq (DNS and DHCP) was already regenerated and restarted by
+		   services_dhcpd_configure() above -- one daemon now, not two. */
 		
 		/* reload webgui */
 		system_webgui_start();
@@ -217,8 +217,8 @@ function interfaces_optional_configure() {
 		/* reload dhcp6s (gateway may have changed) */
 		services_dhcp6s_configure();
 		
-		/* restart dnsmasq */
-		services_dnsmasq_configure();
+		/* dnsmasq (DNS and DHCP) was already regenerated and restarted by
+		   services_dhcpd_configure() above -- one daemon now, not two. */
 	}
 	
 	return 0;

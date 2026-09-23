@@ -54,6 +54,13 @@ case "$PLATFORM" in
 	echo "7) Install on Hard Drive"
 	;;
 esac
+# Development builds only (MW_DEVBUILD=1 at build time writes the marker).
+# m0n0wall never offered a shell and release images still don't; during
+# bring-up it is the difference between reading /var/log/system.log and
+# guessing at it.
+if [ -f /etc/devbuild ]; then
+	echo "8) Shell (development build)"
+fi
 echo
 
 read -p "Enter a number: " opmode
@@ -84,6 +91,13 @@ case ${opmode} in
 		/etc/rc.initial.install
 		;;
 	esac
+	;;
+8)
+	if [ -f /etc/devbuild ]; then
+		echo
+		echo "Development build: root shell. 'exit' returns to this menu."
+		PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin /bin/sh
+	fi
 	;;
 esac
 

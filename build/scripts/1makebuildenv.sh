@@ -31,6 +31,11 @@ FS="$MW_BUILDPATH/m0n0fs"
 [ -d "$SRC" ] || { echo "$SRC does not exist (symlink it to the source tree)"; exit 1; }
 
 echo "Creating the image root..."
+# Base libraries copied from /lib carry the schg (system immutable) flag, and
+# cp -p preserves it. rm -rf cannot remove such a file, so a second build
+# died on "Operation not permitted" against the previous root. Clear the
+# flags first; stage 2 also strips them at copy time.
+[ -d "$FS" ] && chflags -R noschg,nouchg "$FS" 2>/dev/null
 rm -rf "$FS"
 mkdir -p "$FS"
 cd "$FS"
@@ -80,6 +85,17 @@ cp "$SRC/phpconf/config.xml" conf.default/config.xml
 
 echo "Copying base-system support files..."
 cp /usr/share/misc/termcap usr/share/misc/ 2>/dev/null || true
+# pf.os is pf's passive OS fingerprint table. pfctl loads it unconditionally
+# when reading a ruleset and refuses the whole ruleset without it, so its
+# absence meant the firewall ran with NO rules loaded ("Generated pf ruleset
+# is invalid, keeping the previous one: pfctl: /etc/pf.os: No such file").
+# Taken from the build host so it tracks the release rather than a copy
+# frozen in the repository.
+cp /etc/pf.os etc/ || { echo "ERROR: /etc/pf.os missing on the build host"; exit 1; }
+# Development builds get a root shell on the console menu (option 8, see
+# etc/rc.initial). Off unless the build asks for it; release images never
+# carry the marker.
+[ -n "$MW_DEVBUILD" ] && { touch etc/devbuild; echo "  development build: console shell enabled"; }
 [ -f "$SRC/build/files/zoneinfo.tgz" ] && cp "$SRC/build/files/zoneinfo.tgz" usr/share/
 [ -f "$SRC/build/files/login.conf" ]   && cp "$SRC/build/files/login.conf" etc/
 # php.ini goes in /usr/local/etc, which is where the php84 PACKAGE looks.

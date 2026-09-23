@@ -32,145 +32,70 @@
 $pgtitle = array("Diagnostics", "DHCP leases");
 
 require("guiconfig.inc");
-?>
-<?php include("fbegin.inc"); ?>
-<?php
 
-flush();
+/* Leases come from dnsmasq now (see dhcp_dnsmasq.inc). Its lease file has no
+   start time, so that column is gone; everything else is as it was. */
+
+$order = isset($_GET['order']) && in_array($_GET['order'], array("ip", "mac", "hostname", "end"))
+         ? $_GET['order'] : "";
+$all   = !empty($_GET['all']) ? 1 : 0;
 
 function leasecmp($a, $b) {
-	return strcmp($a[$_GET['order']], $b[$_GET['order']]);
+	global $order;
+	if ($order == "ip")
+		return ip2long($a['ip']) <=> ip2long($b['ip']);
+	if ($order == "end")
+		return $a['end'] <=> $b['end'];
+	return strcmp($a[$order], $b[$order]);
 }
 
-function adjust_gmt($dt) {
-	$ts = strtotime($dt . " GMT");
-	return strftime("%Y/%m/%d %H:%M:%S", $ts);
+function lease_end($end) {
+	return ($end == 0) ? "never" : date("Y/m/d H:i:s", $end);
 }
 
-$fp = @fopen("{$g['vardb_path']}/dhcpd.leases","r");
+$leases = dhcp_dnsmasq_leases_read();
+?>
+<?php include("fbegin.inc"); ?>
+<?php if ($leases !== false):
 
-if ($fp):
-
-$return = array();
-
-while ($line = fgets($fp)) {
-	$matches = "";
-
-	// Sort out comments
-	// C-style comments not supported!
-	if (preg_match("/^\s*[\r|\n]/", $line, $matches[0]) ||
-				preg_match("/^([^\"#]*)#.*$/", $line, $matches[1]) ||
-				preg_match("/^([^\"]*)\/\/.*$/", $line, $matches[2]) ||
-				preg_match("/\s*#(.*)/", $line, $matches[3]) ||
-				preg_match("/\\\"\176/", $line, $matches[4])
-		) {
-		$line = "";
-		continue;
-	}
-
-	if (preg_match("/(.*)#(.*)/", $line, $matches))
-		$line = $matches[0];
-
-	// Tokenize lines
-	do {
-		if (preg_match("/^\s*\"([^\"]*)\"(.*)$/", $line, $matches)) {
-			$line = $matches[2];
-			$return[] = array($matches[1], 0);
-		} else if (preg_match("/^\s*([{};])(.*)$/", $line, $matches)) {
-			$line = $matches[2];
-			$return[] = array($matches[0], 1);
-		} else if (preg_match("/^\s*([^{}; \t]+)(.*)$/", $line, $matches)) {
-			$line = $matches[2];
-			$return[] = array($matches[1], 0);
-		} else
-			break;
-
-	} while($line);
-
-	$lines++;
-}
-
-fclose($fp);
-
-$leases = array();
-
-// Put everything together again
-while ($data = array_shift($return)) {
-	if ($data[0] == "lease") {
-		$d = array_shift($return);
-		$curlease = $d[0];
-		$leases[$curlease] = array();	/* newer lease for same IP overwrites older lease */
-		$leases[$curlease]['ip'] = $curlease;
-	}
-	if ($data[0] == "next") {
-		$d = array_shift($return);
-	}
-	if ($data[0] == "client-hostname") {
-		$d = array_shift($return);
-		$leases[$curlease]['hostname'] = $d[0];
-	}
-	if ($data[0] == "hardware") {
-		$d = array_shift($return);
-		if ($d[0] == "ethernet") {
-			$d = array_shift($return);
-			$leases[$curlease]['mac'] = $d[0];
-		}
-	} else if ($data[0] == "starts") {
-		$d = array_shift($return);
-		$d = array_shift($return);
-		$leases[$curlease]['start'] = $d[0];
-		$d = array_shift($return);
-		$leases[$curlease]['start'] .= " " . $d[0];
-	} else if ($data[0] == "ends") {
-		$d = array_shift($return);
-		$d = array_shift($return);
-		$leases[$curlease]['end'] = $d[0];
-		$d = array_shift($return);
-		$leases[$curlease]['end'] .= " " . $d[0];
-	} else if ($data[0] == "binding") {
-		$d = array_shift($return);
-		if ($d[0] == "state") {
-			$d = array_shift($return);
-			$leases[$curlease]['act'] = $d[0];
-		}
-	}
-}
-
-if ($_GET['order'])
+if ($order)
 	usort($leases, "leasecmp");
 ?>
 <table width="100%" border="0" cellpadding="0" cellspacing="0" summary="tab pane">
   <tr>
-    <td class="listhdrr"><a href="?all=<?=htmlspecialchars($_GET['all']);?>&amp;order=ip">IP address</a></td>
-    <td class="listhdrr"><a href="?all=<?=htmlspecialchars($_GET['all']);?>&amp;order=mac">MAC address</a></td>
-    <td class="listhdrr"><a href="?all=<?=htmlspecialchars($_GET['all']);?>&amp;order=hostname">Hostname</a></td>
-    <td class="listhdrr"><a href="?all=<?=htmlspecialchars($_GET['all']);?>&amp;order=start">Start</a></td>
-    <td class="listhdr"><a href="?all=<?=htmlspecialchars($_GET['all']);?>&amp;order=end">End</a></td>
+    <td class="listhdrr"><a href="?all=<?=$all;?>&amp;order=ip">IP address</a></td>
+    <td class="listhdrr"><a href="?all=<?=$all;?>&amp;order=mac">MAC address</a></td>
+    <td class="listhdrr"><a href="?all=<?=$all;?>&amp;order=hostname">Hostname</a></td>
+    <td class="listhdr"><a href="?all=<?=$all;?>&amp;order=end">End</a></td>
     <td class="list"></td>
 	</tr>
 <?php
 foreach ($leases as $data) {
-	if (($data['act'] == "active") || ($_GET['all'] == 1)) {
+	if (($data['act'] == "active") || $all) {
 		if ($data['act'] != "active") {
 			$fspans = "<span class=\"gray\">";
 			$fspane = "</span>";
 		} else {
 			$fspans = $fspane = "";
 		}
+		$data['if'] = "";
 		$lip = ip2long($data['ip']);
-		foreach ($config['dhcpd'] as $dhcpif => $dhcpifconf) {
-			if (($lip >= ip2long($dhcpifconf['range']['from'])) && ($lip <= ip2long($dhcpifconf['range']['to']))) {
-				$data['if'] = $dhcpif;
-				break;
+		if (isset($config['dhcpd']) && is_array($config['dhcpd'])) {
+			foreach ($config['dhcpd'] as $dhcpif => $dhcpifconf) {
+				if (!is_array($dhcpifconf) || empty($dhcpifconf['range']['from']) || empty($dhcpifconf['range']['to']))
+					continue;
+				if (($lip >= ip2long($dhcpifconf['range']['from'])) && ($lip <= ip2long($dhcpifconf['range']['to']))) {
+					$data['if'] = $dhcpif;
+					break;
+				}
 			}
 		}
 		echo "<tr>\n";
 		echo "<td class=\"listlr\">{$fspans}{$data['ip']}{$fspane}&nbsp;</td>\n";
 		echo "<td class=\"listr\">{$fspans}{$data['mac']}{$fspane}&nbsp;</td>\n";
-		echo "<td class=\"listr\">{$fspans}" . 
+		echo "<td class=\"listr\">{$fspans}" .
 			htmlentities($data['hostname']) . "{$fspane}&nbsp;</td>\n";
-		echo "<td class=\"listr\">{$fspans}" . adjust_gmt($data['start']) . "{$fspane}&nbsp;</td>\n";
-		echo "<td class=\"listr\">{$fspans}" . adjust_gmt($data['end']) . "{$fspane}&nbsp;</td>\n";
+		echo "<td class=\"listr\">{$fspans}" . lease_end($data['end']) . "{$fspane}&nbsp;</td>\n";
 		echo "<td class=\"list\" valign=\"middle\"><a href=\"services_dhcp_edit.php?if={$data['if']}&amp;mac={$data['mac']}\"><img src=\"plus.gif\" width=\"17\" height=\"17\" border=\"0\" title=\"add a static mapping for this MAC address\" alt=\"add a static mapping for this MAC address\"></a></td>\n";
 		echo "</tr>\n";
 	}
@@ -179,8 +104,8 @@ foreach ($leases as $data) {
 </table>
 <br>
 <form action="diag_dhcp_leases.php" method="GET">
-<input type="hidden" name="order" value="<?=htmlspecialchars($_GET['order']);?>">
-<?php if ($_GET['all']): ?>
+<input type="hidden" name="order" value="<?=htmlspecialchars($order);?>">
+<?php if ($all): ?>
 <input type="hidden" name="all" value="0">
 <input type="submit" class="formbtn" value="Show active leases only">
 <?php else: ?>

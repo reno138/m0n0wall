@@ -15,7 +15,9 @@ fi
 
 case $1 in
 enable)
-	/sbin/mdmfs -s 16m md1 /ftmp > /dev/null 2>&1
+	# Holds the uploaded image. 16m fitted a 2015 image; the image is ~38 MB
+	# gzipped now. Keep this above upload_max_filesize in php.ini.
+	/sbin/mdmfs -s 128m md1 /ftmp > /dev/null 2>&1
 	;;
 upgrade)
 	# wait 5 seconds before beginning
@@ -36,6 +38,10 @@ upgrade)
 	# dd image onto card
 	if [ -r $2 ]; then
 		/usr/bin/gunzip -S "" -c $2 | dd of=/dev/$CFDEVICE ibs=64k obs=64k > /dev/null 2>&1
+		# The image is GPT and sized for its own content, so on any larger disk
+		# the backup header is not at the last LBA. Rewrite it, as the installer
+		# does, or every boot warns and some firmware refuses the table.
+		/sbin/gpart recover $CFDEVICE > /dev/null 2>&1
 		echo "Image installed."
 	fi
 

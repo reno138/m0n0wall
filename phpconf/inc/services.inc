@@ -32,6 +32,8 @@
 require_once("functions.inc");
 
 function services_dhcp6c_stop() {
+	global $g;
+
 	/* kill any running dhcp6c */
 	killbypid("{$g['varrun_path']}/dhcp6c.pid");
 	mwexec('/sbin/sysctl net.inet6.ip6.accept_rtadv=0');
@@ -274,175 +276,6 @@ EOD;
 	
 	return 0;
 }
-/* SUPERSEDED. ISC dhcpd reached end of maintenance at the end of 2022 and is
-   no longer in the image; DHCP is served by dnsmasq. Kept for reference while
-   the option mapping is still being verified against real clients -- see
-   dhcp_dnsmasq.inc, which reads exactly the same $config['dhcpd'] keys. */
-function services_dhcpd_configure_isc_superseded() {
-	global $config, $g;
-	
-	/* kill any running dhcpd */
-	killbypid("{$g['varrun_path']}/dhcpd.pid");
-	
-	$syscfg = $config['system'];
-	$dhcpdcfg = $config['dhcpd'];
-	
-	/* DHCP enabled on any interfaces? */
-	$dhcpdenable = false;
-	foreach ($dhcpdcfg as $dhcpif => $dhcpifconf) {
-		if (isset($dhcpifconf['enable']) &&
-			(($dhcpif == "lan") ||
-			(isset($config['interfaces'][$dhcpif]['enable']) &&
-			$config['interfaces'][$dhcpif]['if'] && (!$config['interfaces'][$dhcpif]['bridge']))))
-			$dhcpdenable = true;
-	}
-	
-	if (!$dhcpdenable)
-		return 0;
-	
-	if ($g['booting'])
-		echo "Starting DHCP service... ";
-	else
-		sleep(1);
-	
-	/* write dhcpd.conf */
-	$fd = fopen("{$g['varetc_path']}/dhcpd.conf", "w");
-	if (!$fd) {
-		printf("Error: cannot open dhcpd.conf in services_dhcpd_configure().\n");
-		return 1;
-	}
-	
-	$dhcpdconf = <<<EOD
-option domain-name "{$syscfg['domain']}";
-default-lease-time 7200;
-max-lease-time 86400;
-authoritative;
-log-facility local7;
-ddns-update-style none;
-
-EOD;
-	
-	$dhcpdifs = array();
-	foreach ($dhcpdcfg as $dhcpif => $dhcpifconf) {
-		
-		$ifcfg = $config['interfaces'][$dhcpif];
-		
-		if (!isset($dhcpifconf['enable']) ||
-			(($dhcpif != "lan") &&
-			(!isset($ifcfg['enable']) || !$ifcfg['if'] || $ifcfg['bridge'])))
-			continue;
-			
-		$subnet = gen_subnet($ifcfg['ipaddr'], $ifcfg['subnet']);
-		$subnetmask = gen_subnet_mask($ifcfg['subnet']);
-		
-		$dnscfg = "";
-		
-		if ($dhcpifconf['domain']) {
-			$dnscfg .= "	option domain-name \"{$dhcpifconf['domain']}\";\n";
-		}
-		
-		
-		$dnscfg = "";
-		
-		if ($dhcpifconf['domain']) {
-			$dnscfg .= "	option domain-name \"{$dhcpifconf['domain']}\";\n";
-		}
-		
-		$dnsservers = array();
-		if (is_array($dhcpifconf['dnsserver']) && ($dhcpifconf['dnsserver'][0]))
-			$dnsservers = $dhcpifconf['dnsserver'];
-		else if (isset($config['dnsmasq']['enable']))
-			$dnsservers = array($ifcfg['ipaddr']);
-		else if (is_array($syscfg['dnsserver']) && ($syscfg['dnsserver'][0]))
-			$dnsservers = $syscfg['dnsserver'];
-		
-		$dnsservers = array_filter($dnsservers, "is_ipaddr");
-		if (!empty($dnsservers))
-			$dnscfg .= "	option domain-name-servers " . join(",", $dnsservers) . ";\n";
-
-		$dhcpdconf .= "subnet $subnet netmask $subnetmask {\n";
-		$dhcpdconf .= "	pool {\n";
-		if (isset($dhcpifconf['denyunknown'])) 
-		   $dhcpdconf .= "		deny unknown clients;\n";
-		
-		if ($dhcpifconf['gateway'])
-			$routers = $dhcpifconf['gateway'];
-		else
-			$routers = $ifcfg['ipaddr'];
-		
-		$dhcpdconf .= <<<EOD
-		range {$dhcpifconf['range']['from']} {$dhcpifconf['range']['to']};
-	}
-	option routers {$routers};
-$dnscfg
-
-EOD;
-
-		if ($dhcpifconf['defaultleasetime'])
-			$dhcpdconf .= "	default-lease-time {$dhcpifconf['defaultleasetime']};\n";
-		if ($dhcpifconf['maxleasetime'])
-			$dhcpdconf .= "	max-lease-time {$dhcpifconf['maxleasetime']};\n";
-			
-		if (is_array($dhcpifconf['winsserver']) && $dhcpifconf['winsserver'][0]) {
-			$dhcpdconf .= "	option netbios-name-servers " . join(",", $dhcpifconf['winsserver']) . ";\n";
-			$dhcpdconf .= "	option netbios-node-type 8;\n";
-		}
-		
-		if ($dhcpifconf['next-server'])
-			$dhcpdconf .= "	next-server {$dhcpifconf['next-server']};\n";
-		if ($dhcpifconf['filename'])
-			$dhcpdconf .= "	filename \"{$dhcpifconf['filename']}\";\n";
-			
-		$dhcpdconf .= <<<EOD
-}
-
-EOD;
-
-		/* add static mappings */
-		if (is_array($dhcpifconf['staticmap'])) {
-		
-			$i = 0;
-			foreach ($dhcpifconf['staticmap'] as $sm) {
-				if (!is_ipaddr6($sm['ipaddr'])) {
-					$dhcpdconf .= <<<EOD
-host s_{$dhcpif}_{$i} {
-	hardware ethernet {$sm['mac']};
-
-EOD;
-					if ($sm['ipaddr'])
-						$dhcpdconf .= "	fixed-address {$sm['ipaddr']};\n";
-
-					if ($sm['next-server'])
-						$dhcpdconf .= "	next-server {$sm['next-server']};\n";
-					if ($sm['filename'])
-						$dhcpdconf .= "	filename \"{$sm['filename']}\";\n";
-				
-					$dhcpdconf .= "}\n";
-					$i++;
-				}
-			}
-		}
-		
-		$dhcpdifs[] = $ifcfg['if'];
-	}
-
-	fwrite($fd, $dhcpdconf);
-	fclose($fd);
-
-	/* create an empty leases database */
-	touch("{$g['vardb_path']}/dhcpd.leases");
-	
-	/* fire up dhcpd */
-	mwexec("/usr/local/sbin/dhcpd -cf {$g['varetc_path']}/dhcpd.conf " . 
-		join(" ", $dhcpdifs));
-		
-	if (!$g['booting']) {
-		filter_configure();
-	} else
-		echo "done\n";
-	
-	return 0;
-}
 
 function services_dhcrelay_configure() {
 	global $config, $g;
@@ -534,16 +367,34 @@ function services_dnsmasq_configure() {
 	/* kill any running dnsmasq */
 	sigkillbypid("{$g['varrun_path']}/dnsmasq.pid", "TERM");
 
-	if (isset($config['dnsmasq']['enable'])) {
-	
-		if ($g['booting'])
-			echo "Starting DNS forwarder... ";
-		else
+	/* dnsmasq is the DHCP server as well as the DNS forwarder, so it has to
+	   run when EITHER is wanted. Its DHCP half is a separate file, generated
+	   by dhcp_dnsmasq.inc from the same $config['dhcpd'] the webGUI has
+	   always written, and included from dnsmasq.conf below. It is written
+	   here, before the daemon starts, because dnsmasq refuses to start over
+	   a conf-file it cannot open and rc.bootup reaches this function before
+	   services_dhcpd_configure(). Until 2026-09-23 nothing included that
+	   file at all, and DHCP was silently dead in every build. */
+	$dns_on   = isset($config['dnsmasq']['enable']);
+	$dhcpfile = "{$g['varetc_path']}/dnsmasq-dhcp.conf";
+	file_put_contents($dhcpfile, dhcp_dnsmasq_config_generate());
+	$dhcp_on  = count(dhcp_dnsmasq_enabled_interfaces()) > 0;
+
+	if ($dns_on || $dhcp_on) {
+
+		if ($g['booting']) {
+			if ($dns_on && $dhcp_on)
+				echo "Starting DNS forwarder and DHCP server... ";
+			else if ($dns_on)
+				echo "Starting DNS forwarder... ";
+			else
+				echo "Starting DHCP server... ";
+		} else
 			sleep(1);
 
 		/* generate hosts file */
 		system_hosts_generate();
-		
+
 		/* generate dnsmasq.conf */
 		$fd = fopen("{$g['varetc_path']}/dnsmasq.conf", "w");
 		if (!$fd) {
@@ -551,18 +402,33 @@ function services_dnsmasq_configure() {
 			return 1;
 		}
 		$dnsmasqconf = "edns-packet-max=4096\n";
-		
-		if (isset($config['dnsmasq']['regdhcp'])) {
-			$dnsmasqconf .= "dhcp-leasefile={$g['vardb_path']}/dhcpd.leases\n" .
-					"domain={$config['system']['domain']}\n";
-		}
+
+		/* DHCP only: no DNS listener at all */
+		if (!$dns_on)
+			$dnsmasqconf .= "port=0\n";
+
+		/* the DHCP half -- see dhcp_dnsmasq.inc */
+		$dnsmasqconf .= "conf-file={$dhcpfile}\n";
+		if ($dhcp_on)
+			$dnsmasqconf .= "dhcp-leasefile=" . dhcp_dnsmasq_leasefile() . "\n";
+
+		/* "Register DHCP leases in DNS forwarder". With ISC dhcpd this meant
+		   pointing dnsmasq at ISC's lease file. dnsmasq hands out the leases
+		   itself now and always knows the names; the checkbox adds the
+		   system domain so they resolve as FQDNs as well as bare names. */
+		if (isset($config['dnsmasq']['regdhcp']) && !empty($config['system']['domain']))
+			$dnsmasqconf .= "domain={$config['system']['domain']}\nexpand-hosts\n";
+
 		$dnsmasqcfg = $config['dnsmasq'];
-		if (is_array($dnsmasqcfg['hosts'])) {
+		if (isset($dnsmasqcfg['hosts']) && is_array($dnsmasqcfg['hosts'])) {
 			foreach ($dnsmasqcfg['hosts'] as $host) {
-				if (($host['host']) && ($host['host'] == '*')) {
+				if (!is_array($host))
+					continue;
+				if (!empty($host['host']) && $host['host'] == '*' &&
+				    !empty($host['domain']) && !empty($host['ip'])) {
 					$dnsmasqconf .= "address=/{$host['domain']}/{$host['ip']}\n";
 				}
-				if ($host['aliases']) {
+				if (!empty($host['aliases'])) {
 					$aliases = explode(' ', $host['aliases']);
 					foreach ($aliases as $alias) {
 						$dnsmasqconf .= "cname={$alias},{$host['host']}\n";
@@ -580,11 +446,11 @@ function services_dnsmasq_configure() {
 		if (isset($config['dnsmasq']['allservers'])) {
 			$dnsmasqconf .= "all-servers\n";
 		}
-		
+
 		if (isset($config['dnsmasq']['strictorder'])) {
 			$dnsmasqconf .= "strict-order\n";
 		}
-		
+
 		if (isset($config['dnsmasq']['domainoverrides']) && is_array($config['dnsmasq']['domainoverrides'])) {
 			foreach($config['dnsmasq']['domainoverrides'] as $override) {
 				$dnsmasqconf .= "server=/{$override['domain']}/{$override['ip']}\n";
@@ -607,11 +473,17 @@ function services_dnsmasq_configure() {
 		if ($g['booting'])
 			echo "done\n";
 	}
-	
-	if (!$g['booting']) {
-		services_dhcpd_configure();
+
+	/* The original ended here by restarting dhcpd, because ISC dhcpd was a
+	   separate daemon that had to be bounced after a DNS change. dnsmasq now
+	   IS the DHCP server and services_dhcpd_configure() delegates to this
+	   very function -- calling back from here was infinite mutual recursion,
+	   paced at exactly 1 Hz by the sleep(1) above. Boot never saw it
+	   ($g['booting'] skips this block); console option 2 and every GUI save
+	   did. filter_configure() stays: the rule set depends on which
+	   interfaces serve DHCP and whether the forwarder is on. */
+	if (!$g['booting'])
 		filter_configure();
-	}
 
 	return 0;
 }
