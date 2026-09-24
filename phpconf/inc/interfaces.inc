@@ -854,9 +854,14 @@ EOD;
 	   rejects them, prints its usage and exits 1, so a WAN set to DHCP (the
 	   factory default) never obtained an address at all. There is no -sf:
 	   the script path is compiled in as /sbin/dhclient-script, which is
-	   where m0n0wall installs its own. */
+	   where m0n0wall installs its own.
+
+	   -p because the default pidfile is /var/run/dhclient/dhclient.<if>.pid
+	   and that directory does not exist on the image, which dhclient reports
+	   as "Cannot open or create pidfile" before exiting. */
 	mwexec("/sbin/ifconfig " . escapeshellarg($wancfg['if']) . " up");
 	mwexec("/sbin/dhclient -b -c {$g['varetc_path']}/dhclient.conf " .
+		"-p " . escapeshellarg("{$g['varrun_path']}/dhclient." . $wancfg['if'] . ".pid") . " " .
 		escapeshellarg($wancfg['if']));
 	
 	return 0;

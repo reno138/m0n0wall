@@ -71,8 +71,14 @@ VERSION=$(cat "$SRC/version" 2>/dev/null || echo "1.9.0-dev%")
 # If there is no repo -- an exported tarball, say -- substitute the build date
 # rather than leaving a bare '%', which used to leak into image FILENAMES as
 # "generic-pc-1.8.2b%.amd64.iso".
-REV=""
-if command -v git >/dev/null 2>&1 && [ -d "$SRC/.git" ]; then
+# MW_REV first: the build host usually holds a plain copy of the tree, not a
+# git clone, so the git branch below never fires there and the version fell
+# back to the DATE. That silently renames every artifact at midnight -- a
+# deploy script pinned to yesterday's filename keeps shipping yesterday's
+# image, which cost a full verification cycle. Pass MW_REV=$(git rev-parse
+# --short HEAD) from wherever the tree is synced.
+REV="${MW_REV:-}"
+if [ -z "$REV" ] && command -v git >/dev/null 2>&1 && [ -d "$SRC/.git" ]; then
 	REV=$(git -C "$SRC" rev-parse --short HEAD 2>/dev/null || true)
 fi
 [ -n "$REV" ] || REV=$(date +%Y%m%d)
