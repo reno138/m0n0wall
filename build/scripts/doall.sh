@@ -56,12 +56,22 @@ note "output: $MW_BUILDPATH/images"
 note "/usr/src present"
 
 # --- tools ----------------------------------------------------------------
-for t in makefs mkimg pkg perl strip file; do
+for t in makefs mkimg pkg perl strip file php; do
 	command -v "$t" >/dev/null 2>&1 || \
 		fail "$t not found. makefs/mkimg/strip/file are base;
-       perl and pkg come from packages (pkg install perl5)."
+       perl, pkg and php come from packages (pkg install perl5 php84)."
 done
-note "makefs, mkimg, pkg, perl present"
+note "makefs, mkimg, pkg, perl, php present"
+
+# php on the HOST is a build tool: stage 2's second gate parses the image's
+# PHP with it, because that needs token_get_all() and the tokenizer extension
+# is deliberately not shipped in the image.
+php -r 'exit(function_exists("token_get_all") ? 0 : 1);' 2>/dev/null || \
+	fail "the host php has no tokenizer extension (pkg install php84-tokenizer).
+       Stage 2 uses it to check that every function the image's PHP calls
+       actually exists in the image -- that check has already caught ctype
+       and bcmath shipping missing."
+note "host php has the tokenizer"
 
 # --- boot components stage 5 copies from the HOST -------------------------
 # These end up IN the image, so the host's versions are what ship.

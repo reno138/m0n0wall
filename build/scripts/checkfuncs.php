@@ -16,15 +16,33 @@
  * /usr/local/captiveportal and the /etc/rc.* scripts.
  */
 
-$have = array_flip(array_map('strtolower', get_defined_functions()['internal']));
+/* argv[1]: newline-separated list of the functions the IMAGE's php provides,
+   produced by running get_defined_functions() inside a chroot of the image.
+   argv[2]: the image root to scan.
+
+   Split this way because the parse needs token_get_all(), and the tokenizer
+   extension is deliberately NOT in the image -- nothing on the firewall needs
+   to parse PHP. So the build host's php does the reading and the image's php
+   only reports what it has. */
+if ($argc < 3) {
+	fwrite(STDERR, "usage: checkfuncs.php <image-function-list> <image-root>\n");
+	exit(2);
+}
+$list = @file($argv[1], FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+if ($list === false) {
+	fwrite(STDERR, "cannot read {$argv[1]}\n");
+	exit(2);
+}
+$have = array_flip(array_map('strtolower', $list));
+$root = rtrim($argv[2], '/');
 $defined = array();
 $calls   = array();
 
 $files = array_merge(
-	(array)glob("/etc/inc/*"),
-	(array)glob("/etc/rc.*"),
-	(array)glob("/usr/local/www/*"),
-	(array)glob("/usr/local/captiveportal/*")
+	(array)glob("$root/etc/inc/*"),
+	(array)glob("$root/etc/rc.*"),
+	(array)glob("$root/usr/local/www/*"),
+	(array)glob("$root/usr/local/captiveportal/*")
 );
 
 foreach ($files as $f) {
@@ -82,7 +100,7 @@ if (empty($missing)) {
 ksort($missing);
 echo "\nERROR: these functions are called but do not exist in the image's PHP:\n";
 foreach ($missing as $fn => $w)
-	printf("  %-20s %s\n", $fn . "()", implode(", ", array_slice($w, 0, 4)));
+	printf("  %-20s %s\n", $fn . "()", implode(", ", array_map(function ($x) use ($root) { return substr($x, strlen($root)); }, array_slice($w, 0, 4))));
 echo "\nAdd the extension that provides them to PKGS and php.ini in\n";
 echo "build/scripts/2makebinaries.sh and build/files/php.ini.\n";
 exit(1);

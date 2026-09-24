@@ -294,11 +294,15 @@ echo "  all objects load"
 # pass on a host with ctype and bcmath built in.
 # ---------------------------------------------------------------------------
 echo "Verifying every PHP function called by the image exists in it..."
-cp "$SRC/build/scripts/checkfuncs.php" "$FS/tmp/checkfuncs.php"
-chroot "$FS" /usr/local/bin/php -d error_reporting=E_ALL /tmp/checkfuncs.php
-rc=$?
-rm -f "$FS/tmp/checkfuncs.php"
-[ $rc -eq 0 ] || exit 1
+# What the IMAGE's php provides, asked of the image's php itself.
+chroot "$FS" /usr/local/bin/php -r \
+	'echo implode("\n", get_defined_functions()["internal"]);' \
+	> "$MW_BUILDPATH/tmp/image-funcs.txt" || {
+		echo "ERROR: could not ask the image's php what functions it has"; exit 1; }
+# The reading is done by the HOST's php: it needs token_get_all(), and the
+# tokenizer extension is deliberately not in the image.
+php "$SRC/build/scripts/checkfuncs.php" "$MW_BUILDPATH/tmp/image-funcs.txt" "$FS" || exit 1
+rm -f "$MW_BUILDPATH/tmp/image-funcs.txt"
 
 # etc/rc regenerates this at every boot; don't ship a stale one.
 rm -f "$FS/var/run/ld-elf.so.hints"

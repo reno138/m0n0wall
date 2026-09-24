@@ -22,7 +22,10 @@ appear as `da0` and behave like ordinary SCSI under `camcontrol` and
 
 ```sh
 # source tree, matching your release
-pkg install -y git perl5
+# php84 + tokenizer are BUILD tools: stage 2 parses the image's PHP with the
+# host's php to check that every function it calls actually exists in the
+# image. The tokenizer is not shipped -- nothing on a firewall parses PHP.
+pkg install -y git perl5 php84 php84-tokenizer
 git clone -b releng/15.1 https://git.freebsd.org/src.git /usr/src
 
 # the checkout of this project
