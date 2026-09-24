@@ -229,6 +229,33 @@ for d in usr/local/etc/strongswan.d usr/local/share/strongswan \
          usr/local/etc/rc.d/nothing; do
 	[ -d "$STAGE/$d" ] && { mkdir -p "$FS/$d"; cp -Rp "$STAGE/$d/." "$FS/$d/"; }
 done
+
+# Single FILES the daemons read, as opposed to the directories above. The loop
+# over directories skipped these silently because [ -d ] is false for a file,
+# which is how strongswan.conf came to be missing: charon and swanctl both
+# then refuse to start at all --
+#   no files found matching '/usr/local/etc/strongswan.conf'
+#   abort initialization due to invalid configuration
+# -- so IPsec could not be applied even though swanctl.conf was correct and
+# the certificates were on disk. Required, not best-effort.
+# The port ships these as "<name>.sample" and leaves pkg's @sample keyword to
+# create the real file on install -- which does not happen when installing into
+# a rootdir with pkg -r, so the .sample is all the staging root has. Take
+# whichever exists, preferring a real file if one is there.
+for f in usr/local/etc/strongswan.conf; do
+	src=""
+	[ -f "$STAGE/$f" ]         && src="$STAGE/$f"
+	[ -z "$src" ] && [ -f "$STAGE/$f.sample" ] && src="$STAGE/$f.sample"
+	[ -n "$src" ] || {
+		echo "ERROR: neither $f nor $f.sample is in the staging root."
+		echo "       charon and swanctl both refuse to initialise without it,"
+		echo "       so IPsec cannot be configured at all."
+		exit 1
+	}
+	mkdir -p "$FS/$(dirname "$f")"
+	cp -p "$src" "$FS/$f"
+	echo "  $(basename "$f"): $(wc -l < "$FS/$f" | tr -d ' ') lines (from $(basename "$src"))"
+done
 # CA bundle. Everything in the image that speaks TLS as a CLIENT verifies
 # against this one file: Dynamic DNS (dyndns.inc), the GeoIP registry fetch
 # (geoip.inc) and strongSwan.
