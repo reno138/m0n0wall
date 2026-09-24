@@ -161,7 +161,8 @@ if(($_GET['act'] ?? null)=="new" || ($_GET['act'] ?? null)=="edit" || !empty($in
 		if (isset($id) && !empty($a_user[$id])) {
 	       $pconfig['username'] = $a_user[$id]['name'] ?? null;
 	       $pconfig['fullname'] = $a_user[$id]['fullname'] ?? null;
-	       $pconfig['groupname'] = $a_group[$id]['groupname'] ?? null;
+	       /* $a_group does not exist in this file; the user entry carries it */
+	       $pconfig['groupname'] = $a_user[$id]['groupname'] ?? null;
         }
 	}	
 ?>

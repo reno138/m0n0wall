@@ -141,7 +141,7 @@ if ($_POST) {
             continue;
         
 		if (empty($natent['interface']))
-			$natent['interface'] == "wan";
+			$natent['interface'] = "wan";	/* was ==, a comparison with no effect */
 		
 		if ((($natent['interface'] ?? null) == ($_POST['interface'] ?? null)) && (($natent['source']['network'] ?? null) == $osn)) {
 			if (isset($natent['destination']['not']) == isset($_POST['destination_not'])) {

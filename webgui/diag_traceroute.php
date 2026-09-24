@@ -46,7 +46,7 @@ if ($_POST) {
 	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 
 	if (!is_numericint($_POST['ttl'] ?? '') || (($_POST['ttl'] ?? '') < 1) || (($_POST['ttl'] ?? '') > MAX_TTL)) {
-		$input_errors[] = "Maximum number of hops must be between 1 and {MAX_TTL}";
+		$input_errors[] = "Maximum number of hops must be between 1 and " . MAX_TTL;	/* a constant does not interpolate */
 	}
 
 	if (!$input_errors) {

@@ -56,7 +56,10 @@ if ($_POST) {
     $totalMem = ($memory[0] ?? null) + ($memory[1] ?? null) + ($memory[2] ?? null) + ($memory[3] ?? null) + ($memory[4] ?? null);
     $freeMem = $memory[4] ?? null;
     $usedMem = $totalMem - $freeMem;
-    $memUsage = round(($usedMem * 100) / $totalMem, 0);
+    /* DivisionByZeroError is fatal in PHP 8, and $totalMem is 0 whenever the
+       sysctl exec returns nothing -- which took the dashboard down entirely
+       rather than showing a wrong number. */
+    $memUsage = ($totalMem > 0) ? round(($usedMem * 100) / $totalMem, 0) : 0;
 
 ?>
 <?php include("fbegin.inc"); ?>

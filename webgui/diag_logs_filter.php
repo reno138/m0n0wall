@@ -43,8 +43,13 @@ if (!$nentries)
 	$nentries = 50;
 
 if (!empty($_POST['clear'])) {
-	/* Ring-buffer init removed: logs are ordinary files bounded by
-	   newsyslog(8). See build/files/newsyslog.conf. */
+	/* Truncate the pcap pflogd is writing and signal it to reopen, rather
+	   than the text filter.log ipmon used to produce, which nothing writes
+	   any more. */
+	@file_put_contents("{$g['varlog_path']}/pflog.cap", "");
+	$pid = @file_get_contents("{$g['varrun_path']}/pflogd.pid");
+	if ($pid)
+		mwexec("/bin/kill -HUP " . ((int)$pid));
 	/* redirect to avoid reposting form data on refresh */
 	header("Location: diag_logs_filter.php");
 	exit;
@@ -92,125 +97,97 @@ if (isset($_GET['dp']) && (is_numeric($_GET['dp']))) {
 }
 
 
-function dump_clog($logfile, $tail, $withorig = true) {
+/* The firewall log comes from pf now.
+ *
+ * ipmon fed text lines to syslog and this page tailed /var/log/filter.log.
+ * pf copies matching packets to pflog0 and pflogd writes them to
+ * /var/log/pflog.cap as a pcap, so reading and decoding live in
+ * filter_pf.inc (pf_filter_log_read); this page filters and renders.
+ */
+
+/* Raw view: the capture as tcpdump prints it, one line per packet. */
+function dump_pflog($tail) {
 	global $g, $config;
 
-	$sor = isset($config['syslog']['reverse']) ? "-r" : "";
-
-	exec("/usr/bin/tail {$sor} -n " . $tail . " " . escapeshellarg($logfile), $logarr);
-	
-	foreach ($logarr as $logent) {
-		$logent = preg_split("/\s+/", $logent, 6);
+	$cap = "{$g['varlog_path']}/pflog.cap";
+	if (!file_exists($cap)) {
+		echo "<tr><td class=\"listlr\" colspan=\"2\">No firewall log yet. " .
+		     "pflogd writes it once a rule with 'log' matches a packet.</td></tr>\n";
+		return;
+	}
+	$out = array();
+	exec("/usr/sbin/tcpdump -n -e -q -tttt -r " . escapeshellarg($cap) .
+	     " 2>/dev/null | /usr/bin/tail -n " . ((int)$tail), $out);
+	if (isset($config['syslog']['reverse']))
+		$out = array_reverse($out);
+	foreach ($out as $line) {
 		echo "<tr valign=\"top\">\n";
-		
-		if ($withorig) {
-			echo "<td class=\"listlr\" nowrap>" . htmlspecialchars(join(" ", array_slice($logent, 0, 3))) . "</td>\n";
-			echo "<td class=\"listr\">" . htmlspecialchars(($logent[4] ?? '') . " " . ($logent[5] ?? '')) . "</td>\n";
-		} else {
-			echo "<td class=\"listlr\" colspan=\"2\">" . htmlspecialchars($logent[5] ?? '') . "</td>\n";
-		}
+		echo "<td class=\"listlr\" colspan=\"2\">" . htmlspecialchars($line) . "</td>\n";
 		echo "</tr>\n";
 	}
 }
 
-function conv_clog($logfile, $tail) {
-	global $g, $config, $iface, $action, $proto, $srcport, $dstport;
-	
-	/* make interface/port table */
-	$iftable = array();
-	$iftable[$config['interfaces']['lan']['if']] = "LAN";
-	$iftable[get_real_wan_interface()] = "WAN";
-	for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++)
-		$iftable[$config['interfaces']['opt' . $i]['if']] = $config['interfaces']['opt' . $i]['descr'];
+/* Parsed view, with the same filters the ipfilter version offered. */
+function conv_pflog($tail) {
+	global $config, $iface, $action, $proto, $srcport, $dstport;
 
-	$sor = isset($config['syslog']['reverse']) ? "-r" : "";
+	$iftable = pf_log_interface_map();
+	$entries = pf_filter_log_read($tail, isset($config['syslog']['reverse']));
 
-	exec("/usr/bin/tail {$sor} -n " . $tail . " " . escapeshellarg($logfile), $logarr);
-	
 	$filterlog = array();
+	foreach ($entries as $e) {
+		$ifn = $e['interface'];
+		if (isset($iftable[$ifn]))
+			$flent_if = $iftable[$ifn];
+		else if (strpos($ifn, "ng") !== false)
+			$flent_if = "L2TP";
+		else if ($ifn == "enc0")
+			$flent_if = "IPsec";
+		else if ($ifn == "gif0" || $ifn == "stf0")
+			$flent_if = "WAN";
+		else
+			$flent_if = $ifn;
 
-	foreach ($logarr as $logent) {
-		$logent = preg_split("/\s+/", $logent, 6);
-		$ipfa = explode(" ", $logent[5] ?? '');
-		
-		$flent = array();
-		$i = 0;
-		$flent['time'] = $ipfa[$i];
-		$i++;
-		if (substr($ipfa[$i], -1) == "x") {
-			$flent['count'] = substr($ipfa[$i], 0, -1);
-			$i++;
-		}
-		
-		if (!empty($iftable[$ipfa[$i]]))
-			$flent['interface'] = $iftable[$ipfa[$i]];
-		else if (strpos($ipfa[$i], "ng") !== false)
-			$flent['interface'] = "PPTP";
-		else if (strpos($ipfa[$i], "l2tp") !== false)
-			$flent['interface'] = "L2TP";
-		else if ($ipfa[$i] == "enc0")
-			$flent['interface'] = "IPsec";
-		else if ($ipfa[$i] == "gif0")
-			$flent['interface'] = "WAN";
-		else if ($ipfa[$i] == "stf0")
-			$flent['interface'] = "WAN";
-		else
-			$flent['interface'] = $ipfa[$i];
-		
-		if (isset($iface)) {
-			if ($iface != $flent['interface'])
-				continue;
-		}
-		
-		$i += 2;
-		if (!isset($action) || strstr($action, $ipfa[$i]))
-			$flent['act'] = $ipfa[$i];
-		else
-			continue; 
-		$i++;
-		list($flent['src'], $flent['srcport']) = format_ipf_ip($ipfa[$i],$srcport ?? null) ?? array(null, null);
-		if (!isset($flent['src']))
+		if (isset($iface) && $iface != $flent_if)
 			continue;
-		$i += 2;
-		list($flent['dst'], $flent['dstport']) = format_ipf_ip($ipfa[$i],$dstport ?? null) ?? array(null, null);
-		if (!isset($flent['dst']))
+
+		/* the page filters on the first letter of the action, p or b */
+		$act = $e['act'];
+		if (isset($action) && !strstr($action, substr($act, 0, 1)))
 			continue;
-		$i += 2;
-		$protocol = strtoupper($ipfa[$i]);
-		if (!isset($proto) || ($proto == $protocol))
-			$flent['proto'] = $protocol;
-		else
+
+		$protocol = strtoupper($e['proto']);
+		if (isset($proto) && $proto != $protocol)
 			continue;
-		if ($protocol == "ICMP") {
-			$i += 5;
-			$flent['dst'] = $flent['dst'] . ", type " . $ipfa[$i];
-		}
-		$filterlog[] = $flent;
+		if (isset($srcport) && $srcport !== "" && $srcport != $e['srcport'])
+			continue;
+		if (isset($dstport) && $dstport !== "" && $dstport != $e['dstport'])
+			continue;
+
+		$filterlog[] = array(
+			'act'       => $act,
+			'time'      => $e['time'],
+			'interface' => $flent_if,
+			'src'       => format_pflog_ip($e['src'], $e['srcport']),
+			'srcport'   => $e['srcport'],
+			'dst'       => format_pflog_ip($e['dst'], $e['dstport']),
+			'dstport'   => $e['dstport'],
+			'proto'     => $protocol,
+			'count'     => '',
+		);
 	}
-	
 	return $filterlog;
 }
 
-function format_ipf_ip($ipfip,$uport) {
+function format_pflog_ip($ip, $port) {
 	global $resolve;
 
-	$ipfparts = explode(",", $ipfip);
-	$ip = $ipfparts[0];
-	$port = $ipfparts[1] ?? null;
-	if ($resolve) {
-		if (empty($port))
-			return array(gethostbyaddr($ip), "");
-		if ($uport == "" || ($uport == $port))
-			return array(gethostbyaddr($ip) . ", port " . $port, $port);
-		return;
-	}
-
-	if (empty($port))
-		return array($ip, "");
-	if ($uport == "" || ($uport == $port))
-		return array($ip . ", port " . $port, $port);
-	return;
+	$shown = $resolve ? gethostbyaddr($ip) : $ip;
+	if ($shown === false || $shown === "")
+		$shown = $ip;
+	return ($port !== "") ? $shown . ", port " . $port : $shown;
 }
+
 ?>
 
 <?php include("fbegin.inc"); ?>
@@ -231,7 +208,7 @@ function format_ipf_ip($ipfip,$uport) {
   <tr>
     <td class="tabcont">
 <?php if (!isset($config['syslog']['rawfilter'])):
-	$filterlog = conv_clog("/var/log/filter.log", $nentries);
+	$filterlog = conv_pflog($nentries);
 ?>
 		<table width="100%" border="0" cellpadding="0" cellspacing="0" summary="content pane"><tr>
 		  <td colspan="6" class="listtopic"> 
@@ -293,7 +270,7 @@ function format_ipf_ip($ipfip,$uport) {
 			<td colspan="2" class="listtopic"> 
 			  Last <?=$nentries;?> firewall log entries</td>
 		  </tr>
-		  <?php dump_clog("/var/log/filter.log", $nentries, false); ?>
+		  <?php dump_pflog($nentries); ?>
 		</table>
 <?php endif; ?>
 		<br><form action="diag_logs_filter.php" method="post">

@@ -270,7 +270,7 @@ if ($_POST) {
 					<tr>
 					<td > 
                     <select class="formfld" name="mbmontype" align="bottom">
-					<option <?php if(!($config['system']['webgui']['mbmon']['type'] ?? null) == 'F') echo('selected');?> value="C">&deg;C</option>
+					<option <?php if(!(($config['system']['webgui']['mbmon']['type'] ?? null) == 'F')) echo('selected');?> value="C">&deg;C</option>
 					<option <?php if(($config['system']['webgui']['mbmon']['type'] ?? null) == 'F') echo('selected');?> value="F">&deg;F</option>
 					</select></td>
 					<td>

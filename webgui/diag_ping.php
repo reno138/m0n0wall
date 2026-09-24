@@ -46,7 +46,7 @@ if ($_POST) {
 
 	$postcount = $_POST['count'] ?? null;
 	if (!is_numericint($postcount) || ($postcount < 1) || ($postcount > MAX_COUNT)) {
-		$input_errors[] = "Count must be between 1 and {MAX_COUNT}";
+		$input_errors[] = "Count must be between 1 and " . MAX_COUNT;	/* a constant does not interpolate */
 	}
 
 	if (!$input_errors) {

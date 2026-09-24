@@ -73,7 +73,9 @@ if ($_POST) {
 		if ((!empty($_POST['localip']) && !is_ipaddr($_POST['localip']))) {
 			$input_errors[] = "A valid server address must be specified.";
 		}
-		if ((!empty($_POST['subnet']) && !is_ipaddr($_POST['remoteip'] ?? ''))) {
+		/* gated on 'subnet', which this page has no input for, so the remote
+		   start address was never validated */
+		if ((!empty($_POST['remoteip']) && !is_ipaddr($_POST['remoteip']))) {
 			$input_errors[] = "A valid remote start address must be specified.";
 		}
 		if ((!empty($_POST['radiusserver']) && !is_ipaddr($_POST['radiusserver']))) {

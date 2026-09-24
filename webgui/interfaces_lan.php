@@ -146,7 +146,7 @@ if ($_POST) {
 			$v6changed = ($oldipaddr6 != ($config['interfaces']['lan']['ipaddr6'] ?? null) ||
 						  $oldsubnet6 != ($config['interfaces']['lan']['subnet6'] ?? null) ||
 						  $oldipv6slalen != ($config['interfaces']['lan']['slalen'] ?? null) ||
-						  $oldipv6slaid != ($config['interfaces']['lan']['slanid'] ?? null) ||
+						  $oldipv6slaid != ($config['interfaces']['lan']['slaid'] ?? null) ||	/* 'slaid' is the key written above; 'slanid' never existed */
 						  ($pconfig['raflags'] ?? null) != ($_POST['raflags'] ?? null) ||
 						  isset($oldipv6ra) != isset($_POST['ipv6ra']) ||
 						  isset($oldipv6ram) != isset($newipv6ram) ||

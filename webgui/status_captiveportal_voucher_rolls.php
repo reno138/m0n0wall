@@ -71,7 +71,10 @@ $tabs = array('Users' => 'status_captiveportal.php',
     voucher_lock();
     $i = 0; foreach($a_roll as $rollent): 
     $used = voucher_used_count($rollent['number']);
-    $active = count(voucher_read_active_db($rollent['number']),$rollent['minutes']);
+    /* count()'s second argument is its MODE, not a value to pass through --
+       the roll's minutes landed there, and PHP 8 throws ValueError for any
+       mode that is not COUNT_NORMAL or COUNT_RECURSIVE. */
+    $active = count(voucher_read_active_db($rollent['number']));
     $ready = $rollent['count'] - $used;
 ?>
   <tr>

@@ -62,7 +62,7 @@ if ($_POST) {
 					unset($a_secret[$id]);
 					write_config();
 					touch($d_l2tpuserdirty_path);
-					header("Location: l2tp_users.php");
+					header("Location: vpn_l2tp_users.php");	/* the page is vpn_l2tp_users.php; the old target 404s after a delete */
 					exit;
 				}
 			}
