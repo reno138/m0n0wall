@@ -466,7 +466,9 @@ function interfaces_wlan_configure() {
 			$ifcargs .= " ssid " . escapeshellarg($wlan['ssid']) . " channel " . 
 				escapeshellarg($wlan['channel']);
 
-			if ($wlanmode == "ap" && isset($wlcfg['hidessid']))
+			/* $wlan, not $wlcfg: no such variable exists in this function, and
+			   isset() on it hid that, so Hide SSID never took effect. */
+			if ($wlanmode == "ap" && isset($wlan['hidessid']))
 				$ifcargs .= " hidessid";
 				
 			$ifcargs .= " up";
@@ -843,19 +845,36 @@ EOD;
 	fwrite($fd, $dhclientconf);
 	fclose($fd);
 	
-	/* fire up dhclient - don't wait for the lease (-nw) */
-	mwexec("/sbin/dhclient -nw -cf {$g['varetc_path']}/dhclient.conf -sf /sbin/dhclient-script " .
+	/* Fire up dhclient, backgrounding immediately rather than waiting for the
+	   lease (-b; ISC's spelling was -nw).
+
+	   The flags matter: FreeBSD's base dhclient is OpenBSD-derived and takes
+	   "dhclient [-bdqu] [-c file] [-l file] [-p file] interface". The old
+	   ISC flags -nw/-cf/-sf are not merely different spellings -- dhclient
+	   rejects them, prints its usage and exits 1, so a WAN set to DHCP (the
+	   factory default) never obtained an address at all. There is no -sf:
+	   the script path is compiled in as /sbin/dhclient-script, which is
+	   where m0n0wall installs its own. */
+	mwexec("/sbin/ifconfig " . escapeshellarg($wancfg['if']) . " up");
+	mwexec("/sbin/dhclient -b -c {$g['varetc_path']}/dhclient.conf " .
 		escapeshellarg($wancfg['if']));
 	
 	return 0;
 }
 
 function interfaces_wan_dhcp_down() {
-	global $g;
-	mwexec("/sbin/dhclient -r -nw -cf {$g['varetc_path']}/dhclient.conf -sf /sbin/dhclient-script ");
-	sleep(3);
-	/*make sure dhclient is killed and remove pid*/
+	global $config, $g;
+
+	/* Base dhclient has no release (-r) -- that was ISC's, and the old call
+	   passed no interface either, so this only ever reached the killall.
+	   Kill the client and drop the address explicitly. */
 	mwexec("/usr/bin/killall dhclient");
+	sleep(1);
+	if (!empty($config['interfaces']['wan']['if']))
+		mwexec("/sbin/ifconfig " . escapeshellarg($config['interfaces']['wan']['if']) . " delete");
+	/* base dhclient writes /var/run/dhclient.<interface>.pid */
+	if (!empty($config['interfaces']['wan']['if']))
+		unlink_if_exists("{$g['varrun_path']}/dhclient." . $config['interfaces']['wan']['if'] . ".pid");
 	unlink_if_exists("{$g['varrun_path']}/dhclient.pid");
 }
 

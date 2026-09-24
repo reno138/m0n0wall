@@ -435,6 +435,30 @@ function convert_friendly_interface_to_real_interface_name($interface) {
 }
 
 /* wrapper for exec() */
+/* Log a line to syslog, which syslog.conf routes to /var/log/system.log and,
+   if configured, to the remote server. Called from dyndns.inc and
+   interfaces.inc; it had never been defined, so every Dynamic DNS update
+   path died with "Call to undefined function log_error()". */
+function log_error($text) {
+	openlog("m0n0wall", LOG_ODELAY, LOG_USER);
+	syslog(LOG_ERR, $text);
+	closelog();
+	return true;
+}
+
+/* Hash a webGUI password for /var/run/htpasswd, which lighttpd's
+   mod_authn_file reads and checks with crypt(3).
+
+   crypt() with one argument has been an ArgumentCountError since PHP 8.0 --
+   before that it generated a random salt itself. Every caller passed one
+   argument, so changing a password from the GUI or from console option 3
+   was fatal. SHA-512 ($6$) rather than the DES the old default produced:
+   FreeBSD's libcrypt and lighttpd both accept it, and DES silently truncates
+   the password to eight characters. */
+function system_password_hash($password) {
+	return crypt($password, '$6$' . substr(bin2hex(random_bytes(9)), 0, 16) . '$');
+}
+
 function mwexec($command) {
 
 	global $g;

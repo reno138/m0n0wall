@@ -163,7 +163,10 @@ function voucher_auth($voucher_received, $test = 0) {
     }
 
     $active_vouchers[$first_voucher_roll][$first_voucher] = "$timestamp,$minutes";
-    voucher_write_active_db($roll, $active_vouchers[$first_voucher_roll]);
+    /* $first_voucher_roll, not $roll: $roll is left over from the parse loop
+       above and holds the LAST voucher's roll, so credit for a login using
+       vouchers from several rolls was written to the wrong roll's file. */
+    voucher_write_active_db($first_voucher_roll, $active_vouchers[$first_voucher_roll]);
 
     // mark the DB's as dirty.
     if ($fd = fopen($dirtyfile, "w"))
@@ -347,10 +350,14 @@ function voucher_used_count($roll) {
     $bitstring = voucher_read_used_db($roll);
     $max = strlen($bitstring) * 8;
     $used = 0;
-    for ($i = 1; $i <= $max; $i++) {
-        // check if ticket already used or not. 
-        $pos = $i >> 3;            // divide by 8 -> octet
-        $mask = 1 << (($i % 8)-1);  // mask to test bit in octet
+    /* Ticket n lives in bit (n % 8) of octet (n >> 3) -- the same layout
+       voucher_auth() uses. The old loop ran 1..max with "1 << (($i % 8) - 1)",
+       which is a shift by -1 on every eighth ticket: an ArithmeticError in
+       PHP 7+, so this page was fatal for any roll that had a bitmask. It also
+       read one octet past the end of the string on the last iteration. */
+    for ($i = 0; $i < $max; $i++) {
+        $pos = $i >> 3;             // divide by 8 -> octet
+        $mask = 1 << ($i % 8);      // mask to test bit in octet
         if (ord($bitstring[$pos]) & $mask)
             $used++;
     }   

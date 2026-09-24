@@ -56,6 +56,9 @@ function ipsec_ss_enc($alg, $keylen = null) {
 		case 'cast128':   return 'cast128';
 		case 'aes':
 		case 'rijndael':  return 'aes' . ($keylen ? $keylen : '128');
+		/* the GUI's own label for 256-bit Rijndael */
+		case 'rijndael 256':
+		case 'rijndael256': return 'aes256';
 		case 'aes128':    return 'aes128';
 		case 'aes192':    return 'aes192';
 		case 'aes256':    return 'aes256';
@@ -65,7 +68,31 @@ function ipsec_ss_enc($alg, $keylen = null) {
 	return 'aes256';
 }
 
+/* Local IKE identity. The GUI stores myident as an array whose single key
+   names the type: myaddress (use the local address, which strongSwan does by
+   default), address, fqdn, ufqdn, asn1dn. Interpolating the array itself
+   emitted "id = Array" as every tunnel's identity, so peers rejected the
+   phase-1 exchange. Returns null when strongSwan's default is right. */
+function ipsec_ss_myident($p1) {
+	if (empty($p1['myident']) || !is_array($p1['myident']))
+		return null;
+
+	foreach (array('address', 'fqdn', 'ufqdn', 'asn1dn') as $type) {
+		if (!empty($p1['myident'][$type]))
+			return ($type == 'asn1dn')
+			       ? '"' . $p1['myident'][$type] . '"'
+			       : $p1['myident'][$type];
+	}
+	return null;		/* myaddress, or an empty element */
+}
+
 function ipsec_ss_hash($alg) {
+	/* The webGUI stores phase-2 hashes as hmac_sha1, hmac_md5, hmac_sha256...
+	   (racoon's names). Without stripping the prefix nothing matched and
+	   every proposal silently fell through to sha256, so a peer configured
+	   for SHA-1 answered NO_PROPOSAL_CHOSEN. */
+	$alg = preg_replace('/^hmac[-_]/', '', strtolower(trim($alg)));
+
 	switch ($alg) {
 		case 'md5':       return 'md5';
 		case 'sha1':      return 'sha1';
@@ -212,8 +239,9 @@ function ipsec_ss_config_generate() {
 		$conns .= "\t\tlocal {\n";
 		if ($usepsk) {
 			$conns .= "\t\t\tauth = psk\n";
-			if (!empty($p1['myident']))
-				$conns .= "\t\t\tid   = {$p1['myident']}\n";
+			$myid = ipsec_ss_myident($p1);
+			if ($myid !== null)
+				$conns .= "\t\t\tid   = {$myid}\n";
 		} else {
 			$conns .= "\t\t\tauth  = pubkey\n";
 			if (!empty($p1['cert']))
@@ -285,8 +313,14 @@ function ipsec_ss_local_ts($tunnel) {
 		}
 		return null;
 	}
-	if (!empty($ls['address']))
+	if (!empty($ls['address'])) {
+		/* The GUI writes an explicit local subnet as "10.0.0.0/24" in
+		   ['address'] -- there is no 'netbits' key -- so appending one
+		   produced "10.0.0.0/24/32" and swanctl refused the connection. */
+		if (strpos($ls['address'], '/') !== false)
+			return $ls['address'];
 		return $ls['address'] . (!empty($ls['netbits']) ? "/{$ls['netbits']}" : "/32");
+	}
 
 	return null;
 }
@@ -338,8 +372,10 @@ function vpn_ipsec_configure($ipchg = false) {
 	return $rc;
 }
 
+/* pgrep is not in the image, so the old exec() always failed and charon was
+   relaunched (plus a 2 s sleep) on every call -- and a charon that had died
+   looked exactly like one that was running. killall -0 signals nothing and
+   just reports whether a process of that name exists. */
 function is_process_running($name) {
-	$out = array();
-	exec("/usr/bin/pgrep -x " . escapeshellarg($name) . " 2>/dev/null", $out);
-	return !empty($out);
+	return mwexec("/usr/bin/killall -0 " . escapeshellarg($name) . " 2>/dev/null") == 0;
 }

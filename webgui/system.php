@@ -132,7 +132,7 @@ if ($_POST) {
 		$config['system']['enableipv6'] = $_POST['enableipv6'] ? true : false;
 		
 		if ($_POST['password']) {
-			$config['system']['password'] = crypt($_POST['password']);
+			$config['system']['password'] = system_password_hash($_POST['password']);
 		}	
 		
 		$savemsgadd = "";

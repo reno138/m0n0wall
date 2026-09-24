@@ -122,7 +122,7 @@ if ($_SERVER['REMOTE_USER'] === $config['system']['username']) {
 	    		$userent['groupname'] = $_POST['groupname'];
     		
 	    		if ($_POST['password'])
-	    			$userent['password'] = crypt($_POST['password']);
+	    			$userent['password'] = system_password_hash($_POST['password']);
     		
 	    		if (isset($id) && $a_user[$id])
 	    			$a_user[$id] = $userent;
@@ -269,7 +269,7 @@ if($_GET['act']=="new" || $_GET['act']=="edit" || $input_errors){
     	
 		if (!$input_errors) {
 			//all values are okay --> saving changes
-			$config['system']['user'][$userindex[$_SERVER['REMOTE_USER']]]['password']=crypt(trim($_POST['password']));
+			$config['system']['user'][$userindex[$_SERVER['REMOTE_USER']]]['password']=system_password_hash(trim($_POST['password']));
 
 			write_config();
 			$retval = system_password_configure();

@@ -1,0 +1,15 @@
+#!/bin/sh
+# Sourced by /sbin/dhclient-script (exit_with_hooks) after a lease is applied.
+#
+# Tell the configuration system the WAN address changed: rc.newwanip reloads
+# the ruleset with the new address baked in, re-anchors IPsec and sends the
+# Dynamic DNS update.
+#
+# Guarded on an actual change. Without the test this ran on every RENEW --
+# every half lease time -- and each run rebuilds the whole pf ruleset, flushes
+# the NAT table and restarts charon. An empty $old_ip_address (the first lease
+# after boot) is a change, which is what we want.
+
+if [ "x$old_ip_address" != "x$new_ip_address" ]; then
+	/etc/rc.newwanip &
+fi

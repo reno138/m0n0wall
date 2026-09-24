@@ -115,6 +115,7 @@ usr/local/lib/lighttpd/mod_accesslog.so
 usr/local/lib/lighttpd/mod_alias.so
 usr/local/lib/lighttpd/mod_openssl.so
 usr/local/lib/ipsec/*.so
+usr/local/lib/ipsec/plugins/*.so
 usr/local/libexec/ipsec/*
 "
 

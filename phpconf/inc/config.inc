@@ -459,7 +459,7 @@ function convert_config() {
 		$config['dhcpd']['lan'] = $tmp;
 		
 		/* encrypt password */
-		$config['system']['password'] = crypt($config['system']['password']);
+		$config['system']['password'] = system_password_hash($config['system']['password']);
 		
 		$config['version'] = "1.2";
 	}

@@ -225,11 +225,16 @@ function services_dyndns_configure() {
 		return 0;
 
 	if ($g['booting']) {
-		/* At boot the WAN may not be up yet. rc.newwanip fires the update
-		   once an address exists; doing it here as well only produces a
-		   failed request and a confusing log line. */
-		echo "Dynamic DNS will update when the WAN address is known.\n";
-		return 0;
+		/* A dynamic WAN has no address yet; dhclient and ppp-linkup run
+		   rc.newwanip once it does, and that sends the update. A static WAN
+		   has its address now and nothing else will fire, so send it here --
+		   otherwise a static-WAN box never updated after a reboot. */
+		$wantype = isset($config['interfaces']['wan']['ipaddr'])
+		           ? $config['interfaces']['wan']['ipaddr'] : '';
+		if (in_array($wantype, array('dhcp', 'pppoe', 'pptp', 'bigpond', ''))) {
+			echo "Dynamic DNS will update when the WAN address is known.\n";
+			return 0;
+		}
 	}
 
 	return services_dyndns_send();

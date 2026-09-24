@@ -70,6 +70,12 @@
 	
 	/* perform RFC 2136 DNS update */
 	services_dnsupdate_process();
+
+	/* Dynamic DNS. services_dyndns_configure() deliberately does nothing at
+	   boot because the WAN address is not known yet -- it defers to this
+	   script, which never actually sent the update. The cache in
+	   /var/db/dyndns.cache stops an unchanged address being re-announced. */
+	services_dyndns_send();
 	
 	/* reconfigure IPsec tunnels */
 	vpn_ipsec_configure(true);
