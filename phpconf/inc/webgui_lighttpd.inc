@@ -75,7 +75,18 @@ function webgui_lighttpd_config_generate() {
 	$out .= "server.pid-file      = \"{$g['varrun_path']}/lighttpd.pid\"\n";
 	$out .= "server.errorlog      = \"{$g['varlog_path']}/lighttpd.log\"\n";
 	$out .= "server.indexfiles    = ( \"index.php\" )\n";
-	$out .= "server.max-request-size = 4096\n";   /* KB; config uploads are small */
+	/* KB. A firmware image is the largest thing the GUI ever receives and is
+	   ~41 MB today; 4096 was sized for a config backup and rejected the
+	   upload outright. Keep at or above php.ini's upload_max_filesize. */
+	$out .= "server.max-request-size = 102400\n";
+
+	/* Spool the request body to /ftmp, not the default /var/tmp. There is no
+	   /var/tmp on the image, so lighttpd logged "opening temp-file failed
+	   ... No such file or directory" and the upload died; and /var is not a
+	   separate filesystem, it lives on the ~98 MB root RAM disk with a few
+	   MB free. /ftmp is where rc.firmware mounts a RAM disk sized for the
+	   image before the upload starts. */
+	$out .= "server.upload-dirs = ( \"/ftmp\" )\n";
 	$out .= "accesslog.filename   = \"/dev/null\"\n\n";
 
 	$out .= "mimetype.assign = (\n";

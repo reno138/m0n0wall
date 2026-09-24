@@ -28,6 +28,10 @@ trap "echo 'Reboot interrupted'; exit 1" 3
 
 # make some directories in /var
 mkdir -p /var/run /var/log /var/etc /var/db /var/empty /var/spool/lock
+# pflogd chroots into /var/empty after dropping privileges to _pflogd; it must
+# exist and should not be writable. /var is an MFS recreated on every boot, so
+# the mode has to be set here rather than baked into the image.
+chmod 0555 /var/empty
 
 if [ -e /dev/md2 ]; then
 	# If syslinux boot, we need new links as fat32 in freebsd doesn't support symlinks

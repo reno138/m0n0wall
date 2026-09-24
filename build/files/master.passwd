@@ -1,0 +1,25 @@
+# m0n0wall master.passwd
+#
+# Taken from the file in etcadditional.tgz (2011) and brought forward. Stage 1
+# copies this over the tarball's copy and then runs pwd_mkdb, which regenerates
+# passwd, pwd.db and spwd.db from it -- so this file is the single source of
+# truth for image accounts.
+#
+# _pflogd was the reason this file had to become maintainable. pflogd chroots
+# to /var/empty and drops privileges to that user; without it, it exits with
+# "unknown user _pflogd" the instant it starts, and the entire firewall log is
+# silently empty. ipfilter's ipmon never needed a user, so nothing noticed when
+# the packet filter changed.
+# nologin lives in /sbin here (see build/minibsd/m0n0wall.files), not
+# /usr/sbin as on a full FreeBSD install.
+root:*:0:0::0:0:Charlie &:/root:/bin/sh
+toor:*:0:0::0:0:Bourne-again Superuser:/root:
+daemon:*:1:1::0:0:Owner of many system processes:/root:/sbin/nologin
+operator:*:2:5::0:0:System &:/:/sbin/nologin
+bin:*:3:7::0:0:Binaries Commands and Source:/:/sbin/nologin
+tty:*:4:65533::0:0:Tty Sandbox:/:/sbin/nologin
+kmem:*:5:65533::0:0:KMem Sandbox:/:/sbin/nologin
+_pflogd:*:64:64::0:0:pflogd privsep user:/var/empty:/sbin/nologin
+_dhcp:*:65:65::0:0:dhcp programs:/var/empty:/sbin/nologin
+www:*:80:80::0:0:World Wide Web Owner:/nonexistent:/sbin/nologin
+nobody:*:65534:65534::0:0:Unprivileged user:/nonexistent:/sbin/nologin

@@ -117,6 +117,19 @@ cp /etc/pf.os etc/ || { echo "ERROR: /etc/pf.os missing on the build host"; exit
 [ -f "$SRC/build/files/syslog.conf" ]       && cp "$SRC/build/files/syslog.conf" etc/
 # Also after the tarball: adds the address-change guard to the hook.
 [ -f "$SRC/build/files/dhclient-exit-hooks" ] && { cp "$SRC/build/files/dhclient-exit-hooks" etc/; chmod 0755 etc/dhclient-exit-hooks; }
+# Accounts. Also after the tarball, for the same reason, and then pwd_mkdb to
+# regenerate passwd/pwd.db/spwd.db -- a master.passwd the databases do not
+# match is worse than the old one, because getpwnam() reads the databases.
+if [ -f "$SRC/build/files/master.passwd" ]; then
+	cp "$SRC/build/files/master.passwd" etc/master.passwd
+	[ -f "$SRC/build/files/group" ] && cp "$SRC/build/files/group" etc/group
+	chmod 0600 etc/master.passwd
+	pwd_mkdb -p -d "$FS/etc" "$FS/etc/master.passwd" || {
+		echo "ERROR: pwd_mkdb failed -- pflogd and dhclient would not resolve their users"; exit 1; }
+	echo "  accounts: $(grep -c . etc/master.passwd) entries, databases rebuilt"
+fi
+# pflogd chroots here, so it must exist and be empty.
+mkdir -p var/empty && chmod 0555 var/empty
 
 echo "Populating the base system from the manifest..."
 perl "$SRC/build/minibsd/mkmini.pl" "$SRC/build/minibsd/m0n0wall.files" / "$FS/"

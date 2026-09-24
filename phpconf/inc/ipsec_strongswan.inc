@@ -41,6 +41,7 @@
  * ===========================================================================
  */
 
+define('SWANCTL_DIR', '/usr/local/etc/swanctl');
 define('SWANCTL_BIN', '/usr/local/sbin/swanctl');
 define('CHARON_BIN',  '/usr/local/libexec/ipsec/charon');
 
@@ -252,6 +253,11 @@ function ipsec_ss_config_generate() {
 		$conns .= "\t\tremote {\n";
 		$conns .= "\t\t\tauth = " . ($usepsk ? "psk" : "pubkey") . "\n";
 		$conns .= "\t\t\tid   = {$tunnel['remote-gateway']}\n";
+		/* Pin the peer to the certificate the operator pasted in, when they
+		   supplied one; otherwise any certificate a trusted CA signed is
+		   accepted. ipsec_ss_write_credentials() writes the file. */
+		if (!$usepsk && !empty($p1['peercert']))
+			$conns .= "\t\t\tcerts = {$name}-peer.crt\n";
 		$conns .= "\t\t}\n";
 
 		/* The child SA carries the actual traffic selectors. */
@@ -278,6 +284,96 @@ function ipsec_ss_config_generate() {
 			$secrets .= "\tike-{$name} {\n";
 			$secrets .= "\t\tid     = {$tunnel['remote-gateway']}\n";
 			$secrets .= "\t\tsecret = \"{$p1['pre-shared-key']}\"\n";
+			$secrets .= "\t}\n";
+		} else if (!empty($p1['private-key'])) {
+			/* swanctl loads the key by naming it here; it does not scan the
+			   private/ directory on its own. */
+			$secrets .= "\tprivate-{$name} {\n";
+			$secrets .= "\t\tfile = {$name}.key\n";
+			$secrets .= "\t}\n";
+		}
+	}
+
+	/* Road-warrior clients. One connection accepting any remote address --
+	   this is $config['ipsec']['mobileclients'], which the VPN > IPsec >
+	   Mobile clients page has always written and which nothing read until
+	   now, so those settings configured nothing at all. */
+	$mob = isset($ipseccfg['mobileclients']) && is_array($ipseccfg['mobileclients'])
+	       ? $ipseccfg['mobileclients'] : array();
+	if (isset($mob['enable'])) {
+		$mp1    = isset($mob['p1']) ? $mob['p1'] : array();
+		$mmode  = isset($mp1['mode']) ? $mp1['mode'] : '';
+		$mikev1 = ($mmode == 'main' || $mmode == 'aggressive');
+		$musepsk = (isset($mp1['authentication_method']) &&
+		            $mp1['authentication_method'] == 'pre_shared_key')
+		           || empty($mp1['cert']);
+
+		$conns .= "\tmobile {\n";
+		$conns .= "\t\tlocal_addrs  = %any\n";
+		/* the defining difference from a site-to-site tunnel */
+		$conns .= "\t\tremote_addrs = %any\n";
+		$conns .= "\t\tversion      = " . ($mikev1 ? "1" : "2") . "\n";
+		if ($mikev1 && $mmode == 'aggressive')
+			$conns .= "\t\taggressive   = yes\n";
+		$conns .= "\t\tproposals    = " . ipsec_ss_p1_proposal($mp1) . "\n";
+		if (!empty($mp1['lifetime']))
+			$conns .= "\t\trekey_time   = {$mp1['lifetime']}s\n";
+		if (!empty($mob['dpddelay'])) {
+			$conns .= "\t\tdpd_delay    = {$mob['dpddelay']}s\n";
+			$conns .= "\t\tdpd_timeout  = " . ((int)$mob['dpddelay'] * 4) . "s\n";
+		}
+
+		$conns .= "\t\tlocal {\n";
+		if ($musepsk) {
+			$conns .= "\t\t\tauth = psk\n";
+			$mid = ipsec_ss_myident($mp1);
+			if ($mid !== null)
+				$conns .= "\t\t\tid   = {$mid}\n";
+		} else {
+			$conns .= "\t\t\tauth  = pubkey\n";
+			$conns .= "\t\t\tcerts = mobile-local.crt\n";
+		}
+		$conns .= "\t\t}\n";
+
+		/* No id: the whole point is that we do not know who will connect.
+		   Each client authenticates with its own identity, matched against
+		   the secrets below. */
+		$conns .= "\t\tremote {\n";
+		$conns .= "\t\t\tauth = " . ($musepsk ? "psk" : "pubkey") . "\n";
+		$conns .= "\t\t}\n";
+
+		$conns .= "\t\tchildren {\n";
+		$conns .= "\t\t\tmobile {\n";
+		$lan_ts = ipsec_ss_local_ts(array('local-subnet' => array('network' => 'lan')));
+		if ($lan_ts !== null)
+			$conns .= "\t\t\t\tlocal_ts      = {$lan_ts}\n";
+		$conns .= "\t\t\t\tesp_proposals = " .
+		          ipsec_ss_p2_proposals(isset($mob['p2']) ? $mob['p2'] : array()) . "\n";
+		/* Never 'start' or 'trap': we cannot initiate to a roaming client,
+		   and a trap policy would black-hole LAN traffic. */
+		$conns .= "\t\t\t\tstart_action  = none\n";
+		$conns .= "\t\t\t\tdpd_action    = clear\n";
+		$conns .= "\t\t\t}\n";
+		$conns .= "\t\t}\n";
+		$conns .= "\t}\n";
+		$n++;
+
+		/* One secret per identity, from VPN > IPsec > Pre-shared keys. */
+		$mkeys = (isset($ipseccfg['mobilekey']) && is_array($ipseccfg['mobilekey']))
+		         ? $ipseccfg['mobilekey'] : array();
+		$k = 0;
+		foreach ($mkeys as $mk) {
+			if (empty($mk['ident']) || !isset($mk['pre-shared-key']))
+				continue;
+			$secrets .= "\tike-mobile{$k} {\n";
+			$secrets .= "\t\tid     = {$mk['ident']}\n";
+			$secrets .= "\t\tsecret = \"{$mk['pre-shared-key']}\"\n";
+			$secrets .= "\t}\n";
+			$k++;
+		}
+		if (!$musepsk && !empty($mp1['private-key'])) {
+			$secrets .= "\tprivate-mobile {\n";
+			$secrets .= "\t\tfile = mobile.key\n";
 			$secrets .= "\t}\n";
 		}
 	}
@@ -325,6 +421,81 @@ function ipsec_ss_local_ts($tunnel) {
 	return null;
 }
 
+/* Write the X.509 material charon needs onto disk.
+ *
+ * The webGUI stores certificates and private keys base64-encoded inside
+ * config.xml. strongSwan does not read them from there: swanctl loads
+ * credentials from files under its own directory, and the generator above
+ * names those files. Until this existed the generator emitted
+ * "certs = con0-local.crt" and nothing ever created con0-local.crt, so
+ * certificate authentication could not work at all -- every RSA-signature
+ * tunnel failed to load, with a message about a missing certificate.
+ *
+ * Everything is rewritten from config.xml on each call, so a tunnel that has
+ * been deleted or switched to a pre-shared key does not leave its key behind
+ * on a running firewall.
+ */
+function ipsec_ss_write_credentials() {
+	global $config;
+
+	$dirs = array('x509', 'private', 'x509ca');
+	foreach ($dirs as $d) {
+		@mkdir(SWANCTL_DIR . "/{$d}", 0700, true);
+		/* clear what we wrote last time -- nothing else owns these */
+		foreach ((array)@glob(SWANCTL_DIR . "/{$d}/*") as $old)
+			@unlink($old);
+	}
+
+	$put = function ($rel, $b64, $mode) {
+		if (empty($b64))
+			return;
+		$pem = base64_decode($b64);
+		if ($pem === false || trim($pem) === '')
+			return;
+		$path = SWANCTL_DIR . "/" . $rel;
+		$um = umask(0077);
+		@file_put_contents($path, $pem);
+		umask($um);
+		@chmod($path, $mode);
+	};
+
+	$ipseccfg = isset($config['ipsec']) && is_array($config['ipsec']) ? $config['ipsec'] : array();
+
+	/* CA and CRL certificates, shared by every tunnel. */
+	$cacerts = (isset($ipseccfg['cacert']) && is_array($ipseccfg['cacert']))
+	           ? $ipseccfg['cacert'] : array();
+	foreach ($cacerts as $i => $ca) {
+		if (empty($ca['cert']))
+			continue;
+		$put("x509ca/ca{$i}.crt", $ca['cert'], 0644);
+	}
+
+	/* Per-tunnel material. The names must match the generator exactly. */
+	$tunnels = (isset($ipseccfg['tunnel']) && is_array($ipseccfg['tunnel']))
+	           ? $ipseccfg['tunnel'] : array();
+	foreach ($tunnels as $i => $tunnel) {
+		if (isset($tunnel['disabled']) || empty($tunnel['remote-gateway']))
+			continue;
+		$p1 = isset($tunnel['p1']) ? $tunnel['p1'] : array();
+		if (!empty($p1['pre-shared-key']))
+			continue;                       /* psk tunnel: no files needed */
+		$name = ipsec_ss_conn_name($i, $tunnel);
+		$put("x509/{$name}-local.crt", isset($p1['cert']) ? $p1['cert'] : '', 0644);
+		$put("x509/{$name}-peer.crt",  isset($p1['peercert']) ? $p1['peercert'] : '', 0644);
+		$put("private/{$name}.key",    isset($p1['private-key']) ? $p1['private-key'] : '', 0600);
+	}
+
+	/* Road-warrior connection, if it authenticates with a certificate. */
+	$mob = isset($ipseccfg['mobileclients']) && is_array($ipseccfg['mobileclients'])
+	       ? $ipseccfg['mobileclients'] : array();
+	if (isset($mob['enable']) && isset($mob['p1'])) {
+		$put("x509/mobile-local.crt", isset($mob['p1']['cert']) ? $mob['p1']['cert'] : '', 0644);
+		$put("private/mobile.key",    isset($mob['p1']['private-key']) ? $mob['p1']['private-key'] : '', 0600);
+	}
+
+	return 0;
+}
+
 /* ---------------------------------------------------------------------------
  * Starting it
  * ------------------------------------------------------------------------ */
@@ -352,8 +523,11 @@ function vpn_ipsec_configure($ipchg = false) {
 	@chmod($conf, 0600);
 
 	/* charon reads swanctl.conf from its own directory. */
-	@mkdir("/usr/local/etc/swanctl", 0700, true);
-	@copy($conf, "/usr/local/etc/swanctl/swanctl.conf");
+	@mkdir(SWANCTL_DIR, 0700, true);
+	@copy($conf, SWANCTL_DIR . "/swanctl.conf");
+
+	/* ... and its certificates and keys from files beside it. */
+	ipsec_ss_write_credentials();
 
 	if (!is_process_running("charon")) {
 		mwexec_bg(CHARON_BIN);

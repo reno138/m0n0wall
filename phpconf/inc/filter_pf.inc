@@ -907,11 +907,33 @@ function pf_tables_v6_generate() {
 function pf_pflogd_start() {
 	global $g;
 
-	killbypid("{$g['varrun_path']}/pflogd.pid");
+	/* killall, not killbypid: pflogd's -p is not honoured in this build --
+	   it accepts the flag and writes no pidfile -- so there is nothing to
+	   read back. We record the pid ourselves below instead. */
+	mwexec("/usr/bin/killall pflogd");
+
 	mwexec("/sbin/ifconfig pflog0 create 2>/dev/null");
 	mwexec("/sbin/ifconfig pflog0 up");
-	return mwexec("/sbin/pflogd -f {$g['varlog_path']}/pflog.cap " .
-	              "-p {$g['varrun_path']}/pflogd.pid");
+
+	/* pflogd chroots to /var/empty and drops privileges to _pflogd. That
+	   account has to exist in the image or it exits immediately with
+	   "unknown user _pflogd" and the firewall log stays empty forever --
+	   see build/files/master.passwd. */
+	$rc = mwexec("/sbin/pflogd -f {$g['varlog_path']}/pflog.cap");
+
+	/* Write the pidfile ourselves, so newsyslog can signal a reopen when it
+	   rotates the capture. The privileged parent is the one to signal; the
+	   child runs as _pflogd and re-executes itself on SIGHUP. */
+	$out = array();
+	exec("/bin/ps -axo pid,command", $out);
+	foreach ($out as $line) {
+		if (preg_match('/^\s*(\d+)\s+pflogd:\s+\[priv\]/', $line, $m)) {
+			@file_put_contents("{$g['varrun_path']}/pflogd.pid", $m[1] . "\n");
+			break;
+		}
+	}
+
+	return $rc;
 }
 
 /* ---------------------------------------------------------------------------

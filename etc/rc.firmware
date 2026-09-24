@@ -15,9 +15,13 @@ fi
 
 case $1 in
 enable)
-	# Holds the uploaded image. 16m fitted a 2015 image; the image is ~38 MB
-	# gzipped now. Keep this above upload_max_filesize in php.ini.
-	/sbin/mdmfs -s 128m md1 /ftmp > /dev/null 2>&1
+	# Holds the uploaded image. 16m fitted a 2015 image; the image is ~41 MB
+	# now, and an upload transiently needs THREE copies here: lighttpd's spooled
+	# request body, php-cgi's own copy of the upload, and the final
+	# firmware.img. Keep this comfortably above 3x the image and above
+	# upload_max_filesize in php.ini. Fetching from a URL would need one copy;
+	# see the plan.
+	/sbin/mdmfs -s 192m md1 /ftmp > /dev/null 2>&1
 	;;
 upgrade)
 	# wait 5 seconds before beginning
