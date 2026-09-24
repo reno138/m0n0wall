@@ -48,12 +48,14 @@ if [ -z "$MW_BUILDPATH" ] || [ ! -d "$MW_BUILDPATH" ]; then
 fi
 : "${MW_ARCH:=amd64}"
 
+SRC="$MW_BUILDPATH/freebsd15"
 FS="$MW_BUILDPATH/m0n0fs"
 STAGE="$MW_BUILDPATH/tmp/pkgstage"
 [ -d "$FS" ] || { echo "$FS does not exist -- run stage 1 first"; exit 1; }
 
 PKGS="php84 php84-filter php84-session php84-sockets
       php84-xml php84-zlib php84-pcntl php84-posix php84-pecl-radius
+      php84-ctype php84-bcmath
       lighttpd dnsmasq mpd5 strongswan net-snmp wol
       dhcp6 isc-dhcp44-relay
       bind-tools wireguard-tools libqrencode"
@@ -284,6 +286,20 @@ if [ -s "$MW_BUILDPATH/tmp/ldmissing" ]; then
 	exit 1
 fi
 echo "  all objects load"
+
+# ---------------------------------------------------------------------------
+# The second gate: every PHP function the image calls must exist in the
+# image's PHP. Run inside the chroot so "available" means what the firewall
+# will have, not what the build host has -- php -l and the unit tests both
+# pass on a host with ctype and bcmath built in.
+# ---------------------------------------------------------------------------
+echo "Verifying every PHP function called by the image exists in it..."
+cp "$SRC/build/scripts/checkfuncs.php" "$FS/tmp/checkfuncs.php"
+chroot "$FS" /usr/local/bin/php -d error_reporting=E_ALL /tmp/checkfuncs.php
+rc=$?
+rm -f "$FS/tmp/checkfuncs.php"
+[ $rc -eq 0 ] || exit 1
+
 # etc/rc regenerates this at every boot; don't ship a stale one.
 rm -f "$FS/var/run/ld-elf.so.hints"
 
