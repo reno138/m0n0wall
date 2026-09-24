@@ -560,7 +560,11 @@ EOD;
 		/* net-snmp's pidfile flag is lowercase -p; -P means something else
 		   entirely (which MIB modules to load). With -P the daemon starts,
 		   writes no pidfile, and killbypid() can never stop it again. */
-		mwexec("/usr/local/sbin/snmpd -c {$g['varetc_path']}/snmpd.conf" .
+		/* -I -smux: net-snmp otherwise also opens tcp/199 (SMUX) on every
+		   interface. Nothing here speaks SMUX, and agentaddress only binds
+		   the SNMP socket, so without this there is a second listener the
+		   operator never asked for. */
+		mwexec("/usr/local/sbin/snmpd -I -smux -c {$g['varetc_path']}/snmpd.conf" .
 			" -p {$g['varrun_path']}/snmpd.pid");
 
 		if ($g['booting'])
