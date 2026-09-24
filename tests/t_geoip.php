@@ -69,4 +69,34 @@ is_false('rejects a digit',             is_country_code("U1"));
 is_false('rejects empty',               is_country_code(""));
 is_false('rejects null',                is_country_code(null));
 
+/* --- config round trip ------------------------------------------------- */
+/* The settings this feature writes must survive dump_xml_config() and come
+   back through parse_xml_config(). A numerically-indexed array whose key is
+   not in $listtags serialises as <0>AD</0>, which is not a legal XML element
+   name -- the file then fails to parse and every page dies with "XML error:
+   XML_ERR_NAME_REQUIRED". That happened; this is the guard. */
+require MW_ROOT . '/phpconf/inc/xmlparse.inc';
+
+$cfg = array(
+	'system' => array('hostname' => 'm0n0wall'),
+	'geoip'  => array('interval' => 168, 'country' => 'AD,US'),
+	'filter' => array('rule' => array(
+		array('type' => 'block', 'interface' => 'wan',
+		      'source' => array('country' => 'CN,RU'),
+		      'destination' => array('any' => true)),
+	)),
+);
+$xml = dump_xml_config($cfg, 'm0n0wall');
+is_true('serialised config has no numeric element name',
+        preg_match('/<\/?\d+[\s>]/', $xml) === 0);
+
+$tmp = tempnam(sys_get_temp_dir(), 'geoipcfg');
+file_put_contents($tmp, $xml);
+$back = parse_xml_config($tmp, 'm0n0wall');
+unlink($tmp);
+is_true('config survives the round trip', is_array($back));
+is_same('geoip country preserved',        $back['geoip']['country'] ?? null, 'AD,US');
+is_same('geoip interval preserved',       $back['geoip']['interval'] ?? null, '168');
+is_same('rule country preserved',         $back['filter']['rule'][0]['source']['country'] ?? null, 'CN,RU');
+
 exit(mw_report('geoip.inc'));

@@ -172,10 +172,19 @@ function geoip_countries_in_use() {
 		}
 	}
 
-	if (isset($config['geoip']['country']) && is_array($config['geoip']['country'])) {
-		foreach ($config['geoip']['country'] as $cc)
+	/* A comma-separated string, the same representation a rule side uses.
+	   NOT a PHP list: config.xml is serialised by walking the array, and a
+	   numerically-indexed array whose key is not in $listtags comes out as
+	   <0>AD</0> -- which is not a legal XML element name, so the next read of
+	   config.xml fails and takes the whole webGUI with it. Only names in
+	   $listtags may be lists, and 'country' cannot join them because a rule
+	   side stores several countries in one element. */
+	if (!empty($config['geoip']['country'])) {
+		foreach (explode(',', (string)$config['geoip']['country']) as $cc) {
+			$cc = trim($cc);
 			if (is_country_code($cc))
 				$ccs[strtoupper($cc)] = true;
+		}
 	}
 
 	$out = array_keys($ccs);

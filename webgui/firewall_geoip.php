@@ -35,8 +35,7 @@ if (!is_array($config['geoip'] ?? null))
 	$config['geoip'] = array();
 
 $pconfig['interval'] = $config['geoip']['interval'] ?? 168;
-$pconfig['country']  = isset($config['geoip']['country']) && is_array($config['geoip']['country'])
-                       ? implode(', ', $config['geoip']['country']) : '';
+$pconfig['country']  = $config['geoip']['country'] ?? '';
 
 if ($_POST) {
 
@@ -65,7 +64,8 @@ if ($_POST) {
 		if (empty($extra))
 			unset($config['geoip']['country']);
 		else
-			$config['geoip']['country'] = array_keys($extra);
+			/* a string, not a list -- see geoip_countries_in_use() */
+			$config['geoip']['country'] = implode(',', array_keys($extra));
 
 		write_config();
 
