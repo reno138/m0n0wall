@@ -57,21 +57,12 @@ if (isset($_POST['del_x']) && is_array($_POST['entries'] ?? null)) {
 	}
 	
 	if (empty($input_errors)) {
-		foreach ($_POST['entries'] as $entry) {
-			// Scheduler: delete matching jobs
+		foreach ($_POST['entries'] as $entry)
 			croen_update_job('shaper-set_queue_weight', $a_queues[$entry]['descr'] ?? null);
-			unset($a_queues[$entry]);
-	
-			/* renumber all rules */
-			if (is_array($config['shaper']['rule'] ?? null)) {
-				for ($i = 0; isset($config['shaper']['rule'][$i]); $i++) {
-					$currule = &$config['shaper']['rule'][$i];
-					if (isset($currule['targetqueue']) && ($currule['targetqueue'] > $entry))
-						$currule['targetqueue']--;
-				}
-			}
-		}
-	
+
+		/* see the note in firewall_shaper_pipes.php: one pass, in shaper.inc */
+		shaper_remove_entries('queue', $_POST['entries']);
+
 		write_config();
 		touch($d_shaperconfdirty_path);
 		header("Location: firewall_shaper_queues.php");

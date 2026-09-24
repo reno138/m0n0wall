@@ -112,4 +112,91 @@ is_same('an ordinary rule set generates with no diagnostics', $errors, array());
 is_true('and it still produces rules', strpos($out, 'set 4') !== false);
 is_true('the port range is emitted', strpos($out, '80-443') !== false);
 
+/* --- REGRESSION: deleting pipes/queues must renumber every reference -------
+ *
+ * The three inline versions of this (pipes delete, queues delete, magic wizard)
+ * were each wrong. The multi-entry case is the one that matters: the old code
+ * looped once per victim and compared an already-decremented target against the
+ * next raw index, so it under-counted the shift above the second victim. */
+function mk_shaper() {
+    return array(
+      'pipe' => array(
+        array('descr'=>'p0','bandwidth'=>'100'),
+        array('descr'=>'p1','bandwidth'=>'200'),
+        array('descr'=>'p2','bandwidth'=>'300'),
+        array('descr'=>'p3','bandwidth'=>'400'),
+        array('descr'=>'p4','bandwidth'=>'500'),
+      ),
+      'queue' => array(
+        array('descr'=>'q0','targetpipe'=>'0','weight'=>'1'),
+        array('descr'=>'q1','targetpipe'=>'4','weight'=>'2'),
+      ),
+      'rule' => array(
+        array('descr'=>'r0','targetpipe'=>'0'),
+        array('descr'=>'r1','targetpipe'=>'2'),
+        array('descr'=>'r2','targetpipe'=>'4'),
+        array('descr'=>'r3','targetqueue'=>'1'),
+      ),
+    );
+}
+
+/* delete pipes 1 and 3 in ONE action: 0 stays 0, 2 becomes 1, 4 becomes 2 */
+$config['shaper'] = mk_shaper();
+shaper_remove_entries('pipe', array(1, 3));
+is_same('two pipes removed', count($config['shaper']['pipe']), 3);
+is_same('the surviving pipes are the right ones',
+        array_map(function ($p) { return $p['descr']; }, $config['shaper']['pipe']),
+        array('p0','p2','p4'));
+is_same('a reference below both victims is unchanged',  $config['shaper']['rule'][0]['targetpipe'], 0);
+is_same('a reference between them shifts by one',       $config['shaper']['rule'][1]['targetpipe'], 1);
+is_same('a reference above both shifts by TWO',         $config['shaper']['rule'][2]['targetpipe'], 2);
+is_same('a queue reference is remapped as well',        $config['shaper']['queue'][1]['targetpipe'], 2);
+is_same('and one below is left alone',                  $config['shaper']['queue'][0]['targetpipe'], 0);
+
+/* the remapped indices must still resolve when the ruleset is generated */
+$config['interfaces'] = array(
+  'lan' => array('if'=>'em1','ipaddr'=>'10.0.0.1','subnet'=>'24'),
+  'wan' => array('if'=>'em0','ipaddr'=>'dhcp'),
+);
+foreach ($config['shaper']['rule'] as $k => $unused) {
+    $config['shaper']['rule'][$k]['interface'] = 'lan';
+    $config['shaper']['rule'][$k]['direction'] = 'out';
+    $config['shaper']['rule'][$k]['source'] = array('any'=>true);
+    $config['shaper']['rule'][$k]['destination'] = array('any'=>true);
+}
+$errors = array();
+set_error_handler(function ($no, $str) use (&$errors) { $errors[] = $str; return true; });
+ob_start(); $out = shaper_rules_generate(); $noise = ob_get_clean();
+restore_error_handler();
+is_same('no diagnostics after a renumber', $errors, array());
+is_false('and no unresolvable pipe', strpos($noise, 'not found') !== false);
+is_true ('the highest surviving pipe is still referenced', strpos($out, 'pipe 3 ') !== false);
+
+/* deleting a single entry must behave exactly as it always did */
+$config['shaper'] = mk_shaper();
+shaper_remove_entries('pipe', array(1));
+is_same('single delete: below is unchanged', $config['shaper']['rule'][0]['targetpipe'], 0);
+is_same('single delete: above shifts by one', $config['shaper']['rule'][1]['targetpipe'], 1);
+
+/* queues renumber the rules that target them */
+$config['shaper'] = mk_shaper();
+shaper_remove_entries('queue', array(0));
+is_same('a rule targeting queue 1 now targets queue 0',
+        $config['shaper']['rule'][3]['targetqueue'], 0);
+
+/* a reference to something that IS being deleted cannot work, so it is
+ * disabled rather than left pointing at whatever lands on that index */
+$config['shaper'] = mk_shaper();
+$n = shaper_remove_entries('pipe', array(0));
+is_same('the dangling reference is reported', $n, 2);   /* rule r0 and queue q0 */
+is_true ('the rule that pointed at it is disabled',  isset($config['shaper']['rule'][0]['disabled']));
+is_true ('the queue that pointed at it is disabled', isset($config['shaper']['queue'][0]['disabled']));
+is_false('an unrelated rule is left enabled',        isset($config['shaper']['rule'][1]['disabled']));
+
+/* deleting nothing must change nothing */
+$config['shaper'] = mk_shaper();
+$before = $config['shaper'];
+shaper_remove_entries('pipe', array());
+is_same('deleting nothing is a no-op', $config['shaper'], $before);
+
 exit(mw_report('shaper'));

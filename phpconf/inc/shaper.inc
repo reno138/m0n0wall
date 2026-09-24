@@ -126,6 +126,90 @@ function shaper_configure() {
 	return 0;
 }
 
+/* Remove entries from the pipe or queue list and fix every reference to them.
+ *
+ * Pipes and queues are referenced BY ARRAY INDEX: a rule says targetpipe = 2,
+ * a queue says targetpipe = 0. So deleting an entry shifts the meaning of every
+ * index above it, and the lists are re-indexed contiguously the next time the
+ * config is written -- there is no way to keep a hole.
+ *
+ * Every caller used to do this inline, and all of them were wrong in the same
+ * way: they looped once per deleted entry and compared an ALREADY-DECREMENTED
+ * target against the next raw, pre-deletion index. Deleting two entries in one
+ * action therefore under-counted the shift for every reference above the second
+ * one, silently pointing rules at the wrong pipe -- or at one that no longer
+ * exists, which ipfw rejects. The magic-shaper wizard did not renumber at all.
+ *
+ * Doing it in one pass removes the class of bug: the old -> new map is computed
+ * from the survivors BEFORE anything is removed, so no arithmetic depends on
+ * the order the victims are processed in.
+ *
+ * $type    'pipe' or 'queue'
+ * $victims array of indices to remove
+ *
+ * A surviving rule or queue that pointed AT a victim cannot work any more, so it
+ * is disabled rather than silently deleted or left pointing somewhere arbitrary.
+ * Returns the number of entries disabled that way, so a caller can tell the user.
+ */
+function shaper_remove_entries($type, $victims) {
+	global $config;
+
+	if ($type !== 'pipe' && $type !== 'queue')
+		return 0;
+	if (!is_array($config['shaper'][$type] ?? null) || !is_array($victims))
+		return 0;
+
+	if (empty($victims))
+		return 0;                         /* nothing to do, and nothing to touch */
+
+	$victims = array_map('intval', $victims);
+	$list    = &$config['shaper'][$type];
+
+	/* old index -> new index over the survivors; null marks a victim */
+	$map = array();
+	$new = 0;
+	foreach (array_keys($list) as $old) {
+		$map[(int) $old] = in_array((int) $old, $victims, true) ? null : $new++;
+	}
+
+	foreach ($victims as $v)
+		unset($list[$v]);
+	$list = array_values($list);
+
+	/* Which reference fields point at this kind of entry?
+	   A queue belongs to a pipe, and a rule targets one or the other. */
+	$refs = ($type === 'pipe')
+	        ? array(array('rule', 'targetpipe'), array('queue', 'targetpipe'))
+	        : array(array('rule', 'targetqueue'));
+
+	$disabled = 0;
+	foreach ($refs as $r) {
+		list($section, $field) = $r;
+		if (!is_array($config['shaper'][$section] ?? null))
+			continue;
+		foreach ($config['shaper'][$section] as $k => $unused) {
+			$ent = &$config['shaper'][$section][$k];
+			if (!isset($ent[$field]) || $ent[$field] === '')
+				continue;
+			$old = (int) $ent[$field];
+			if (!array_key_exists($old, $map))
+				continue;                     /* already dangling; leave it */
+			if ($map[$old] === null) {
+				/* it pointed at something that is now gone */
+				if (!isset($ent['disabled'])) {
+					$ent['disabled'] = true;
+					$disabled++;
+				}
+			} else {
+				$ent[$field] = $map[$old];
+			}
+			unset($ent);
+		}
+	}
+
+	return $disabled;
+}
+
 function shaper_rules_generate() {
 	global $config, $g;
 

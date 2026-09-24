@@ -37,17 +37,37 @@ require("guiconfig.inc");
 function wipe_magic () {
   global $config;
 
-  /* wipe previous */
-  $types=array("pipe","queue","rule");
-  foreach ($types as $type) {
+  /* Wipe the wizard's own entries -- those whose description starts "m_".
+  
+     Rules can simply be dropped: nothing references a rule. Pipes and queues
+     are referenced BY INDEX by the user-defined entries this deliberately
+     preserves, so removing one silently re-points every reference above it once
+     the lists are re-indexed on the next config write. This function did not
+     renumber at all, so running the wizard twice left every surviving
+     user-defined rule pointing at the wrong pipe. shaper_remove_entries()
+     does the removal and the renumbering in one pass. */
+  $victims = array('pipe' => array(), 'queue' => array());
+
+  foreach (array("rule", "pipe", "queue") as $type) {
+    if (!is_array($config['shaper'][$type] ?? null))
+      continue;
     foreach (array_keys($config['shaper'][$type]) as $num) {
-    if (substr($config['shaper'][$type][$num]['descr'] ?? '',0,2) == "m_") {
-	  // Scheduler: delete matching jobs
-	  croen_update_job(($type == 'rule' ? Array('shaper-enable_rule', 'shaper-disable_rule') : ($type == 'pipe' ? 'shaper-set_pipe_bandwidth' : 'shaper-set_queue_weight')), $config['shaper'][$type][$num]['descr']);
-      unset($config['shaper'][$type][$num]);
-    }
+      if (substr($config['shaper'][$type][$num]['descr'] ?? '',0,2) != "m_")
+        continue;
+      // Scheduler: delete matching jobs
+      croen_update_job(($type == 'rule' ? Array('shaper-enable_rule', 'shaper-disable_rule') : ($type == 'pipe' ? 'shaper-set_pipe_bandwidth' : 'shaper-set_queue_weight')), $config['shaper'][$type][$num]['descr']);
+      if ($type == 'rule')
+        unset($config['shaper'][$type][$num]);
+      else
+        $victims[$type][] = $num;
     }
   }
+  $config['shaper']['rule'] = array_values($config['shaper']['rule'] ?? array());
+
+  /* queues before pipes: a queue's targetpipe has to be remapped by the pipe
+     pass, and it must not still be in the list if it is itself going away */
+  shaper_remove_entries('queue', $victims['queue']);
+  shaper_remove_entries('pipe',  $victims['pipe']);
   /* Although we don't delete user-defined rules, it's probably best to
      disable the shaper to prevent bad things from happening */
   $config['shaper']['enable'] = FALSE;

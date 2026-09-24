@@ -66,27 +66,15 @@ if (isset($_POST['del_x']) && is_array($_POST['entries'] ?? null)) {
 	}
 	
 	if (empty($input_errors)) {
-		foreach ($_POST['entries'] as $entry) {
-			// Scheduler: delete matching jobs
+		/* Scheduler jobs first, while the indices still mean what they did on
+		   the page the user submitted. */
+		foreach ($_POST['entries'] as $entry)
 			croen_update_job('shaper-set_pipe_bandwidth', $a_pipes[$entry]['descr'] ?? null);
-			unset($a_pipes[$entry]);
 
-			/* renumber all rules and queues */
-			if (is_array($config['shaper']['rule'] ?? null)) {
-				for ($i = 0; isset($config['shaper']['rule'][$i]); $i++) {
-					$currule = &$config['shaper']['rule'][$i];
-					if (isset($currule['targetpipe']) && ($currule['targetpipe'] > $entry))
-						$currule['targetpipe']--;
-				}
-			}
-			if (is_array($config['shaper']['queue'] ?? null)) {
-				for ($i = 0; isset($config['shaper']['queue'][$i]); $i++) {
-					$curqueue = &$config['shaper']['queue'][$i];
-					if (($curqueue['targetpipe'] ?? null) > $entry)
-						$curqueue['targetpipe']--;
-				}
-			}
-		}
+		/* One pass, in shaper.inc: renumbering inline here was wrong for any
+		   multi-entry delete, because each iteration compared an already
+		   decremented target against the next raw index. */
+		shaper_remove_entries('pipe', $_POST['entries']);
 
 		write_config();
 		touch($d_shaperconfdirty_path);
