@@ -173,6 +173,10 @@
 	/* start Scheduler */
 	services_croen_configure();
 	
+	/* refresh the GeoIP tables periodically (and load whatever is on disk) */
+	geoip_tables_reload();
+	services_geoip_configure();
+	
 	/* set up termcap (for the firewall states page) */
 	system_set_termcap();
 	

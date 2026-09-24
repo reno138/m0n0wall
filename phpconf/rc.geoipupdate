@@ -1,0 +1,36 @@
+#!/usr/local/bin/php -f
+<?php
+/*
+	rc.geoipupdate
+	part of m0n0wall (http://m0n0.ch/wall)
+
+	Refresh the country tables and make them effective.
+
+	Run by minicron on the interval from Firewall: GeoIP, and by the "Update
+	now" button on that page. Safe to run concurrently with itself only in the
+	sense that the second run wastes bandwidth -- each country file is written
+	to a .new and renamed, so a reader never sees a half-written table.
+*/
+
+	require_once("config.inc");
+	require_once("functions.inc");
+
+	list($written, $errors) = geoip_update();
+
+	foreach ($errors as $e)
+		log_error("GeoIP: {$e}");
+
+	if (!empty($written)) {
+		$parts = array();
+		foreach ($written as $cc => $n)
+			$parts[] = "{$cc}={$n}";
+		log_error("GeoIP: updated " . implode(" ", $parts));
+
+		/* Load into the running pf without rebuilding the rule set, then
+		   rebuild anyway: a table declared 'persist' with no file at boot has
+		   to become a file-backed one for pfctl -sr to show where it came
+		   from, and the rule set is cheap to regenerate. */
+		geoip_tables_reload();
+		filter_configure();
+	}
+?>

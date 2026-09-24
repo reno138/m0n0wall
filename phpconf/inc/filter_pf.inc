@@ -30,6 +30,13 @@
 	POSSIBILITY OF SUCH DAMAGE.
 */
 
+/* geoip.inc provides the country tables pf_tables_generate() declares and the
+   <geo_XX> names pf_rule_endpoint() emits. Required here rather than left to
+   functions.inc's ordering: this file was once loaded only by the tests
+   because nothing required it, and a dependency that works by luck of load
+   order is the same mistake one level down. */
+require_once("geoip.inc");
+
 /* ===========================================================================
  * ipfilter -> pf: the translation decisions
  * ===========================================================================
@@ -296,6 +303,14 @@ function pf_options_generate() {
 	$out .= "set skip on lo0\n";          /* replaces the two explicit lo0 passes */
 	$out .= "set optimization normal\n";
 
+	/* Country tables are large: one country runs to tens of thousands of
+	   prefixes and pf's default limit is 200000 entries for ALL tables
+	   together, so a couple of countries can exhaust it and pfctl then
+	   rejects the whole rule set. Raised only when a rule actually uses a
+	   country, so a firewall that does not runs with the stock limit. */
+	if (count(geoip_countries_in_use()) > 0)
+		$out .= "set limit table-entries 1000000\n";
+
 	if (!empty($config['filter']['tcpidletimeout'])) {
 		$t = $config['filter']['tcpidletimeout'] * 2;
 		$out .= "set timeout tcp.established $t\n";
@@ -427,6 +442,20 @@ function pf_resolve_network($token, $ctx) {
 function pf_rule_endpoint($side, $ctx) {
 	if (isset($side['any']))
 		return "any";
+	/* Country before the rest: a rule may name several, and pf takes a list
+	   of tables inside braces, so "from { <geo_CN>, <geo_RU> }" is one rule
+	   rather than one rule per country. */
+	if (!empty($side['country'])) {
+		$tbls = array();
+		foreach (explode(',', $side['country']) as $cc) {
+			$cc = trim($cc);
+			if (is_country_code($cc))
+				$tbls[] = "<" . geoip_table_name($cc) . ">";
+		}
+		if (empty($tbls))
+			return null;
+		return (count($tbls) == 1) ? $tbls[0] : "{ " . implode(", ", $tbls) . " }";
+	}
 	if (!empty($side['network']))
 		return pf_resolve_network($side['network'], $ctx);
 	if (!empty($side['address']))
@@ -544,6 +573,21 @@ function pf_tables_generate() {
 		$out .= "table <priv> const { 10.0.0.0/8, 127.0.0.0/8, " .
 		        "172.16.0.0/12, 192.168.0.0/16 }\n";
 	}
+
+	/* One table per country any rule refers to. Declared even when the file is
+	   missing -- 'persist' keeps an empty table alive, so the rule set always
+	   loads and the rule simply matches nothing until geoip_update() has run.
+	   See the header of geoip.inc: this fails open on purpose, and the GeoIP
+	   status page is where you confirm the tables are actually populated. */
+	foreach (geoip_countries_in_use() as $cc) {
+		$tbl  = geoip_table_name($cc);
+		$file = geoip_file($cc);
+		if (file_exists($file))
+			$out .= "table <{$tbl}> persist file \"{$file}\"\n";
+		else
+			$out .= "table <{$tbl}> persist\t# no data yet: matches nothing\n";
+	}
+
 	return $out;
 }
 

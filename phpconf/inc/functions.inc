@@ -47,6 +47,7 @@ require_once("dhcp_dnsmasq.inc");
 require_once("webgui_lighttpd.inc");
 require_once("dyndns.inc");
 require_once("ipsec_strongswan.inc");
+require_once("geoip.inc");		/* country tables for filter rules */
 require_once("captiveportal_lighttpd.inc");
 require_once("captiveportal.inc");
 require_once("voucher.inc");

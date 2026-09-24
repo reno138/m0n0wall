@@ -135,6 +135,7 @@ $menu['Firewall']['Traffic shaper'] = array('firewall_shaper.php',
 							  				'firewall_shaper_queues.php',
 											'firewall_shaper_magic.php');
 $menu['Firewall']['Aliases']        = array('firewall_aliases.php');
+$menu['Firewall']['GeoIP']          = array('firewall_geoip.php');
 
 $menu['Services']['DNS forwarder']	= array('services_dnsmasq.php');
 $menu['Services']['Dynamic DNS'] 	= array('services_dyndns.php');

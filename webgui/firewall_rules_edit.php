@@ -102,6 +102,22 @@ function address_to_pconfig($adr, &$padr, &$pmask, &$pnot, &$pbeginport, &$pendp
 	}
 }
 
+/* "cn, RU , zz" -> array("CN","RU","ZZ"), or false if any entry is not a
+   two-letter code. These end up in a pf table name and a filename, so they
+   are validated here and again in geoip.inc rather than trusted. */
+function country_list_normalise($raw) {
+	$out = array();
+	foreach (explode(',', (string)$raw) as $cc) {
+		$cc = trim($cc);
+		if ($cc === '')
+			continue;
+		if (!is_country_code($cc))
+			return false;
+		$out[strtoupper($cc)] = true;
+	}
+	return empty($out) ? false : array_keys($out);
+}
+
 function pconfig_to_address(&$adr, $padr, $pmask, $pnot, $pbeginport, $pendport) {
 	global $maxnetmask;
 	
@@ -129,6 +145,18 @@ function pconfig_to_address(&$adr, $padr, $pmask, $pnot, $pbeginport, $pendport)
 
 if (isset($id) && !empty($a_filter[$id])) {
 	$pconfig['interface'] = $a_filter[$id]['interface'];
+
+	/* Country: handled beside address_to_pconfig() rather than inside it,
+	   because that helper is shared with the NAT and shaper pages and a rule
+	   side is either a country or an address, never both. */
+	if (!empty($a_filter[$id]['source']['country'])) {
+		$pconfig['src'] = "country";
+		$pconfig['srccountry'] = $a_filter[$id]['source']['country'];
+	}
+	if (!empty($a_filter[$id]['destination']['country'])) {
+		$pconfig['dst'] = "country";
+		$pconfig['dstcountry'] = $a_filter[$id]['destination']['country'];
+	}
 	
 	if (!isset($a_filter[$id]['type']))
 		$pconfig['type'] = "pass";
@@ -208,13 +236,19 @@ if ($_POST) {
 			$_POST['dstendport'] = $_POST['dstbeginport'];		
 	}
 		
-	if (is_specialnet($_POST['srctype'])) {
+	if (($_POST['srctype'] ?? '') == "country") {
+		$_POST['src'] = "country";
+		$_POST['srcmask'] = 0;
+	} else if (is_specialnet($_POST['srctype'])) {
 		$_POST['src'] = $_POST['srctype'];
 		$_POST['srcmask'] = 0;
 	} else if ($_POST['srctype'] == "single") {
 		$_POST['srcmask'] = $maxnetmask;
 	}
-	if (is_specialnet($_POST['dsttype'])) {
+	if (($_POST['dsttype'] ?? '') == "country") {
+		$_POST['dst'] = "country";
+		$_POST['dstmask'] = 0;
+	} else if (is_specialnet($_POST['dsttype'])) {
 		$_POST['dst'] = $_POST['dsttype'];
 		$_POST['dstmask'] = 0;
 	}  else if ($_POST['dsttype'] == "single") {
@@ -228,11 +262,13 @@ if ($_POST) {
 	$reqdfields = explode(" ", "type interface proto src dst");
 	$reqdfieldsn = explode(",", "Type,Interface,Protocol,Source,Destination");
 	
-	if (!(is_specialnet($_POST['srctype']) || ($_POST['srctype'] == "single"))) {
+	if (!(is_specialnet($_POST['srctype']) || ($_POST['srctype'] == "single")
+	      || ($_POST['srctype'] ?? '') == "country")) {
 		$reqdfields[] = "srcmask";
 		$reqdfieldsn[] = "Source bit count";
 	}
-	if (!(is_specialnet($_POST['dsttype']) || ($_POST['dsttype'] == "single"))) {
+	if (!(is_specialnet($_POST['dsttype']) || ($_POST['dsttype'] == "single")
+	      || ($_POST['dsttype'] ?? '') == "country")) {
 		$reqdfields[] = "dstmask";
 		$reqdfieldsn[] = "Destination bit count";
 	}
@@ -265,7 +301,10 @@ if ($_POST) {
 		$input_errors[] = "The end destination port must be an integer between 1 and 65535.";
 	}
 	
-	if (!is_specialnet($_POST['srctype'])) {
+	if (($_POST['srctype'] ?? '') == "country") {
+		if (country_list_normalise($_POST['srccountry'] ?? '') === false)
+			$input_errors[] = "Source: enter one or more two-letter country codes, separated by commas.";
+	} else if (!is_specialnet($_POST['srctype'])) {
 		if ($_POST['src'] && !($ipv6rules ? is_ipaddr6($_POST['src']) : is_ipaddroranyalias($_POST['src']))) {
 			$input_errors[] = "A valid source IP address or alias must be specified.";
 		}
@@ -273,7 +312,10 @@ if ($_POST) {
 			$input_errors[] = "A valid source bit count must be specified.";
 		}
 	}
-	if (!is_specialnet($_POST['dsttype'])) {
+	if (($_POST['dsttype'] ?? '') == "country") {
+		if (country_list_normalise($_POST['dstcountry'] ?? '') === false)
+			$input_errors[] = "Destination: enter one or more two-letter country codes, separated by commas.";
+	} else if (!is_specialnet($_POST['dsttype'])) {
 		if ($_POST['dst'] && !($ipv6rules ? is_ipaddr6($_POST['dst']) : is_ipaddroranyalias($_POST['dst']))) {
 			$input_errors[] = "A valid destination IP address or alias must be specified.";
 		}
@@ -317,6 +359,20 @@ if ($_POST) {
 		pconfig_to_address($filterent['destination'], $_POST['dst'],
 			$_POST['dstmask'], $_POST['dstnot'] ?? null,
 			$_POST['dstbeginport'], $_POST['dstendport']);
+
+		/* Country replaces the address on that side. pconfig_to_address() ran
+		   first so 'not' and the ports it parsed are kept; only the address
+		   itself is swapped for the country list. */
+		foreach (array('src' => 'source', 'dst' => 'destination') as $k => $side) {
+			unset($filterent[$side]['country']);
+			if (($_POST[$k . 'type'] ?? '') != "country")
+				continue;
+			$ccs = country_list_normalise($_POST[$k . 'country'] ?? '');
+			if ($ccs === false)
+				continue;
+			unset($filterent[$side]['address'], $filterent[$side]['network'], $filterent[$side]['any']);
+			$filterent[$side]['country'] = implode(',', $ccs);
+		}
 		
 		$filterent['disabled'] = !empty($_POST['disabled']) ? true : false;
 		$filterent['log'] = !empty($_POST['log']) ? true : false;
@@ -402,6 +458,9 @@ function typesel_change() {
 			document.iform.srcmask.disabled = 1;
 			break;
 	}
+	/* by value, not selectedIndex: the Country option is appended after the
+	   conditional pptp/l2tp/opt entries, so its index is not fixed */
+	document.iform.srccountry.disabled = (document.iform.srctype.value != "country");
 	switch (document.iform.dsttype.selectedIndex) {
 		case 1:	/* single */
 			document.iform.dst.disabled = 0;
@@ -419,6 +478,7 @@ function typesel_change() {
 			document.iform.dstmask.disabled = 1;
 			break;
 	}
+	document.iform.dstcountry.disabled = (document.iform.dsttype.value != "country");
 }
 
 function proto_change() {
@@ -588,7 +648,9 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
                             <option value="opt<?=$i;?>" <?php if ($pconfig['src'] == "opt" . $i) { echo "selected"; } ?>>
                             <?=htmlspecialchars($config['interfaces']['opt' . $i]['descr']);?> subnet</option>
 							<?php endfor; ?>
-                          </select></td>
+                          							<option value="country" <?php if ($pconfig['src'] == "country") { echo "selected"; } ?>>
+							Country</option>
+							</select></td>
                       </tr>
                       <tr> 
                         <td>Address:&nbsp;&nbsp;</td>
@@ -600,7 +662,9 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
 						<option value="<?=$i;?>" <?php if ($i == ($pconfig['srcmask'] ?? null)) echo "selected"; ?>><?=$i;?></option>
 						<?php endfor; ?>
 						</select>
-						</td>
+						
+						<br><span class="vexpl">Country codes (ISO 3166-1 alpha-2), comma separated &mdash; e.g. <em>CN, RU</em>. Only used when the type above is <em>Country</em>. Matching is by pf table; see <a href="firewall_geoip.php">Firewall: GeoIP</a> for the data and its age.</span>
+						<br><input name="srccountry" type="text" class="formfld" id="srccountry" size="30" value="<?=htmlspecialchars($pconfig['srccountry'] ?? '');?>"></td>
 					  </tr>
                     </table></td>
                 </tr>
@@ -676,7 +740,9 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
                             <option value="opt<?=$i;?>" <?php if ($pconfig['dst'] == "opt" . $i) { echo "selected"; } ?>>
                             <?=htmlspecialchars($config['interfaces']['opt' . $i]['descr']);?> subnet</option>
 							<?php endfor; ?>
-                          </select></td>
+                          							<option value="country" <?php if ($pconfig['dst'] == "country") { echo "selected"; } ?>>
+							Country</option>
+							</select></td>
                       </tr>
                       <tr> 
                         <td>Address:&nbsp;&nbsp;</td>
@@ -687,7 +753,9 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
 						<?php for ($i = ($maxnetmask - 1); $i > 0; $i--): ?>
 						<option value="<?=$i;?>" <?php if ($i == ($pconfig['dstmask'] ?? null)) echo "selected"; ?>><?=$i;?></option>
 						<?php endfor; ?>
-						</select></td>
+						</select>
+						<br><span class="vexpl">Country codes (ISO 3166-1 alpha-2), comma separated &mdash; e.g. <em>CN, RU</em>. Only used when the type above is <em>Country</em>. Matching is by pf table; see <a href="firewall_geoip.php">Firewall: GeoIP</a> for the data and its age.</span>
+						<br><input name="dstcountry" type="text" class="formfld" id="dstcountry" size="30" value="<?=htmlspecialchars($pconfig['dstcountry'] ?? '');?>"></td>
                       </tr>
                     </table></td>
                 </tr>
