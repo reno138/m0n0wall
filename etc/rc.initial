@@ -96,7 +96,14 @@ case ${opmode} in
 	if [ -f /etc/devbuild ]; then
 		echo
 		echo "Development build: root shell. 'exit' returns to this menu."
-		PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin /bin/sh
+		# Reset the SIGINT/SIGQUIT traps this script sets. Without this the
+		# shell inherits them as IGNORED, so Ctrl-C does nothing in it -- and
+		# an unterminated quote or a blocking command leaves the console stuck
+		# at a '>' prompt with no way out but a reboot.
+		( trap - 2 3
+		  PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin
+		  export PATH
+		  exec /bin/sh )
 	fi
 	;;
 esac
