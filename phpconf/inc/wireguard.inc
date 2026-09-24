@@ -396,3 +396,24 @@ function wg_config_filename($tunnel, $peer) {
 		$name = 'peer';
 	return "{$if}-{$name}.conf";
 }
+
+/* The tunnels that can carry firewall rules, as interface => label.
+ *
+ * The firewall pages need this so a rule can name one tunnel; the pf generator
+ * has its own pf_wg_interfaces(), which answers the same question but returns
+ * bare names and must not depend on the webGUI being loaded.
+ */
+function wg_rule_interfaces() {
+	global $config;
+
+	$out = array();
+	if (!isset($config['wireguard']['tunnel']) || !is_array($config['wireguard']['tunnel']))
+		return $out;
+	foreach ($config['wireguard']['tunnel'] as $t) {
+		if (isset($t['disabled']) || empty($t['if']))
+			continue;
+		$label = !empty($t['descr']) ? $t['descr'] : $t['if'];
+		$out[$t['if']] = $label . " (WireGuard)";
+	}
+	return $out;
+}

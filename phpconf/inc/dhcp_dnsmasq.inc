@@ -187,7 +187,10 @@ function dhcp_dnsmasq_config_generate() {
 			}
 		}
 
-		/* PXE. ISC: next-server + filename. dnsmasq: dhcp-boot. */
+		$pxehosts = array();
+
+		/* PXE. ISC: next-server + filename. dnsmasq: dhcp-boot.
+		   This is the POOL default; a reservation can override it below. */
 		if (!empty($dhcpifconf['filename'])) {
 			$boot = $dhcpifconf['filename'];
 			if (!empty($dhcpifconf['next-server']))
@@ -195,13 +198,21 @@ function dhcp_dnsmasq_config_generate() {
 			$out .= "dhcp-boot=tag:{$dhcpif},{$boot}\n";
 		}
 
-		/* ISC "deny unknown clients": serve only hosts with a static mapping. */
-		if (isset($dhcpifconf['denyunknown']))
-			$out .= "dhcp-ignore=tag:!known\n";
+		/* ISC "deny unknown clients": serve only hosts with a static mapping.
+		
+		   The interface tag matters. 'dhcp-ignore=tag:!known' with no interface
+		   tag is GLOBAL, so ticking the box on one interface stopped dynamic
+		   DHCP on every interface -- the setting is per-interface in the GUI
+		   and has to be per-interface here. Both tags must match for the rule
+		   to fire, which is exactly "unknown clients on this interface". */
+		if (isset($dhcpifconf['denyunknown']) && $dhcpifconf['denyunknown'] !== false)
+			$out .= "dhcp-ignore=tag:{$dhcpif},tag:!known\n";
 
 		/* Static mappings. ISC host{} blocks become dhcp-host lines. */
 		if (isset($dhcpifconf['staticmap']) && is_array($dhcpifconf['staticmap'])) {
+			$smi = 0;
 			foreach ($dhcpifconf['staticmap'] as $sm) {
+				$smi++;
 				if (empty($sm['mac']))
 					continue;
 				/* v6 mappings are not ours to serve here */
@@ -212,7 +223,37 @@ function dhcp_dnsmasq_config_generate() {
 					$parts[] = $sm['ipaddr'];
 				if (!empty($sm['hostname']))
 					$parts[] = $sm['hostname'];
+
+				/* Per-reservation PXE.
+				
+				   services_dhcp_edit.php writes 'filename' and 'next-server'
+				   on an individual reservation and its help text promises they
+				   override the pool's values -- but nothing read them, so a
+				   reserved client silently got the pool's dhcp-boot or none at
+				   all. dnsmasq needs the host tagged to attach an option to it,
+				   hence set: here and tag: on the matching dhcp-boot. */
+				if (!empty($sm['filename']) || !empty($sm['next-server'])) {
+					$smtag = "res-{$dhcpif}-{$smi}";
+					$parts[] = "set:{$smtag}";
+					$boot = !empty($sm['filename'])
+					        ? $sm['filename']
+					        : (!empty($dhcpifconf['filename']) ? $dhcpifconf['filename'] : '');
+					$srv  = !empty($sm['next-server'])
+					        ? $sm['next-server']
+					        : (!empty($dhcpifconf['next-server']) ? $dhcpifconf['next-server'] : '');
+					$spec = $boot;
+					if ($srv !== '')
+						$spec .= ",," . $srv;
+					if ($spec !== '')
+						$pxehosts[] = "dhcp-boot=tag:{$smtag},{$spec}\n";
+				}
+
 				$out .= "dhcp-host=" . implode(",", $parts) . "\n";
+			}
+			/* after the dhcp-host lines, so the tags they set already exist */
+			if (!empty($pxehosts)) {
+				$out .= implode("", $pxehosts);
+				$pxehosts = array();
 			}
 		}
 

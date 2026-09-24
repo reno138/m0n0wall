@@ -102,7 +102,11 @@ function RADIUS_AUTHENTICATION($username,$password,$radiusservers,$clientip,$cli
     $rauth->putAttribute(RADIUS_NAS_PORT, $nas_port);
 
     // Extra data to identify the client and nas
-    $rauth->putAttribute(RADIUS_FRAMED_IP_ADDRESS, $clientip, addr);
+    /* "addr", quoted. A bare word is an undefined CONSTANT in PHP 8, not a
+       string fallback -- this line alone made every RADIUS authentication
+       attempt die with an uncaught Error, so RADIUS login was completely
+       broken. radius_accounting.inc always had the quotes. */
+    $rauth->putAttribute(RADIUS_FRAMED_IP_ADDRESS, $clientip, "addr");
     $rauth->putAttribute(RADIUS_CALLED_STATION_ID, $calledstationid);
     $rauth->putAttribute(RADIUS_CALLING_STATION_ID, $callingstationid);
 

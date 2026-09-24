@@ -36,9 +36,24 @@ header("Cache-Control: no-store, no-cache, must-revalidate");
 header("Cache-Control: post-check=0, pre-check=0", false);
 header("Pragma: no-cache");
 
-$orig_host = $_ENV['HTTP_HOST'];
-$orig_request = $_ENV['CAPTIVE_REQPATH'];
-$clientip = $_ENV['REMOTE_ADDR'];
+/* $_SERVER, not $_ENV.
+ *
+ * Under mini_httpd these arrived as real environment variables; php-cgi behind
+ * lighttpd puts the CGI environment in $_SERVER, and variables_order does not
+ * populate $_ENV by default -- so all three were null and the portal could not
+ * even identify the client.
+ *
+ * CAPTIVE_REQPATH is gone for good: only the patched mini_httpd ever set it.
+ * The equivalent is REQUEST_URI, which still holds the URL the client actually
+ * asked for (lighttpd's error-handler-404 keeps it across the internal
+ * redirect to index.php, and REDIRECT_URI is the fallback for versions that
+ * move it). Without this the original destination was lost and a client who
+ * logged in successfully was left sitting on the portal page instead of being
+ * sent where they were going.
+ */
+$orig_host    = $_SERVER['HTTP_HOST'] ?? '';
+$orig_request = $_SERVER['REQUEST_URI'] ?? ($_SERVER['REDIRECT_URI'] ?? '/');
+$clientip     = $_SERVER['REMOTE_ADDR'] ?? '';
 
 if (!$clientip) {
     /* not good - bail out */
@@ -64,7 +79,7 @@ if ($orig_host != $ourhostname) {
 $redirurl = $oururl;
 if (preg_match("/redirurl=(.*)/", $orig_request, $matches))
     $redirurl = urldecode($matches[1]);
-if ($_POST['redirurl'])
+if (!empty($_POST['redirurl']))
     $redirurl = $_POST['redirurl'];
 
 $macfilter = !isset($config['captiveportal']['nomacfilter']);
@@ -77,17 +92,21 @@ if (!$clientmac && $macfilter) {
     exit;
 }
 
-/* find out if we need RADIUS + RADIUSMAC or not */
+/* find out if we need RADIUS + RADIUSMAC or not.
+   Both are initialised: they are tested further down whether or not the db
+   file exists, and an undefined variable is a warning in PHP 8. */
+$radius_enable = FALSE;
+$radmac_enable = FALSE;
 if (file_exists("{$g['vardb_path']}/captiveportal_radius.db")) {
     $radius_enable = TRUE;
-    if ($radius_enable && isset($config['captiveportal']['radmac_enable']))
+    if (isset($config['captiveportal']['radmac_enable']))
         $radmac_enable = TRUE;
 }
 
-if ($_POST['logout_id']) {
+if (!empty($_POST['logout_id'])) {
     disconnect_client($_POST['logout_id']);
     setcookie('sessionid', '', 1);
-    if ($_POST['logout_popup']) {
+    if (!empty($_POST['logout_popup'])) {
     echo <<<EOD
 <HTML>
 <HEAD><TITLE>Disconnecting...</TITLE></HEAD>
@@ -118,7 +137,9 @@ if (isset($_COOKIE['sessionid'])) {
         if(($cpdb[$i][5] == $sessionid) && ($cpdb[$i][2] == $clientip)) {
 
             /* change password requested */
-            if (($config['captiveportal']['auth_method'] == "local") && $_POST['change_pass'] && $_POST['oldpass'] && $_POST['newpass'] && $_POST['newpass2']) {
+            if ((($config['captiveportal']['auth_method'] ?? '') == "local")
+                && !empty($_POST['change_pass']) && !empty($_POST['oldpass'])
+                && !empty($_POST['newpass']) && !empty($_POST['newpass2'])) {
                 if ($_POST['newpass'] != $_POST['newpass2']) {
                     $msg = "Error: Passwords do not match";
                 } else if ($_POST['newpass'] == $_POST['oldpass']) {
@@ -146,7 +167,7 @@ if (isset($_COOKIE['sessionid'])) {
                     $msg = "Password changed";
                 }
             }
-            portal_reply_page($redirurl, "status", $msg);
+            portal_reply_page($redirurl, "status", $msg ?? null);
             exit;
         }
     }
@@ -164,7 +185,7 @@ if ($clientmac && portal_mac_fixed($clientmac)) {
     /* radius functions handle everything so we exit here since we're done */
     exit;
 
-} else if ($_POST['accept'] && $_POST['auth_voucher']) {
+} else if (!empty($_POST['accept']) && !empty($_POST['auth_voucher'])) {
 
     $voucher = trim($_POST['auth_voucher']);
     $timecredit = voucher_auth($voucher);
@@ -191,9 +212,9 @@ if ($clientmac && portal_mac_fixed($clientmac)) {
         portal_reply_page($redirurl, "error", $config['voucher']['msgnoaccess']);
     }
 
-} else if ($_POST['accept'] && $radius_enable) {
+} else if (!empty($_POST['accept']) && $radius_enable) {
 
-    if ($_POST['auth_user'] && $_POST['auth_pass']) {
+    if (!empty($_POST['auth_user']) && !empty($_POST['auth_pass'])) {
         $auth_list = radius($_POST['auth_user'],$_POST['auth_pass'],$clientip,$clientmac,"USER LOGIN");
 
         if ($auth_list['auth_val'] == 1) {
@@ -205,11 +226,14 @@ if ($clientmac && portal_mac_fixed($clientmac)) {
             portal_reply_page($redirurl, "error", $auth_list['reply_message']);
         }
     } else {
-        captiveportal_logportalauth($_POST['auth_user'],$clientmac,$clientip,"ERROR");
+        /* reached when the form arrived with no credentials at all, so the
+           field may be absent rather than merely empty */
+        captiveportal_logportalauth($_POST['auth_user'] ?? '',$clientmac,$clientip,"ERROR");
         portal_reply_page($redirurl, "error");
     }
 
-} else if ($_POST['accept'] && $config['captiveportal']['auth_method'] == "local") {
+} else if (!empty($_POST['accept'])
+           && ($config['captiveportal']['auth_method'] ?? '') == "local") {
 
     //check against local usermanager
     $userdb = &$config['captiveportal']['user'];
@@ -246,7 +270,7 @@ if ($clientmac && portal_mac_fixed($clientmac)) {
         portal_reply_page($redirurl, "error");
     }
 
-} else if ($_POST['accept'] && $clientip) {
+} else if (!empty($_POST['accept']) && $clientip) {
     captiveportal_logportalauth("unauthenticated",$clientmac,$clientip,"ACCEPT");
     portal_allow($clientip, $clientmac, "unauthenticated");
 

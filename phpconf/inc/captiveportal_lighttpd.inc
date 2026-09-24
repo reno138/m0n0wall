@@ -85,11 +85,31 @@ function captiveportal_lighttpd_config_generate($https = false) {
 
 	$out .= "server.document-root = \"{$g['captiveportal_path']}\"\n";
 	$out .= "server.port          = {$port}\n";
-	if ($cpip !== '')
-		$out .= "server.bind          = \"{$cpip}\"\n";
+	/* Bind the LOOPBACK, not the portal interface.
+	
+	   captiveportal.inc intercepts unauthenticated web traffic with
+	   'ipfw ... fwd 127.0.0.1,8000', which rewrites the packet's destination to
+	   the loopback -- so a server bound only to the interface address has no
+	   socket for the redirected connection to land on and every intercepted
+	   request was refused. That is the entire point of the portal, so it was
+	   dead rather than degraded.
+	
+	   The interface address is still needed: index.php bounces the client to
+	   http://<cpip>:8000/?redirurl=... and the client then connects there
+	   directly. So both are listened on, and nothing else is -- binding
+	   0.0.0.0 would expose the portal on the WAN. */
+	$out .= "server.bind          = \"127.0.0.1\"\n";
 	$out .= "server.pid-file      = \"{$g['varrun_path']}/lighttpd.{$tag}.pid\"\n";
 	$out .= "server.errorlog      = \"{$g['varlog_path']}/portalauth.log\"\n";
 	$out .= "server.indexfiles    = ( \"index.php\" )\n";
+	/* An intercepted client asked for some other site's URL, so the path is
+	   almost never "/" -- it is "/news/index.html" or whatever they clicked.
+	   Without this every one of those got lighttpd's 404 page instead of the
+	   login page. mini_httpd's captive mode forced all non-element requests to
+	   index.php; this is the lighttpd spelling of that, and it preserves the
+	   original URL in REQUEST_URI so index.php can redirect the client back to
+	   where they were going. */
+	$out .= "server.error-handler-404 = \"/index.php\"\n";
 	$out .= "server.max-worker    = {$maxproc}\n";
 	/* An unauthenticated client should not be able to post megabytes. */
 	$out .= "server.max-request-size = 256\n";
@@ -115,19 +135,55 @@ function captiveportal_lighttpd_config_generate($https = false) {
 	$out .= ")\n\n";
 
 	/* Uploaded portal elements -- logos, stylesheets -- live outside the
-	   document root and are served for this vhost only. This is what
-	   mini_httpd's -cpelement did. */
-	if ($vhost !== '') {
-		$out .= "# was mini_httpd's -cpelement: uploaded portal content\n";
-		$out .= "\$HTTP[\"host\"] =~ \"^" . preg_quote($vhost, '"') . "\" {\n";
-		$out .= "\talias.url += ( \"/captiveportal-\" => \"{$g['captiveportal_element_path']}/\" )\n";
-		$out .= "}\n\n";
+	   document root. This is what mini_httpd's -cpelement did.
+	
+	   One alias per uploaded file, at the ROOT of the URL space, because that
+	   is what the file manager tells the user to write:
+	
+	       <img src="test.jpg">
+	
+	   The previous "/captiveportal-" prefix was invented here and matched
+	   neither the GUI's instructions nor mini_httpd, so every uploaded logo and
+	   stylesheet 404'd and portal pages rendered unstyled. A per-file alias is
+	   used rather than aliasing "/" itself, which would shadow index.php. */
+	if (isset($config['captiveportal']['element'])
+	    && is_array($config['captiveportal']['element'])) {
+		$aliases = "";
+		foreach ($config['captiveportal']['element'] as $element) {
+			if (empty($element['name']))
+				continue;
+			/* The file manager already rejects a name with a path in it; this
+			   is the second line of defence, since an alias pointing out of
+			   the element directory would serve arbitrary files. */
+			$name = basename($element['name']);
+			if ($name === '' || $name[0] === '.')
+				continue;
+			$aliases .= "\talias.url += ( \"/" . $name . "\" => \"" .
+			            "{$g['captiveportal_element_path']}/" . $name . "\" )\n";
+		}
+		if ($aliases !== "") {
+			$out .= "# was mini_httpd's -cpelement: uploaded portal content\n";
+			$out .= $aliases . "\n";
+		}
 	}
 
 	if ($https) {
 		$out .= "ssl.engine  = \"enable\"\n";
 		$out .= "ssl.pemfile = \"{$g['varetc_path']}/cert-portal.pem\"\n";
 		$out .= "ssl.openssl.ssl-conf-cmd = ( \"MinProtocol\" => \"TLSv1.2\" )\n\n";
+	}
+
+	/* The second listener: the address index.php sends the client to, and the
+	   one the 'pass tcp from any to $cpip 8000' ipfw rules already allow. TLS
+	   has to be re-stated because lighttpd enables it per socket. */
+	if ($cpip !== '') {
+		$out .= "# the address index.php redirects the client to\n";
+		$out .= "\$SERVER[\"socket\"] == \"{$cpip}:{$port}\" {\n";
+		if ($https) {
+			$out .= "\tssl.engine  = \"enable\"\n";
+			$out .= "\tssl.pemfile = \"{$g['varetc_path']}/cert-portal.pem\"\n";
+		}
+		$out .= "}\n\n";
 	}
 
 	return $out;

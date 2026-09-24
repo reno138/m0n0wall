@@ -59,6 +59,11 @@ if (((($config['l2tp']['mode'] ?? null) == "server" )) && !$ipv6rules)
 if (isset($config['ipsec']['enable']))
 	$iflist['ipsec'] = "IPsec VPN";
 
+/* One tab per WireGuard tunnel. Without this a rule saved against a tunnel had
+   no tab to appear under, so it was invisible here while still being loaded
+   into pf -- the worst combination. */
+$iflist += wg_rule_interfaces();
+
 for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
 	$iflist['opt' . $i] = $config['interfaces']['opt' . $i]['descr'] ?? null;
 }

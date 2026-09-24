@@ -32,6 +32,11 @@ function mw_rmtree(string $p): void {
     @rmdir($p);
 }
 
+/* Let a bare require_once("functions.inc") resolve to tests/stubs. PHP searches
+   the include_path BEFORE the calling file's own directory, so this shadows the
+   real aggregator without editing the files under test. See stubs/functions.inc. */
+set_include_path(__DIR__ . '/stubs' . PATH_SEPARATOR . get_include_path());
+
 /* Load globals.inc, then re-root every path it defines into the sandbox. */
 require MW_ROOT . '/phpconf/inc/globals.inc';
 $__sb = mw_sandbox();

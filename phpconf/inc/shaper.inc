@@ -105,15 +105,22 @@ function shaper_configure() {
 		
 	} else {
 		mwexec("/sbin/sysctl net.link.ether.bridge.ipfw=0");
-		if (!isset($config['captiveportal']['enable'])) {
-			/* unload ipfw and dummynet */
-			mwexec("/sbin/kldunload dummynet");
-			mwexec("/sbin/kldunload ipfw");
-		} else {
-			/* captive portal is on - just remove our rules */
-			mwexec("/sbin/ipfw -f delete set 4");
-			mwexec("/sbin/ipfw -f pipe flush");
-		}
+		/* Remove our own rules and pipes, always.
+		
+		   This used to kldunload dummynet and ipfw when the captive portal was
+		   off. Both are compiled INTO this kernel (options IPFIREWALL and
+		   options DUMMYNET in M0N0WALL_GENERIC), so the unload could only ever
+		   fail -- leaving set 4 and every dummynet pipe live. The shaper
+		   therefore could not be switched off without a reboot.
+		
+		   Deleting the set and flushing is what the captive-portal branch
+		   always did, it is what actually works, and it is safe either way:
+		   set 4 is the shaper's own set, and the portal keeps its rules in
+		   set 1. Queues are flushed as well -- 'pipe flush' does not remove
+		   them, so they would have survived. */
+		mwexec("/sbin/ipfw -f delete set 4");
+		mwexec("/sbin/ipfw -f queue flush");
+		mwexec("/sbin/ipfw -f pipe flush");
 	}
 	
 	return 0;
@@ -124,7 +131,11 @@ function shaper_rules_generate() {
 
 	$wancfg = $config['interfaces']['wan'];
 	$lancfg = $config['interfaces']['lan'];
-	$pptpdcfg = $config['pptpd'];
+	/* PPTP is removed from this port. Kept as a single false so the rule
+	   walker below can still recognise and SKIP a restored config's pptp
+	   rules, without reading a $config['pptpd'] section that no longer
+	   exists -- that read warned on every shaper rebuild. */
+	$pptp_server = false;
 	
 	$lanif = $lancfg['if'];
 	$wanif = get_real_wan_interface();
@@ -150,10 +161,11 @@ function shaper_rules_generate() {
 		}
 	}
 	
-	if ($pptpdcfg['mode'] == "server") {
-		$pptpip = $pptpdcfg['localip'];
-		$pptpsa = $pptpdcfg['remoteip'];
-		$pptpsn = subnet_size_to_cidr($pptpdcfg['nunits'] ? $pptpdcfg['nunits'] : 16);
+	$pptpip = $pptpsa = $pptpsn = "";
+	if ($pptp_server) {
+		$pptpip = "";
+		$pptpsa = "";
+		$pptpsn = "";
 	}
 	
 	$rulei = 50000;
@@ -176,14 +188,13 @@ function shaper_rules_generate() {
 		/* does the rule deal with a PPTP interface? */
 		if ($rule['interface'] == "pptp") {
 		
-			if ($pptpdcfg['mode'] != "server") {
+			/* always, now: PPTP is removed, so there is no interface to shape */
+			if (!$pptp_server) {
 				$i++;
 				continue;
 			}
 				
-			$nif = $pptpdcfg['nunits'];
-			if (!$nif)
-				$nif = 16;
+			$nif = 16;
 			$ispptp = true;
 		} else {
 			
@@ -198,21 +209,24 @@ function shaper_rules_generate() {
 			$ispptp = false;
 		}
 		
-		if ($pptpdcfg['mode'] != "server") {
-			if (($rule['source']['network'] == "pptp") ||
-				($rule['destination']['network'] == "pptp")) {
+		if (!$pptp_server) {
+			if ((($rule['source']['network'] ?? '') == "pptp") ||
+				(($rule['destination']['network'] ?? '') == "pptp")) {
 					$i++;
 					continue;
 				}
 		}
 		
-		if (strstr($rule['source']['network'], "opt")) {
+		/* 'network' and 'address' are alternatives -- a rule has one or the
+		   other, never both -- so each is absent half the time and both have
+		   to be read with ?? / !empty(). */
+		if (strstr($rule['source']['network'] ?? '', "opt")) {
 			if (!array_key_exists($rule['source']['network'], $optcfg)) {
 				$i++;
 				continue;
 			}
 		}
-		if (strstr($rule['destination']['network'], "opt")) {
+		if (strstr($rule['destination']['network'] ?? '', "opt")) {
 			if (!array_key_exists($rule['destination']['network'], $optcfg)) {
 				$i++;
 				continue;
@@ -220,11 +234,11 @@ function shaper_rules_generate() {
 		}
 		
 		/* check for unresolvable aliases */
-		if ($rule['source']['address'] && !alias_expand($rule['source']['address'])) {
+		if (!empty($rule['source']['address']) && !alias_expand($rule['source']['address'])) {
 			$i++;
 			continue;
 		}
-		if ($rule['destination']['address'] && !alias_expand($rule['destination']['address'])) {
+		if (!empty($rule['destination']['address']) && !alias_expand($rule['destination']['address'])) {
 			$i++;
 			continue;
 		}
@@ -284,7 +298,7 @@ function shaper_rules_generate() {
 			
 			if (!isset($rule['protocol']) || in_array($rule['protocol'], array("tcp","udp"))) {
 				
-				if ($rule['source']['port']) {
+				if (!empty($rule['source']['port'])) {
 					$srcport = explode("-", $rule['source']['port']);
 					
 					if ((!$srcport[1]) || ($srcport[0] == $srcport[1])) {
@@ -330,7 +344,7 @@ function shaper_rules_generate() {
 			
 			if (!isset($rule['protocol']) || in_array($rule['protocol'], array("tcp","udp"))) {
 				
-				if ($rule['destination']['port']) {
+				if (!empty($rule['destination']['port'])) {
 					$dstport = explode("-", $rule['destination']['port']);
 					
 					if ((!$dstport[1]) || ($dstport[0] == $dstport[1])) {
@@ -341,16 +355,17 @@ function shaper_rules_generate() {
 				}
 			}
 			
-			if ($rule['iplen'])
+			/* all three are optional match refinements, blank by default */
+			if (!empty($rule['iplen']))
 				$line .= "iplen {$rule['iplen']} ";
 				
-			if ($rule['iptos']) 
+			if (!empty($rule['iptos'])) 
 				$line .= "iptos {$rule['iptos']} ";
 			
-			if ($rule['tcpflags'])
+			if (!empty($rule['tcpflags']))
 				$line .= "tcpflags {$rule['tcpflags']} ";
 				
-			if ($rule['direction'] == "in")
+			if (($rule['direction'] ?? '') == "in")
 				$line .= "in ";
 			else if ($rule['direction'] == "out")
 				$line .= "out ";
@@ -375,23 +390,29 @@ function shaper_rules_generate() {
 	
 	/* generate pipes */
 	if (isset($config['shaper']['pipe'])) {
-		$pipei = 1;
-		foreach ($config['shaper']['pipe'] as $pipe) {
+		foreach ($config['shaper']['pipe'] as $pipek => $pipe) {
+			/* index + 1, for the same reason as the queues below: this is what
+			   the rule emitter uses ($rule['targetpipe'] + 1). */
+			$pipei = $pipek + 1;
 			$line = "pipe $pipei config bw {$pipe['bandwidth']}Kbit/s ";
 			
-			if ($pipe['delay']) {
+			/* Every one of these is optional in the GUI and is simply ABSENT
+			   when left blank, so they are read with !empty() rather than for
+			   truth -- four undefined-key warnings per pipe otherwise, printed
+			   into the Apply page and the boot console. */
+			if (!empty($pipe['delay'])) {
 				$line .= "delay {$pipe['delay']} ";
 			}
 			
-			if ($pipe['plr']) {
+			if (!empty($pipe['plr'])) {
 				$line .= "plr {$pipe['plr']} ";
 			}
 			
-			if ($pipe['qsize']) {
+			if (!empty($pipe['qsize'])) {
 				$line .= "queue {$pipe['qsize']} ";
 			}
 			
-			switch ($pipe['mask']) {
+			switch ($pipe['mask'] ?? '') {
 				case 'source':
 					$line .= "mask src-ip 0xffffffff ";
 					break;
@@ -402,25 +423,36 @@ function shaper_rules_generate() {
 			
 			$line .= "\n";
 			$shaperrules .= $line;
-			$pipei++;
 		}
 	}
 	
 	/* generate queues */
 	if (isset($config['shaper']['queue'])) {
-		$queuei = 1;
-		foreach ($config['shaper']['queue'] as $queue) {
+		foreach ($config['shaper']['queue'] as $queuek => $queue) {
 			
-			$pipen = $queue['targetpipe'] + 1;
+			/* The ipfw queue number is the array INDEX plus one, not a running
+			   counter over the emitted queues.
+			
+			   A running counter was wrong because the 'continue' below does not
+			   advance it, while the rule emitter derives its queue number from
+			   the config index ($rule['targetqueue'] + 1). One queue with an
+			   unresolvable pipe therefore shifted every later queue's number
+			   by one and silently pointed every rule above it at the wrong
+			   queue -- or at one that was never configured, which ipfw
+			   rejects. Deriving both from the index makes them agree by
+			   construction. */
+			$queuei = $queuek + 1;
+			$pipen = ($queue['targetpipe'] ?? -1) + 1;
 			if (!isset($queue['targetpipe']) || !isset($config['shaper']['pipe'][$queue['targetpipe']])) {
 				printf("Pipe $pipen for queue $queuei not found!\n");
 				continue;
 			}
 			
 			$line = "queue $queuei config pipe {$pipen}";
-			$line .= " weight {$queue['weight']}";
+			if (!empty($queue['weight']))
+				$line .= " weight {$queue['weight']}";
 			
-			switch ($queue['mask']) {
+			switch ($queue['mask'] ?? '') {
 				case 'source':
 					$line .= " mask src-ip 0xffffffff ";
 					break;
@@ -431,7 +463,6 @@ function shaper_rules_generate() {
 			
 			$line .= "\n";
 			$shaperrules .= $line;
-			$queuei++;
 		}
 	}
 

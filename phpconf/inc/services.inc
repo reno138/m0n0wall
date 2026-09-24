@@ -420,8 +420,17 @@ function services_dnsmasq_configure() {
 
 		/* the DHCP half -- see dhcp_dnsmasq.inc */
 		$dnsmasqconf .= "conf-file={$dhcpfile}\n";
-		if ($dhcp_on)
+		if ($dhcp_on) {
 			$dnsmasqconf .= "dhcp-leasefile=" . dhcp_dnsmasq_leasefile() . "\n";
+			/* Log to local7, which is where ISC dhcpd logged.
+			
+			   syslog.conf routes local7.* to /var/log/dhcpd.log and that is the
+			   only thing Diagnostics: Logs -> DHCP reads; the same facility
+			   feeds the "DHCP events" remote-syslog option. dnsmasq defaults to
+			   LOG_DAEMON, so without this the DHCP log tab was permanently
+			   empty and the DHCP messages went to the system log instead. */
+			$dnsmasqconf .= "log-facility=local7\n";
+		}
 
 		/* "Register DHCP leases in DNS forwarder". With ISC dhcpd this meant
 		   pointing dnsmasq at ISC's lease file. dnsmasq hands out the leases

@@ -187,7 +187,6 @@ function pf_nat_rules_generate() {
 
 	$wancfg = $config['interfaces']['wan'];
 	$lancfg = $config['interfaces']['lan'];
-	$pptpdcfg = $config['pptpd'];
 	$wanif = get_real_wan_interface();
 	$lansa = gen_subnet($lancfg['ipaddr'], $lancfg['subnet']);
 
@@ -229,7 +228,21 @@ function pf_nat_rules_generate() {
 
 			$proto = pf_proto_spec($rule['protocol']);
 			$eport = pf_port_spec($rule['external-port']);
-			$lport = !empty($rule['local-port']) ? "port {$rule['local-port']}" : "";
+
+			/* A port RANGE has to be mapped sequentially, not collapsed.
+			   'rdr ... port 8000:8010 -> 10.0.0.5 port 8000' would send the
+			   whole range to the single port 8000; pf spells the sequential
+			   form 'port 8000:*', which walks the target ports up in step with
+			   the matched ones. ipfilter did this implicitly with its
+			   'port = x -> y' range syntax, so the behaviour is restored, not
+			   invented. */
+			$lport = "";
+			if (!empty($rule['local-port'])) {
+				$lport = "port {$rule['local-port']}";
+				$ep = explode("-", $rule['external-port']);
+				if (isset($ep[1]) && $ep[1] !== "" && $ep[0] != $ep[1])
+					$lport .= ":*";
+			}
 
 			$rules .= pf_tidy("rdr on $natif $proto from any to $extaddr $eport " .
 			                  "-> $target $lport") . "\n";
@@ -261,7 +274,7 @@ function pf_nat_rules_generate() {
 
 		for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
 			$optcfg = $config['interfaces']['opt' . $i];
-			if (isset($optcfg['enable']) && !$optcfg['bridge']) {
+			if (isset($optcfg['enable']) && empty($optcfg['bridge'])) {
 				$optsa = gen_subnet($optcfg['ipaddr'], $optcfg['subnet']);
 				$rules .= pf_nat_rule_generate_if($wanif,
 					$optsa . "/" . $optcfg['subnet'], "", null);
@@ -312,7 +325,12 @@ function pf_options_generate() {
 		$out .= "set limit table-entries 1000000\n";
 
 	if (!empty($config['filter']['tcpidletimeout'])) {
-		$t = $config['filter']['tcpidletimeout'] * 2;
+		/* No *2 here. ipfilter's net.inet.ipf.fr_tcpidletimeout was in
+		   half-second ticks, so filter.inc doubled the GUI's seconds to get
+		   ticks. pf's 'set timeout tcp.established' is already in SECONDS --
+		   carrying the doubling over silently gave every install twice the
+		   idle timeout the GUI showed. */
+		$t = (int) $config['filter']['tcpidletimeout'];
 		$out .= "set timeout tcp.established $t\n";
 	}
 
@@ -339,8 +357,8 @@ function pf_base_rules_generate($lanif, $wanif, $lanip, $lansa, $lansn, $optcfg,
 	$out .= "pass out quick on $lanif proto udp from $lanip port 67 to any port 68\n";
 
 	foreach ($optcfg as $on => $oc) {
-		if (((isset($config['dhcpd'][$on]['enable']) || isset($config['dhcrelay'][$on]['enable'])) && !$oc['bridge']) ||
-		    ($oc['bridge'] && (isset($config['dhcpd'][$oc['bridge_if']]['enable']) || isset($config['dhcrelay'][$oc['bridge_if']]['enable'])))) {
+		if (((isset($config['dhcpd'][$on]['enable']) || isset($config['dhcrelay'][$on]['enable'])) && empty($oc['bridge'])) ||
+		    (!empty($oc['bridge']) && (isset($config['dhcpd'][$oc['bridge_if']]['enable']) || isset($config['dhcrelay'][$oc['bridge_if']]['enable'])))) {
 			$out .= "\n# DHCP server on $on\n";
 			$out .= "pass in quick on {$oc['if']} proto udp from any port 68 to 255.255.255.255 port 67\n";
 			$out .= "pass in quick on {$oc['if']} proto udp from any port 68 to {$oc['ip']} port 67\n";
@@ -351,7 +369,7 @@ function pf_base_rules_generate($lanif, $wanif, $lanip, $lansa, $lansn, $optcfg,
 	$out .= "\n# WAN spoof check\n";
 	$out .= "block in $log quick on $wanif from $lansa/$lansn to any\n";
 	foreach ($optcfg as $oc) {
-		if (!$oc['bridge'])
+		if (empty($oc['bridge']) && $oc['sa'] !== "")
 			$out .= "block in $log quick on $wanif from {$oc['sa']}/{$oc['sn']} to any\n";
 	}
 
@@ -396,6 +414,40 @@ function pf_spoofcheck_generate($ifname, $if, $sa, $sn, $log, $ipv6 = false) {
 	return $out;
 }
 
+/* The wg interfaces that wg_configure() will actually have brought up. Same
+ * enable/disable test as wireguard.inc, so the ruleset cannot disagree with
+ * the interfaces that exist. */
+function pf_wg_interfaces() {
+	global $config;
+
+	$ifs = array();
+	if (!isset($config['wireguard']['tunnel']) || !is_array($config['wireguard']['tunnel']))
+		return $ifs;
+	foreach ($config['wireguard']['tunnel'] as $t) {
+		if (isset($t['disabled']) || empty($t['if']))
+			continue;
+		$ifs[] = $t['if'];
+	}
+	return $ifs;
+}
+
+/* Has the admin written any rule bound to a WireGuard interface? */
+function pf_wg_has_user_rules() {
+	global $config;
+
+	foreach (array('rule', 'rule6') as $k) {
+		if (!isset($config['filter'][$k]) || !is_array($config['filter'][$k]))
+			continue;
+		foreach ($config['filter'][$k] as $r) {
+			if (isset($r['disabled']))
+				continue;
+			if (isset($r['interface']) && substr($r['interface'], 0, 2) === "wg")
+				return true;
+		}
+	}
+	return false;
+}
+
 /* IKE / ESP / AH, unchanged in meaning from filter_rules_ipsec_generate(). */
 function pf_ipsec_rules_generate($ifname, $ip) {
 	$out  = "\n# IPsec: IKE, NAT-T, ESP, AH\n";
@@ -432,7 +484,7 @@ function pf_resolve_network($token, $ctx) {
 	switch ($token) {
 		case 'wanip': return $ctx['curwanip'];
 		case 'lan':   return $ctx['lansa'] . "/" . $ctx['lansn'];
-		case 'pptp':  return isset($ctx['pptpsa']) ? $ctx['pptpsa'] . "/" . $ctx['pptpsn'] : null;
+		case 'pptp':  return null;        /* PPTP removed from this port */
 		case 'l2tp':  return isset($ctx['l2tpsa']) ? $ctx['l2tpsa'] . "/" . $ctx['l2tpsn'] : null;
 	}
 	return null;
@@ -480,6 +532,46 @@ function pf_rule_endpoint($side, $ctx) {
  * pseudo-interfaces the caller loops and supplies ng0, l2tp0, enc0 and so on,
  * exactly as filter.inc did.
  */
+/* ipfilter and pf do not agree on three ICMP type names, and pfctl rejects the
+ * WHOLE ruleset when it meets one it does not know -- so a single rule saying
+ * "Echo" left the firewall with no rules at all, which is how this was found.
+ *
+ *   ipf 'echo'      -> pf 'echoreq'
+ *   ipf 'timest'    -> pf 'timereq'
+ *   ipf 'timestrep' -> pf 'timerep'
+ *
+ * The other eleven names are spelled identically in both. Configs saved by the
+ * old GUI (and any restored 1.8 config.xml) still hold the ipf spellings, so
+ * translating here rather than only fixing the GUI keeps them loadable. A name
+ * pf still does not know returns null and the qualifier is dropped -- broader
+ * than asked, but the alternative is a firewall that loads nothing.
+ */
+function pf_icmptype_v4($t) {
+	static $legacy = array(
+		'echo'      => 'echoreq',
+		'timest'    => 'timereq',
+		'timestrep' => 'timerep',
+	);
+	static $known = array(
+		'echoreq', 'echorep', 'unreach', 'squench', 'redir', 'timex',
+		'paramprob', 'timereq', 'timerep', 'inforeq', 'inforep',
+		'maskreq', 'maskrep', 'althost', 'routeradv', 'routersol',
+		'trace', 'dataconv', 'mobredir', 'skip', 'photuris',
+	);
+
+	$t = trim($t);
+	if (isset($legacy[$t]))
+		$t = $legacy[$t];
+	if (is_numeric($t))
+		return $t;
+	if (in_array($t, $known))
+		return $t;
+
+	log_error("pf: dropping unknown ICMP type '$t' from a rule; " .
+	          "pfctl would reject the entire ruleset.");
+	return null;
+}
+
 function pf_user_rule_generate($rule, $ctx, $iface, $af = "") {
 	if (isset($rule['disabled']))
 		return "";
@@ -554,8 +646,16 @@ function pf_user_rule_generate($rule, $ctx, $iface, $af = "") {
 	}
 
 	if (($ruleproto == "icmp" || $ruleproto == "ipv6-icmp")
-	    && !empty($rule['icmptype']))
-		$line .= " icmp-type {$rule['icmptype']}";
+	    && !empty($rule['icmptype'])) {
+		/* ICMPv6 has its own keyword in pf, and its types are numeric. */
+		if ($ruleproto == "ipv6-icmp")
+			$line .= " icmp6-type {$rule['icmptype']}";
+		else {
+			$t = pf_icmptype_v4($rule['icmptype']);
+			if ($t !== null)
+				$line .= " icmp-type $t";
+		}
+	}
 
 	/* pf keeps state on pass rules by default, but say so explicitly: it
 	   documents intent and survives a future change to the default. */
@@ -630,7 +730,12 @@ function pf_build_context($ipv6 = false) {
 		$oc = $config['interfaces']['opt' . $i];
 		if (!isset($oc['enable']) || empty($oc['if']))
 			continue;
-		$oic = array('if' => $oc['if']);
+		/* Every key the consumers read is initialised, so a plain
+		   $oc['bridge'] / $oc['sa'] test cannot raise "Undefined array key".
+		   Those warnings printed into the Apply-changes page and onto the boot
+		   console for any ordinary config that had an OPT interface. */
+		$oic = array('if' => $oc['if'], 'bridge' => 0, 'bridge_if' => '',
+		             'ip' => '', 'sn' => '', 'sa' => '');
 		if (!empty($oc['bridge'])) {
 			$oic['bridge'] = 1;
 			$oic['bridge_if'] = $oc['bridge'];
@@ -645,11 +750,8 @@ function pf_build_context($ipv6 = false) {
 		$ctx['optcfg']['opt' . $i] = $oic;
 	}
 
-	if (isset($config['pptpd']['mode']) && $config['pptpd']['mode'] == "server" && !$ipv6) {
-		$ctx['pptpsa'] = $config['pptpd']['remoteip'];
-		$ctx['pptpsn'] = subnet_size_to_cidr(!empty($config['pptpd']['nunits'])
-		                   ? $config['pptpd']['nunits'] : 16);
-	}
+	/* No pptpsa/pptpsn: PPTP is removed, and pf_resolve_network() answers null
+	   for the 'pptp' token so a restored config's pptp rules are skipped. */
 	if (isset($config['l2tp']['mode']) && $config['l2tp']['mode'] == "server" && !$ipv6) {
 		$ctx['l2tpsa'] = $config['l2tp']['remoteip'];
 		$ctx['l2tpsn'] = subnet_size_to_cidr(!empty($config['l2tp']['nunits'])
@@ -729,6 +831,38 @@ function pf_rules_generate($ipv6 = false) {
 	    (isset($config['l2tp']['mode']) && $config['l2tp']['mode'] == "server"))
 		$out .= "pass out quick on enc0 all keep state\n";
 
+	/* IKE / NAT-T / ESP / AH inbound on the WAN.
+	   pf_ipsec_rules_generate() was written with the rest of this file but
+	   never called, so the default 'block in all' above dropped every IKE
+	   packet: strongSwan would load its connections, log nothing, and no
+	   tunnel could ever be established from outside. */
+	if (isset($config['ipsec']['enable']) && !empty($ctx['curwanip'])) {
+		$out .= pf_ipsec_rules_generate($ctx['wanif'], $ctx['curwanip']);
+	}
+
+	/* WireGuard. Same class of gap: wg_configure() brings the interfaces up
+	   and 'block in/out all' then drops everything that comes out of them, so
+	   a tunnel could hand-shake and still pass no traffic.
+
+	   A wg interface carries already-authenticated traffic from a peer the
+	   admin configured by public key, so it is treated like a trusted
+	   interface by default -- but only while the admin has written no rules
+	   of their own for it. As soon as one 'wg' rule exists, these blanket
+	   passes are withheld and the user's rules decide, exactly as they would
+	   on LAN. */
+	$wgifs = pf_wg_interfaces();
+	if ($wgifs) {
+		$out .= "\n# WireGuard tunnels\n";
+		$wgruled = pf_wg_has_user_rules();
+		foreach ($wgifs as $wgif) {
+			$out .= "pass out quick on $wgif all keep state\n";
+			if (!$wgruled)
+				$out .= "pass in quick on $wgif all keep state\n";
+		}
+		if ($wgruled)
+			$out .= "# inbound governed by the user's 'WireGuard' rules below\n";
+	}
+
 	if (!isset($config['system']['webgui']['noantilockout'])) {
 		$out .= "\n# anti-lockout: never strand the admin outside the webGUI\n";
 		$out .= "pass in quick on {$ctx['lanif']} from {$ctx['lansa']}/{$ctx['lansn']} " .
@@ -765,11 +899,24 @@ function pf_rule_interface($rule, $ctx) {
 
 	switch ($rule['interface']) {
 		case 'pptp':
-			return (isset($config['pptpd']['mode']) && $config['pptpd']['mode'] == "server")
-			       ? "ng0" : null;      /* XXX-VERIFY: ipf looped ng0..ngN */
+			/* PPTP is removed from this port. A restored pre-1.9 config can
+			   still carry pptp rules; skipping them is correct -- there is no
+			   interface for them to bind to. */
+			return null;
 		case 'l2tp':
-			return (isset($config['l2tp']['mode']) && $config['l2tp']['mode'] == "server")
-			       ? "l2tp0" : null;    /* XXX-VERIFY: likewise l2tp0..N */
+			/* One interface per client, so a rule has to cover them all.
+			   'l2tp0' alone left every client after the first with no rules,
+			   and the default block then dropped it. nunits is the configured
+			   ceiling, so the brace list is exactly as wide as the server. */
+			if (!isset($config['l2tp']['mode']) || $config['l2tp']['mode'] != "server")
+				return null;
+			$n = !empty($config['l2tp']['nunits']) ? (int) $config['l2tp']['nunits'] : 16;
+			if ($n < 1) $n = 1;
+			if ($n == 1) return "l2tp0";
+			$ifs = array();
+			for ($i = 0; $i < $n; $i++)
+				$ifs[] = "l2tp$i";
+			return "{ " . implode(" ", $ifs) . " }";
 		case 'ipsec':
 			return isset($config['ipsec']['enable']) ? "enc0" : null;
 		case 'lan':
@@ -781,6 +928,11 @@ function pf_rule_interface($rule, $ctx) {
 		return isset($ctx['optcfg'][$rule['interface']])
 		       ? $ctx['optcfg'][$rule['interface']]['if'] : null;
 	}
+	/* A WireGuard tunnel is selected by its own interface name, and only while
+	   that tunnel still exists and is enabled. */
+	if (substr($rule['interface'], 0, 2) === "wg")
+		return in_array($rule['interface'], pf_wg_interfaces())
+		       ? $rule['interface'] : null;
 	return null;
 }
 
@@ -898,6 +1050,33 @@ function pf_base_rules_v6_generate($lanif, $wanif, $optcfg, $log) {
 	   lacked ipfw's 'me'; pf has '(self)', so it can be tightened here. */
 	$out .= "pass out quick on $wanif inet6 proto udp from any port 546 to any port 547\n";
 	$out .= "pass in quick on $wanif inet6 proto udp from any to (self) port 546\n";
+
+	/* Transition tunnels.
+	
+	   A 6to4, tunnel-broker or AICCU WAN carries IPv6 inside IPv4 protocol 41,
+	   which arrives on the PHYSICAL WAN -- so these are inet rules, not inet6 --
+	   and emerges decapsulated on stf0/gif0/tun0. filter.inc passed both; this
+	   file passed neither, so selecting any tunnelled IPv6 mode produced a WAN
+	   that came up and carried nothing.
+	
+	   The echo-request allowance is what tunnel brokers ping to decide the
+	   endpoint is still alive; without it the tunnel is torn down at the far
+	   end after a few minutes. */
+	$v6mode = $config['interfaces']['wan']['ipaddr6'] ?? '';
+	$tunnelled = ($v6mode == "6to4" || $v6mode == "aiccu"
+	              || !empty($config['interfaces']['wan']['tunnel6']));
+	if ($tunnelled) {
+		$out .= "\n# IPv6 transition tunnel\n";
+		if ($v6mode != "aiccu" || !isset($config['interfaces']['wan']['aiccu']['ayiya'])) {
+			$out .= "pass in quick on $wanif inet proto ipencap from any to (self) keep state\n";
+			$out .= "pass out quick on $wanif inet proto ipencap from (self) to any keep state\n";
+		}
+		$out .= "pass in quick on $wanif inet proto icmp from any to (self) " .
+		        "icmp-type echoreq keep state\n";
+		$tunif = get_real_wan_interface(true);
+		if ($tunif && $tunif != $wanif)
+			$out .= "pass quick on $tunif all keep state\n";
+	}
 
 	if (isset($config['interfaces']['wan']['blockpriv'])) {
 		$out .= "\n# reject IPv6 transition/site-local abuse on the WAN\n";
@@ -1068,9 +1247,16 @@ function pf_filter_log_read($nentries = 50, $reverse = false) {
 			'src' => '', 'srcport' => '', 'dst' => '', 'dstport' => '', 'proto' => '',
 		);
 
-		/* "192.0.2.30.54321 > 192.0.2.240.65001: tcp 0" */
+		/* "192.0.2.30.54321 > 192.0.2.240.65001: tcp 0", and the v6 form
+		   "2001:db8::1.54321 > 2001:db8::2.80: tcp 0".
+		
+		   Splitting the destination at the FIRST colon truncated every IPv6
+		   address at its first group and left the rest of the address sitting
+		   in the protocol column. Neither address can contain whitespace, so
+		   the separator to anchor on is the colon that is FOLLOWED by
+		   whitespace -- greedy \S+ then backtracks to exactly that one. */
 		$rest = $m[7];
-		if (preg_match('/^(\S+) > ([^:]+(?::\S+)*?):\s*(\S+)/', $rest, $r)) {
+		if (preg_match('/^(\S+) > (\S+):\s*(\S*)/', $rest, $r)) {
 			list($e['src'], $e['srcport']) = pf_log_split_endpoint($r[1]);
 			list($e['dst'], $e['dstport']) = pf_log_split_endpoint($r[2]);
 			$e['proto'] = strtoupper(rtrim($r[3], ','));
@@ -1158,7 +1344,11 @@ function pf_captiveportal_rules_generate($ctx) {
 
 function filter_configure($ipv4only = false) { return pf_filter_configure($ipv4only); }
 function filter_resync()                     { return pf_filter_resync(); }
-function filter_configure6()                 { return 0; /* one unified ruleset now */ }
+/* One unified ruleset -- but the callers (the IPv6 Rules 'Apply changes'
+ * button and rc.newwanip6) are asking for the rules to be REBUILT, and
+ * returning 0 without doing so reported success while changing nothing. The v6
+ * rules live in the same file, so a normal reload is the correct answer. */
+function filter_configure6()                 { return pf_filter_configure(); }
 function filter_ipmon_start()                { return pf_pflogd_start(); }
 function filter_flush_state_table()          { return pf_flush_state_table(); }
 function filter_flush_state_table_ipv6()     { return pf_flush_state_table(); }

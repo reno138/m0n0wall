@@ -32,25 +32,48 @@
 $pgtitle = array("Services", "DHCP relay");
 require("guiconfig.inc");
 
+/* The DHCP server the WAN itself leased from, or null if there is not one.
+ *
+ * Rewritten, because every part of the old version was broken against this
+ * base system:
+ *
+ *   - it read /var/db/dhclient.leases, a filename FreeBSD's base dhclient
+ *     never creates. file() returned false and count(false) is a TypeError in
+ *     PHP 8, so simply ticking "proxy requests to the DHCP server on the WAN
+ *     subnet" and saving returned a blank 500 page. The base client (which is
+ *     OpenBSD-derived, not ISC) appends the interface name, and the port does
+ *     not pass -l, so the path is the compiled default plus ".<ifname>".
+ *   - the end-of-lease test compared against "}" while file() keeps the
+ *     trailing newline, so the per-lease reset never fired.
+ *   - the interface test compared a preg_match RESULT ARRAY against the whole
+ *     WAN interface config ARRAY, which could not be equal.
+ *
+ * Reading the WAN's own lease file removes the need to match the interface at
+ * all: every lease in it belongs to that interface, so the last
+ * dhcp-server-identifier in the file is the current server.
+ */
 function get_wan_dhcp_server() {
 	global $config, $g;
-	$dhclientfn = $g['vardb_path'] . "/dhclient.leases";
-	$leases = file($dhclientfn);
-	/* Start at the end, work backwards finding the latest lease for the WAN */
-	for ($i = (count($leases)-1); $i >= 0; $i--) {
-		if ($leases[$i] == "}") {
-			unset($iface);
-			unset($dhcpserver);
-		} elseif (strstr($leases[$i],"interface")) {
-			preg_match("/\s+interface \"(\w+)\";/",$leases[$i],$iface);
-		}  	elseif (strstr($leases[$i],"dhcp-server-identifier")) {
-				preg_match("/\s+dhcp-server-identifier (\d+\.\d+\.\d+\.\d+);/",$leases[$i],$dhcpserver);
-			}
-		if (($iface ?? null) == $config['interfaces']['wan'] && isset($dhcpserver)) {
-			break;
-		}
-	}		  	
-	return $dhcpserver[1] ?? null;
+
+	$wanif = $config['interfaces']['wan']['if'] ?? '';
+	if ($wanif === '')
+		return null;
+
+	$dhclientfn = $g['vardb_path'] . "/dhclient.leases." . $wanif;
+	if (!is_readable($dhclientfn))
+		return null;
+
+	$leases = @file($dhclientfn, FILE_IGNORE_NEW_LINES);
+	if (!is_array($leases))
+		return null;
+
+	/* last one wins: dhclient appends, so the newest lease is at the end */
+	$server = null;
+	foreach ($leases as $line) {
+		if (preg_match('/dhcp-server-identifier\s+(\d+\.\d+\.\d+\.\d+)\s*;/', $line, $m))
+			$server = $m[1];
+	}
+	return $server;
 }
 
 $if = $_GET['if'] ?? null;
@@ -87,8 +110,17 @@ if ($_POST) {
 
 	/* input validation */
 	if (!empty($_POST['enable'])) {
-		if (isset($_POST['proxydhcp']))
+		if (isset($_POST['proxydhcp'])) {
 			$_POST['server'] = get_wan_dhcp_server();
+			/* Say why rather than leaving the generic "required field" error:
+			   the field is deliberately filled in for the user here, and it can
+			   only be empty because the WAN has no DHCP lease to learn from. */
+			if (empty($_POST['server']))
+				$input_errors[] = "The DHCP server on the WAN subnet could not be " .
+				    "determined -- the WAN interface has no DHCP lease. Set the WAN to " .
+				    "DHCP and wait for it to obtain an address, or enter the server " .
+				    "address manually instead of proxying.";
+		}
 		$reqdfields = explode(" ", "server");
 		$reqdfieldsn = explode(",", "Destination Server");
 		

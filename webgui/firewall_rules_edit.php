@@ -181,7 +181,7 @@ if (isset($id) && !empty($a_filter[$id])) {
 
 	$pconfig['disabled'] = isset($a_filter[$id]['disabled']);
 	$pconfig['log'] = isset($a_filter[$id]['log']);
-	$pconfig['frags'] = isset($a_filter[$id]['frags']);
+	/* $pconfig['frags'] intentionally absent -- see the Fragments row. */
 	$pconfig['descr'] = $a_filter[$id]['descr'];
 	
 } else {
@@ -376,7 +376,9 @@ if ($_POST) {
 		
 		$filterent['disabled'] = !empty($_POST['disabled']) ? true : false;
 		$filterent['log'] = !empty($_POST['log']) ? true : false;
-		$filterent['frags'] = !empty($_POST['frags']) ? true : false;
+		/* 'frags' is not written any more: pf reassembles globally, so there
+		   is nothing a per-rule flag could change. Existing keys in a restored
+		   config are simply ignored. */
 		$filterent['descr'] = $_POST['descr'];
 		
 		if (isset($id) && !empty($a_filter[$id]))
@@ -536,6 +538,11 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
 					      $interfaces = array('wan' => 'WAN', 'lan' => 'LAN', 'ipsec' => 'IPsec');
 					  else
 					      $interfaces = array('wan' => 'WAN', 'lan' => 'LAN', 'l2tp' => 'L2TP', 'ipsec' => 'IPsec');
+					  /* Each enabled WireGuard tunnel is its own interface, so a
+					     rule can be bound to one tunnel rather than to "the VPN".
+					     Without this the tunnels were up but unreachable by any
+					     rule the admin could write. */
+					  $interfaces += wg_rule_interfaces();
 					  for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
 					  	$interfaces['opt' . $i] = $config['interfaces']['opt' . $i]['descr'];
 					  }
@@ -572,17 +579,22 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
                       <?php
 					  
 					  if (!$ipv6rules) {
+                          /* pf's type names, not ipfilter's. Three differ
+                             ("echo"/"timest"/"timestrep" were ipf spellings pf
+                             rejects, and pfctl refuses the ENTIRE ruleset over
+                             one unknown name). pf_icmptype_v4() still maps the
+                             old spellings, so a restored pre-1.9 config loads. */
                           $icmptypes = array(
                             "" => "any",
                             "unreach" => "Destination unreachable",
-                            "echo" => "Echo",
+                            "echoreq" => "Echo request",
                             "echorep" => "Echo reply",
                             "squench" => "Source quench",
                             "redir" => "Redirect",
                             "timex" => "Time exceeded",
                             "paramprob" => "Parameter problem",
-                            "timest" => "Timestamp",
-                            "timestrep" => "Timestamp reply",
+                            "timereq" => "Timestamp request",
+                            "timerep" => "Timestamp reply",
                             "inforeq" => "Information request",
                             "inforep" => "Information reply",
                             "maskreq" => "Address mask request",
@@ -608,8 +620,16 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
                           );
                       }
 					  
+					  /* A rule saved with an ipf-era name must still show up
+					     selected rather than silently reverting to "any". */
+					  $cursel = $pconfig['icmptype'] ?? null;
+					  $legacymap = array('echo' => 'echoreq', 'timest' => 'timereq',
+					                     'timestrep' => 'timerep');
+					  if (isset($legacymap[$cursel]))
+						  $cursel = $legacymap[$cursel];
+
 					  foreach ($icmptypes as $icmptype => $descr): ?>
-                      <option value="<?=$icmptype;?>" <?php if ($icmptype == ($pconfig['icmptype'] ?? null)) echo "selected"; ?>>
+                      <option value="<?=$icmptype;?>" <?php if ((string) $icmptype === (string) $cursel) echo "selected"; ?>>
                       <?=htmlspecialchars($descr);?>
                       </option>
                       <?php endforeach; ?>
@@ -803,12 +823,13 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">Fragments</td>
                   <td width="78%" class="vtable"> 
-                    <input name="frags" type="checkbox" id="frags" value="yes" <?php if (!empty($pconfig['frags'])) echo "checked"; ?>>
-                    <strong>Allow fragmented packets</strong><br>
-                    <span class="vexpl">Hint: this option puts additional load 
-                    on the firewall and may make it vulnerable to DoS attacks. 
-                    In most cases, it is not needed. Try enabling it if you have 
-                    troubles connecting to certain sites.</span></td>
+                    <strong>Handled automatically</strong><br>
+                    <span class="vexpl">There is no longer a per-rule setting here.
+                    Fragments are reassembled before the rules are consulted
+                    (<em>scrub in all fragment reassemble</em>), so every rule sees
+                    whole packets and fragmented traffic is matched correctly
+                    without an option. The old per-rule checkbox was an ipfilter
+                    requirement; under pf it could not have any effect.</span></td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">Log</td>

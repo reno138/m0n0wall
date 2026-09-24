@@ -70,7 +70,8 @@ function captiveportal_configure() {
         captiveportal_radius_stop_all();
 
         /* initialize minicron interval value */
-        $croninterval = $config['captiveportal']['croninterval'] ? $config['captiveportal']['croninterval'] : 60;
+        $croninterval = !empty($config['captiveportal']['croninterval'])
+                        ? $config['captiveportal']['croninterval'] : 60;
 
         /* double check if the $croninterval is numeric and at least 10 seconds. If not we set it to 60 to avoid problems */
         if ((!is_numeric($croninterval)) || ($croninterval < 10)) { $croninterval = 60; }
@@ -81,9 +82,21 @@ function captiveportal_configure() {
         unlink_if_exists("{$g['vardb_path']}/captiveportal_ip.db");
         unlink_if_exists("{$g['vardb_path']}/captiveportal_radius.db");
         
+        /* Normalise <page> once for the four reads below.
+
+           An empty <page/> -- which is what a portal that has never had a
+           custom page uploaded has -- parses to an empty STRING, not an array.
+           Indexing a string with a string key is a TypeError in PHP 8
+           ("Cannot access offset of type string on string"), so this was fatal
+           the moment the portal was enabled, before a single rule was written.
+           parse_xml_config() only guarantees arrays for TOP-LEVEL sections. */
+        $cpage = $config['captiveportal']['page'] ?? null;
+        if (!is_array($cpage))
+            $cpage = array();
+
         /* write portal page */
-        if ($config['captiveportal']['page']['htmltext'])
-            $htmltext = base64_decode($config['captiveportal']['page']['htmltext']);
+        if (!empty($cpage['htmltext']))
+            $htmltext = base64_decode($cpage['htmltext']);
         else {
             /* example/template page */
             $htmltext = <<<EOD
@@ -111,8 +124,8 @@ EOD;
         }
         
         /* write error page */
-        if ($config['captiveportal']['page']['errtext'])
-            $errtext = base64_decode($config['captiveportal']['page']['errtext']);
+        if (!empty($cpage['errtext']))
+            $errtext = base64_decode($cpage['errtext']);
         else {
             /* example page */
             $errtext = <<<EOD
@@ -140,8 +153,8 @@ EOD;
         }
         
         /* write status page */
-        if ($config['captiveportal']['page']['statustext'])
-            $statustext = base64_decode($config['captiveportal']['page']['statustext']);
+        if (!empty($cpage['statustext']))
+            $statustext = base64_decode($cpage['statustext']);
         else {
             /* example page with just logout, no password change */
             $statustext = <<<EOD
@@ -165,8 +178,8 @@ EOD;
         }
 
         /* write logout page */
-        if ($config['captiveportal']['page']['logouttext'])
-            $logouttext = base64_decode($config['captiveportal']['page']['logouttext']);
+        if (!empty($cpage['logouttext']))
+            $logouttext = base64_decode($cpage['logouttext']);
         else {
             /* example page */
             $logouttext = <<<EOD
