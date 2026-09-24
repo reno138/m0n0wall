@@ -148,8 +148,17 @@ function wg_tunnel_config_generate($tunnel) {
 	$out .= "PrivateKey = {$tunnel['privatekey']}\n";
 	$out .= "ListenPort = " . (!empty($tunnel['listenport']) ? $tunnel['listenport'] : 51820) . "\n";
 
-	if (!empty($tunnel['mtu']))
-		$out .= "MTU = {$tunnel['mtu']}\n";
+	/* NO MTU, Address or DNS here. Those are wg-quick(8) keys; this file is
+	   fed to "wg setconf", whose [Interface] section understands only
+	   PrivateKey, ListenPort and FwMark. One unknown key makes it reject the
+	   WHOLE file --
+	       Line unrecognized: `MTU=1420'
+	       Configuration parsing error
+	   -- so the private key and the listen port were not applied either, and
+	   the interface came up keyless on a random port while the GUI reported
+	   success. MTU is set with ifconfig in wg_configure(); the client export
+	   in wg_peer_config_generate() is a genuine wg-quick config and does
+	   carry Address, DNS and MTU. */
 
 	if (isset($tunnel['peer']) && is_array($tunnel['peer'])) {
 		foreach ($tunnel['peer'] as $peer) {
@@ -275,7 +284,18 @@ function wg_configure() {
 		@chmod($conf, 0600);
 
 		mwexec("/sbin/ifconfig $if create 2>/dev/null");
-		mwexec(WG_BIN . " setconf $if " . escapeshellarg($conf));
+
+		/* Report a rejected configuration instead of discarding it. This
+		   failing silently is what let a keyless tunnel look healthy. */
+		$out = array();
+		exec(WG_BIN . " setconf " . escapeshellarg($if) . " " .
+		     escapeshellarg($conf) . " 2>&1", $out, $rc);
+		if ($rc != 0)
+			log_error("WireGuard: wg setconf $if failed: " . implode("; ", $out));
+
+		if (!empty($tunnel['mtu']))
+			mwexec("/sbin/ifconfig $if mtu " . escapeshellarg($tunnel['mtu']));
+
 		mwexec("/sbin/ifconfig $if inet {$tunnel['address']}/{$tunnel['subnet']} up");
 
 		/* Routes for anything reachable through a peer. */
