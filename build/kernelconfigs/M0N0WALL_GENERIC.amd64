@@ -73,6 +73,13 @@ device		pf
 device		pflog
 device		pfsync
 
+# wg(4), the WireGuard driver. wireguard-tools was in the image from the start
+# but this was not, so wireguard.inc's first step -- "ifconfig wg0 create" --
+# failed with "SIOCIFCREATE2 (wg0): Invalid argument" and the entire mesh VPN
+# feature could not work. Nothing is shipped as a loadable module (kldstat
+# shows only the kernel), so it has to be compiled in.
+device		wg
+
 # ipfw stays for the traffic shaper and the captive portal. Both filters
 # register on the same pfil hooks -- see the ordering note in filter_pf.inc.
 options		IPFIREWALL
