@@ -361,7 +361,10 @@ function get_interface_list($ethernet = true, $wireless = true, $serial = true) 
 		if (substr($ifname, -1) == "*")
 			$ifname = substr($ifname, 0, strlen($ifname) - 1);
 		
-		if (preg_match("/^(ppp|sl|gif|faith|lo|ng|ngwan|vlan|wlan|tun|enc|ipfw|bridge|usbus)\d/", $ifname))
+		/* pflog/pfsync added: pf creates them, they carry no traffic of their own
+		   and they are not valid VLAN parents, but they were offered as assignable
+		   ports and as VLAN parent interfaces. */
+		if (preg_match("/^(ppp|sl|gif|faith|lo|ng|ngwan|vlan|wlan|tun|enc|ipfw|bridge|usbus|pflog|pfsync)\d/", $ifname))
 			continue;
 		
 		if (preg_match($g['wireless_regex'], $ifname)) {
