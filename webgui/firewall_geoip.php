@@ -36,6 +36,7 @@ if (!is_array($config['geoip'] ?? null))
 
 $pconfig['interval'] = $config['geoip']['interval'] ?? 168;
 $pconfig['country']  = $config['geoip']['country'] ?? '';
+$pconfig['failclosed'] = isset($config['geoip']['failclosed']);
 
 if ($_POST) {
 
@@ -61,6 +62,10 @@ if ($_POST) {
 
 	if (empty($input_errors)) {
 		$config['geoip']['interval'] = ($_POST['interval'] ?? '') === '' ? 168 : (int)$_POST['interval'];
+		if (!empty($_POST['failclosed']))
+			$config['geoip']['failclosed'] = true;
+		else
+			unset($config['geoip']['failclosed']);
 		if (empty($extra))
 			unset($config['geoip']['country']);
 		else
@@ -125,6 +130,21 @@ foreach ($status as $st)
       nothing is downloaded for a country nothing refers to.</span></td>
   </tr>
   <tr>
+    <td width="22%" valign="top" class="vncell">When data is missing</td>
+    <td width="78%" class="vtable">
+      <input name="failclosed" type="checkbox" id="failclosed" value="yes"
+             <?php if ($pconfig['failclosed']) echo "checked"; ?>>
+      <strong>Block everything a country rule would have matched</strong>
+      <br><span class="vexpl">An empty table matches nothing, so by default a
+      <em>block</em> rule over a country with no data carries the traffic it was meant
+      to stop. With this set, such a rule blocks everything else it matches until a
+      refresh succeeds. <em>Pass</em> rules are unaffected &mdash; an empty table
+      already passes nothing.<br>
+      Leave it off unless you would rather lose connectivity than lose the block: the
+      tables are on a RAM disk and are empty after every reboot until an update
+      succeeds, which needs a working WAN.</span></td>
+  </tr>
+  <tr>
     <td width="22%" valign="top">&nbsp;</td>
     <td width="78%">
       <input name="Submit" type="submit" class="formbtn" value="Save">
@@ -160,9 +180,14 @@ foreach ($status as $st)
 <table width="100%" border="0" cellspacing="0" cellpadding="0" summary="info pane">
   <tr>
     <td><strong><span class="red">Note:</span></strong><br>
-    <?=$empty_tables;?> table(s) above hold no prefixes. An empty pf table matches
-    nothing, so a rule using that country currently has no effect &mdash; it does not
-    block, and it does not pass. The tables live on a RAM disk and are empty after
+    <?=$empty_tables;?> table(s) above hold no prefixes.
+    <?php if (isset($config['geoip']['failclosed'])): ?>
+    <strong>When data is missing</strong> is set, so every <em>block</em> rule using one
+    of those countries is currently blocking everything else it matches.
+    <?php else: ?>
+    An empty pf table matches nothing, so a rule using that country currently has no
+    effect &mdash; it does not block, and it does not pass.
+    <?php endif; ?> The tables live on a RAM disk and are empty after
     every reboot until a refresh succeeds, which needs a working WAN. Press
     <em>Save and update now</em>, or check the system log for the reason the last
     refresh failed.</td>

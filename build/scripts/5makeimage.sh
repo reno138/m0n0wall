@@ -30,6 +30,46 @@
 
 set -e
 
+# ---------------------------------------------------------------------------
+# Append a firmware signature, in the layout verifysig(1) expects:
+#
+#   | gzip image | signature | siglen (2 bytes LE) | magic 0xe14d77cb (4 LE) |
+#
+# RSA over a SHA-1 digest, because that is what verifysig verifies
+# (EVP_VerifyInit with EVP_sha1). gzip ignores the trailing bytes, which is
+# what lets the same file be both the upgrade artifact and the firmware.img on
+# the CD.
+#
+# perl does the two integers: printf in sh cannot emit a NUL byte, and a
+# 256-byte signature length is 0x0100 -- low byte zero.
+# ---------------------------------------------------------------------------
+sign_image() {
+	_img="$1"
+	_key="$MW_BUILDPATH/keys/private.pem"
+	[ -f "$_key" ] || { echo "ERROR: no signing key at $_key (run stage 1)"; exit 1; }
+
+	openssl dgst -sha1 -sign "$_key" -out "$TMP/sig.bin" "$_img" || {
+		echo "ERROR: signing $_img failed"; exit 1; }
+	_len=$(stat -f %z "$TMP/sig.bin")
+	cat "$TMP/sig.bin" >> "$_img"
+	perl -e 'print pack("v", $ARGV[0]), pack("V", 0xe14d77cb)' "$_len" >> "$_img"
+	rm -f "$TMP/sig.bin"
+
+	# Verify with the very binary the firewall will use, against the very key
+	# the image carries -- a signature this build cannot check is worse than
+	# no signature, because the failure would only appear on someone's upgrade.
+	_fs="$MW_BUILDPATH/m0n0fs"
+	cp "$_img" "$_fs/tmp/verify.img"
+	if chroot "$_fs" /usr/local/bin/verifysig /etc/pubkey.pem /tmp/verify.img; then
+		echo "  signed and verified: $(basename "$_img") (${_len}-byte signature)"
+	else
+		rm -f "$_fs/tmp/verify.img"
+		echo "ERROR: $_img does not verify against the public key in the image"
+		exit 1
+	fi
+	rm -f "$_fs/tmp/verify.img"
+}
+
 if [ -z "$MW_BUILDPATH" ] || [ ! -d "$MW_BUILDPATH" ]; then
 	echo "\$MW_BUILDPATH is not set"
 	exit 1
@@ -180,6 +220,7 @@ makeimage() {
 	rm -f "$TMP/esp-$platform.img" "$TMP/root-$platform.ufs"
 	gzip -9f "$TMP/image-$platform.bin"
 	mv "$TMP/image-$platform.bin.gz" "$IMAGES/$platform-$VERSION.img"
+	sign_image "$IMAGES/$platform-$VERSION.img"
 
 	echo ' done'
 }

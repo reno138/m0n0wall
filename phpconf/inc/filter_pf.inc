@@ -446,6 +446,14 @@ function pf_rule_endpoint($side, $ctx) {
 	   of tables inside braces, so "from { <geo_CN>, <geo_RU> }" is one rule
 	   rather than one rule per country. */
 	if (!empty($side['country'])) {
+		/* Fail closed, if asked. An empty table matches nothing, so a block
+		   rule over a country with no data silently carries the traffic it
+		   was meant to stop. Widening it to "any" blocks everything the rest
+		   of the rule matches until a refresh succeeds. Only the caller knows
+		   whether this rule blocks or passes, so it passes that in via
+		   $side['_failclosed'], set by pf_user_rule_generate(). */
+		if (!empty($side['_failclosed']) && geoip_list_has_empty($side['country']))
+			return "any";
 		$tbls = array();
 		foreach (explode(',', $side['country']) as $cc) {
 			$cc = trim($cc);
@@ -512,8 +520,16 @@ function pf_user_rule_generate($rule, $ctx, $iface, $af = "") {
 	if ($proto !== "")
 		$line .= " " . $proto;
 
+	/* Fail-closed applies only to rules that BLOCK: an empty country table
+	   passes nothing, so a pass rule is already closed. Signalled through the
+	   side array because pf_rule_endpoint() is shared with the NAT and shaper
+	   paths and has no idea what action it is serving. */
+	$failclosed = ($type != "pass") && geoip_fail_closed();
+
 	/* source */
-	$src = pf_rule_endpoint($rule['source'], $ctx);
+	$srcside = $rule['source'];
+	if ($failclosed) $srcside['_failclosed'] = true;
+	$src = pf_rule_endpoint($srcside, $ctx);
 	if ($src === null || $src === "" || $src === "/")
 		return "";
 	$line .= " from " . pf_addr_spec($src, isset($rule['source']['not']));
@@ -525,7 +541,9 @@ function pf_user_rule_generate($rule, $ctx, $iface, $af = "") {
 	}
 
 	/* destination */
-	$dst = pf_rule_endpoint($rule['destination'], $ctx);
+	$dstside = $rule['destination'];
+	if ($failclosed) $dstside['_failclosed'] = true;
+	$dst = pf_rule_endpoint($dstside, $ctx);
 	if ($dst === null || $dst === "" || $dst === "/")
 		return "";
 	$line .= " to " . pf_addr_spec($dst, isset($rule['destination']['not']));

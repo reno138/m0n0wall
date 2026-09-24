@@ -86,6 +86,40 @@ VERSION=$(echo "$VERSION" | sed "s/%/$REV/g")
 echo "$VERSION" > etc/version
 echo "  version: $VERSION"
 
+# ---------------------------------------------------------------------------
+# Firmware signing key.
+#
+# The image carries the PUBLIC key and will only accept an upgrade signed by
+# the matching private one, so this keypair is the trust root of every image
+# this tree builds. It lives in $MW_BUILDPATH, deliberately NOT in the
+# repository: a signing key in version control is not a signing key.
+#
+# Generated on first use. Whoever builds their own ISO therefore gets their
+# own trust root and can only upgrade with images they built themselves, which
+# is the property wanted -- and is why the key m0n0wall used to ship was
+# useless to anyone but its author. That was a 1024-bit key whose private half
+# nobody here has; this is 2048.
+#
+# Keep $MW_BUILDPATH/keys. Losing private.pem means no future build can produce
+# an upgrade for an already-installed system.
+# ---------------------------------------------------------------------------
+KEYDIR="$MW_BUILDPATH/keys"
+mkdir -p "$KEYDIR"
+chmod 0700 "$KEYDIR"
+if [ ! -f "$KEYDIR/private.pem" ]; then
+	echo "Generating a firmware signing key (first build)..."
+	openssl genrsa -out "$KEYDIR/private.pem" 2048 2>/dev/null || {
+		echo "ERROR: could not generate a signing key with openssl"; exit 1; }
+	chmod 0600 "$KEYDIR/private.pem"
+	rm -f "$KEYDIR/public.pem"
+fi
+if [ ! -f "$KEYDIR/public.pem" ]; then
+	openssl rsa -in "$KEYDIR/private.pem" -pubout -out "$KEYDIR/public.pem" 2>/dev/null || {
+		echo "ERROR: could not derive the public key"; exit 1; }
+fi
+cp "$KEYDIR/public.pem" etc/pubkey.pem
+echo "  signing key: $KEYDIR/private.pem ($(openssl rsa -in "$KEYDIR/private.pem" -noout -text 2>/dev/null | sed -n 's/.*Private-Key: (\([0-9]*\) bit.*/\1/p') bit)"
+
 echo "Installing the default configuration..."
 cp "$SRC/phpconf/config.xml" conf.default/config.xml
 

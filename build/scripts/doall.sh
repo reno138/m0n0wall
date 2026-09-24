@@ -56,10 +56,11 @@ note "output: $MW_BUILDPATH/images"
 note "/usr/src present"
 
 # --- tools ----------------------------------------------------------------
-for t in makefs mkimg pkg perl strip file php; do
+for t in makefs mkimg pkg perl strip file php openssl; do
 	command -v "$t" >/dev/null 2>&1 || \
 		fail "$t not found. makefs/mkimg/strip/file are base;
-       perl, pkg and php come from packages (pkg install perl5 php84)."
+       perl, pkg and php come from packages (pkg install perl5 php84);
+       openssl is base and signs the firmware images."
 done
 note "makefs, mkimg, pkg, perl, php present"
 

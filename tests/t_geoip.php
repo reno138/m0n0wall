@@ -69,6 +69,21 @@ is_false('rejects a digit',             is_country_code("U1"));
 is_false('rejects empty',               is_country_code(""));
 is_false('rejects null',                is_country_code(null));
 
+/* --- fail-closed ------------------------------------------------------- */
+/* geoip_country_is_empty() looks at GEOIP_DIR, which does not exist in the
+   test environment -- which is exactly the "no data yet" case it has to
+   report, so that is what is asserted here. */
+is_true ('a country with no file counts as empty',  geoip_country_is_empty('ZZ'));
+is_true ('a list containing an empty country',      geoip_list_has_empty('CN,RU'));
+is_false('an empty list has nothing empty',         geoip_list_has_empty(''));
+is_false('junk codes are ignored, not treated as empty', geoip_list_has_empty('ZZZ,1'));
+
+$config = array();
+is_false('fail-closed off by default',              geoip_fail_closed());
+$config = array('geoip' => array('failclosed' => true));
+is_true ('fail-closed honoured when set',           geoip_fail_closed());
+$config = array();
+
 /* --- config round trip ------------------------------------------------- */
 /* The settings this feature writes must survive dump_xml_config() and come
    back through parse_xml_config(). A numerically-indexed array whose key is

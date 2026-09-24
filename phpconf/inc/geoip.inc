@@ -37,7 +37,14 @@
  * ONLY COUNTRIES IN USE ARE FETCHED. geoip_countries_in_use() reads the rule
  * set; nothing is downloaded for a country no rule mentions.
  *
- * IT FAILS OPEN, AND THAT IS VISIBLE. /var/db is a RAM disk, so after a reboot
+ * IT FAILS OPEN BY DEFAULT, AND THAT IS VISIBLE -- OR IT FAILS CLOSED IF YOU
+ * ASK IT TO. See geoip_fail_closed() and pf_geoip_side_or_fail(): with the
+ * option set, a BLOCK rule whose country table holds no prefixes is emitted
+ * against "any" instead, so it blocks everything matching the rest of the rule
+ * until the data arrives. A PASS rule needs nothing: an empty table already
+ * passes nothing.
+ *
+ * FAILING OPEN IS THE DEFAULT AND THAT IS VISIBLE. /var/db is a RAM disk, so after a reboot
  * the tables are empty until the first refresh succeeds -- and a box whose WAN
  * is not up yet cannot refresh. An empty pf table matches nothing, so a
  * country block rule is a no-op until the data arrives. That is the safe
@@ -329,4 +336,33 @@ function services_geoip_configure() {
 		echo "done\n";
 
 	return 0;
+}
+
+/* Should a country rule with no data behave as if it matched everything?
+ *
+ * Only affects BLOCK rules: an empty table passes nothing, so a pass rule
+ * already fails closed. Off by default, because turning it on means a box
+ * that cannot reach the registries after a reboot blocks traffic it would
+ * otherwise have carried -- which is the right answer for some sites and
+ * plainly the wrong one for others, so it is a decision and not a default.
+ */
+function geoip_fail_closed() {
+	global $config;
+	return isset($config['geoip']['failclosed']);
+}
+
+/* True when this country has no usable table on disk. */
+function geoip_country_is_empty($cc) {
+	$f = geoip_file($cc);
+	return !file_exists($f) || filesize($f) < 4;
+}
+
+/* True when any country named in a comma-separated list has no data. */
+function geoip_list_has_empty($list) {
+	foreach (explode(',', (string)$list) as $cc) {
+		$cc = trim($cc);
+		if (is_country_code($cc) && geoip_country_is_empty($cc))
+			return true;
+	}
+	return false;
 }

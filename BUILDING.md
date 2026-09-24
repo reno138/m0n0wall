@@ -26,6 +26,7 @@ appear as `da0` and behave like ordinary SCSI under `camcontrol` and
 # host's php to check that every function it calls actually exists in the
 # image. The tokenizer is not shipped -- nothing on a firewall parses PHP.
 pkg install -y git perl5 php84 php84-tokenizer
+# openssl is in base and is used to generate the firmware signing key
 git clone -b releng/15.1 https://git.freebsd.org/src.git /usr/src
 
 # the checkout of this project
@@ -63,6 +64,23 @@ To run one stage at a time:
 cd ~/mw-build/freebsd15/build/scripts
 env MW_BUILDPATH=$HOME/mw-build sh 5makeimage.sh
 ```
+
+## The firmware signing key
+
+The first build generates `$MW_BUILDPATH/keys/private.pem` (RSA 2048) and
+installs the matching public key into the image as `/etc/pubkey.pem`. Stage 5
+signs every `.img` with it and then verifies the result using the image's own
+`verifysig` against the image's own public key, so an unverifiable signature
+fails the build rather than someone's upgrade.
+
+**That keypair is the trust root of every image this tree builds.** It is
+deliberately not in the repository. Back up `$MW_BUILDPATH/keys`: losing
+`private.pem` means no later build can produce an upgrade an already-installed
+system will accept, and the only way forward is a reinstall.
+
+Build your own ISO and you get your own trust root, which is the point --
+images signed by someone else's key will be refused. The webGUI still offers an
+override for an unsigned or wrongly-signed image, and says which it is.
 
 ## What each stage does
 
