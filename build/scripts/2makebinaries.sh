@@ -56,6 +56,7 @@ STAGE="$MW_BUILDPATH/tmp/pkgstage"
 PKGS="php84 php84-filter php84-session php84-sockets
       php84-xml php84-zlib php84-pcntl php84-posix php84-pecl-radius
       php84-ctype php84-bcmath
+      ca_root_nss
       lighttpd dnsmasq mpd5 strongswan net-snmp wol
       dhcp6 isc-dhcp44-relay
       bind-tools wireguard-tools libqrencode"
@@ -228,11 +229,34 @@ for d in usr/local/etc/strongswan.d usr/local/share/strongswan \
          usr/local/etc/rc.d/nothing; do
 	[ -d "$STAGE/$d" ] && { mkdir -p "$FS/$d"; cp -Rp "$STAGE/$d/." "$FS/$d/"; }
 done
-# CA bundle -- inadyn and strongswan validate TLS with it
-[ -f "$STAGE/usr/local/etc/ssl/cert.pem" ] && {
-	mkdir -p "$FS/usr/local/etc/ssl"
-	cp -p "$STAGE/usr/local/etc/ssl/cert.pem" "$FS/usr/local/etc/ssl/"
+# CA bundle. Everything in the image that speaks TLS as a CLIENT verifies
+# against this one file: Dynamic DNS (dyndns.inc), the GeoIP registry fetch
+# (geoip.inc) and strongSwan.
+#
+# It used to be copied only "if present", and it never was -- ca_root_nss was
+# not in the component list, so the test silently failed and the file was
+# simply absent. Every HTTPS request then died with "failed loading cafile
+# stream" and "Failed to enable crypto", which surfaces as a generic fetch
+# failure a long way from the cause. Not optional any more: no CA bundle, no
+# image.
+#
+# ca_root_nss ships the real bundle in share/certs and leaves etc/ssl/cert.pem
+# as a symlink to it, so dereference rather than copying a dangling link into
+# an image that will not contain the target.
+mkdir -p "$FS/usr/local/etc/ssl"
+CAFILE=""
+for c in "$STAGE/usr/local/etc/ssl/cert.pem" \
+         "$STAGE/usr/local/share/certs/ca-root-nss.crt"; do
+	[ -f "$c" ] && { CAFILE="$c"; break; }
+done
+[ -n "$CAFILE" ] || {
+	echo "ERROR: no CA bundle in the staging root."
+	echo "       ca_root_nss must be in PKGS; without it Dynamic DNS, the GeoIP"
+	echo "       registry fetch and strongSwan cannot verify any TLS peer."
+	exit 1
 }
+cp -pL "$CAFILE" "$FS/usr/local/etc/ssl/cert.pem"
+echo "  CA bundle: $(wc -l < "$FS/usr/local/etc/ssl/cert.pem" | tr -d ' ') lines"
 
 echo "Stripping..."
 find "$FS/usr/local" -type f 2>/dev/null | while read -r f; do
