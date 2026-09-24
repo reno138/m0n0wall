@@ -34,13 +34,15 @@ require("guiconfig.inc");
 
 $protocols = explode(" ", "TCP UDP TCP/UDP ICMP ESP AH GRE IPv6 IGMP any");
 
-$nentries = $config['syslog']['nentries'];
+$actstring = $ifstring = $srcstring = $dststring = $prstring = "";
+
+$nentries = $config['syslog']['nentries'] ?? null;
 $resolve = isset($config['syslog']['resolve']);
 
 if (!$nentries)
 	$nentries = 50;
 
-if ($_POST['clear']) {
+if (!empty($_POST['clear'])) {
 	/* Ring-buffer init removed: logs are ordinary files bounded by
 	   newsyslog(8). See build/files/newsyslog.conf. */
 	/* redirect to avoid reposting form data on refresh */
@@ -103,9 +105,9 @@ function dump_clog($logfile, $tail, $withorig = true) {
 		
 		if ($withorig) {
 			echo "<td class=\"listlr\" nowrap>" . htmlspecialchars(join(" ", array_slice($logent, 0, 3))) . "</td>\n";
-			echo "<td class=\"listr\">" . htmlspecialchars($logent[4] . " " . $logent[5]) . "</td>\n";
+			echo "<td class=\"listr\">" . htmlspecialchars(($logent[4] ?? '') . " " . ($logent[5] ?? '')) . "</td>\n";
 		} else {
-			echo "<td class=\"listlr\" colspan=\"2\">" . htmlspecialchars($logent[5]) . "</td>\n";
+			echo "<td class=\"listlr\" colspan=\"2\">" . htmlspecialchars($logent[5] ?? '') . "</td>\n";
 		}
 		echo "</tr>\n";
 	}
@@ -129,7 +131,7 @@ function conv_clog($logfile, $tail) {
 
 	foreach ($logarr as $logent) {
 		$logent = preg_split("/\s+/", $logent, 6);
-		$ipfa = explode(" ", $logent[5]);
+		$ipfa = explode(" ", $logent[5] ?? '');
 		
 		$flent = array();
 		$i = 0;
@@ -140,7 +142,7 @@ function conv_clog($logfile, $tail) {
 			$i++;
 		}
 		
-		if ($iftable[$ipfa[$i]])
+		if (!empty($iftable[$ipfa[$i]]))
 			$flent['interface'] = $iftable[$ipfa[$i]];
 		else if (strpos($ipfa[$i], "ng") !== false)
 			$flent['interface'] = "PPTP";
@@ -166,11 +168,11 @@ function conv_clog($logfile, $tail) {
 		else
 			continue; 
 		$i++;
-		list($flent['src'], $flent['srcport']) = format_ipf_ip($ipfa[$i],$srcport);
+		list($flent['src'], $flent['srcport']) = format_ipf_ip($ipfa[$i],$srcport ?? null) ?? array(null, null);
 		if (!isset($flent['src']))
 			continue;
 		$i += 2;
-		list($flent['dst'], $flent['dstport']) = format_ipf_ip($ipfa[$i],$dstport);
+		list($flent['dst'], $flent['dstport']) = format_ipf_ip($ipfa[$i],$dstport ?? null) ?? array(null, null);
 		if (!isset($flent['dst']))
 			continue;
 		$i += 2;
@@ -192,16 +194,18 @@ function conv_clog($logfile, $tail) {
 function format_ipf_ip($ipfip,$uport) {
 	global $resolve;
 
-	list($ip,$port) = explode(",", $ipfip);
+	$ipfparts = explode(",", $ipfip);
+	$ip = $ipfparts[0];
+	$port = $ipfparts[1] ?? null;
 	if ($resolve) {
-		if (!$port)
+		if (empty($port))
 			return array(gethostbyaddr($ip), "");
 		if ($uport == "" || ($uport == $port))
 			return array(gethostbyaddr($ip) . ", port " . $port, $port);
 		return;
 	}
 
-	if (!$port)
+	if (empty($port))
 		return array($ip, "");
 	if ($uport == "" || ($uport == $port))
 		return array($ip . ", port " . $port, $port);
@@ -257,7 +261,7 @@ function format_ipf_ip($ipfip,$uport) {
 					 	$img = "block.gif";
 			 	?>
 			  <a href="?act=<?=$filterent['act'];?><?=$actstring;?><img src="<?=$img;?>" width="11" height="11" align="middle" border="0" title="click to select action" alt="click to select action"></a>
-			  <?php if ($filterent['count']) echo $filterent['count'];?></td>
+			  <?php if (!empty($filterent['count'])) echo $filterent['count'];?></td>
 			  <td class="listr" nowrap><?=htmlspecialchars($filterent['time']);?></td>
 			  <td class="listr" nowrap>
 			    <a href="?if=<?=$filterent['interface'];?><?=$ifstring;?><?=htmlspecialchars($filterent['interface']);?></a></td>

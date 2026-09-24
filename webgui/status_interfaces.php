@@ -35,7 +35,7 @@ $wancfg = &$config['interfaces']['wan'];
 
 
 if ($_POST) {
-	if ($_POST['submit'] == "Disconnect" || $_POST['submit'] == "Release") {
+	if (($_POST['submit'] ?? null) == "Disconnect" || ($_POST['submit'] ?? null) == "Release") {
 		if ($wancfg['ipaddr'] == "dhcp")
 			interfaces_wan_dhcp_down();
 		else if ($wancfg['ipaddr'] == "pppoe")
@@ -44,7 +44,7 @@ if ($_POST) {
 			interfaces_wan_pptp_down();
 		else if ($wancfg['ipaddr'] == "modem")
 			interfaces_wan_modem_down();
-	} else if ($_POST['submit'] == "Connect" || $_POST['submit'] == "Renew") {
+	} else if (($_POST['submit'] ?? null) == "Connect" || ($_POST['submit'] ?? null) == "Renew") {
 		if ($wancfg['ipaddr'] == "dhcp")
 			interfaces_wan_dhcp_up();
 		else if ($wancfg['ipaddr'] == "pppoe")
@@ -75,6 +75,7 @@ function get_interface_info($ifdescr) {
 	global $config, $g;
 	$ifaddr6s = array();
 	$ifaddr4s = array();
+	$ifaddr6a = array();
 	$ifinfo = array();
 	
 	/* find out interface name */
@@ -91,7 +92,7 @@ function get_interface_info($ifdescr) {
 	} else {
 		exec("/usr/bin/netstat -I " . $ifinfo['if'] . " -nWb -f link", $linkinfo);
 	}
-	$linkinfo = preg_split("/\s+/", $linkinfo[1]);
+	$linkinfo = preg_split("/\s+/", $linkinfo[1] ?? '');
 	if (preg_match("/\*$/", $linkinfo[0]) || preg_match("/^$/", $linkinfo[0])) {
 		$ifinfo['status'] = "down";
 	} else {
@@ -103,15 +104,15 @@ function get_interface_info($ifdescr) {
 		array_splice($linkinfo, 3, 0, "Not Supported");
 	}
 
-	$ifinfo['macaddr'] = $linkinfo[3];
-	$ifinfo['inpkts'] = $linkinfo[4];
-	$ifinfo['inerrs'] = $linkinfo[5];
-	$ifinfo['indrops'] = $linkinfo[6];
-	$ifinfo['inbytes'] = $linkinfo[7];
-	$ifinfo['outpkts'] = $linkinfo[8];
-	$ifinfo['outerrs'] = $linkinfo[9];
-	$ifinfo['outbytes'] = $linkinfo[10];
-	$ifinfo['collisions'] = $linkinfo[11];
+	$ifinfo['macaddr'] = $linkinfo[3] ?? null;
+	$ifinfo['inpkts'] = $linkinfo[4] ?? null;
+	$ifinfo['inerrs'] = $linkinfo[5] ?? null;
+	$ifinfo['indrops'] = $linkinfo[6] ?? null;
+	$ifinfo['inbytes'] = $linkinfo[7] ?? null;
+	$ifinfo['outpkts'] = $linkinfo[8] ?? null;
+	$ifinfo['outerrs'] = $linkinfo[9] ?? null;
+	$ifinfo['outbytes'] = $linkinfo[10] ?? null;
+	$ifinfo['collisions'] = $linkinfo[11] ?? null;
 	
 	/* DHCP? -> see if dhclient is up */
 	if (($ifdescr == "wan") && ($config['interfaces']['wan']['ipaddr'] == "dhcp")) {
@@ -126,7 +127,7 @@ function get_interface_info($ifdescr) {
 	if (($ifdescr == "wan") && ($config['interfaces']['wan']['ipaddr'] == "pppoe")) {
 		unset($linkinfo);
 		exec("/usr/bin/netstat -I " . $ifinfo['if'] . " -nWb -f link", $linkinfo);
-		$linkinfo = preg_split("/\s+/", $linkinfo[1]);
+		$linkinfo = preg_split("/\s+/", $linkinfo[1] ?? '');
 		if (preg_match("/\*$/", $linkinfo[0])) {
 			$ifinfo['pppoelink'] = "down";
 		} else {
@@ -147,7 +148,7 @@ function get_interface_info($ifdescr) {
 	if (($ifdescr == "wan") && ($config['interfaces']['wan']['ipaddr'] == "pptp")) {
 		unset($linkinfo);
 		exec("/usr/bin/netstat -I " . $ifinfo['if'] . " -nWb -f link", $linkinfo);
-		$linkinfo = preg_split("/\s+/", $linkinfo[1]);
+		$linkinfo = preg_split("/\s+/", $linkinfo[1] ?? '');
 		if (preg_match("/\*$/", $linkinfo[0])) {
 			$ifinfo['pptplink'] = "down";
 		} else {
@@ -215,7 +216,7 @@ function get_interface_info($ifdescr) {
 			}
 		}
 		
-		if ($ifinfo['pppoelink'] != "down" && $ifinfo['pptplink'] != "down" && $ifinfo['modemlink'] != "down") {
+		if (($ifinfo['pppoelink'] ?? null) != "down" && ($ifinfo['pptplink'] ?? null) != "down" && ($ifinfo['modemlink'] ?? null) != "down") {
 			/* try to determine IP address and netmask with ifconfig */
 			unset($ifconfiginfo);
 			exec("/sbin/ifconfig " . $ifinfo['if'], $ifconfiginfo);
@@ -235,7 +236,7 @@ function get_interface_info($ifdescr) {
 			
 			if ($ifdescr == "wan") {
 				/* run netstat to determine the default gateway */
-				if ($ifinfo['modemlink']) {
+				if (!empty($ifinfo['modemlink'])) {
 					$ifinfo['gateway'] = "Modem";
 				} else {
 					unset($netstatrninfo);
@@ -250,7 +251,7 @@ function get_interface_info($ifdescr) {
 				if (ipv6enabled()) {
 					unset($netstatrninfo);
 					exec("/usr/bin/netstat -rnf inet6", $netstatrninfo);
-					if ($ifinfo['modemlink']) {
+					if (!empty($ifinfo['modemlink'])) {
 						$ifinfo['gateway6'] = "Modem";
 					} else { 
 						foreach ($netstatrninfo as $nsr) {
@@ -260,7 +261,7 @@ function get_interface_info($ifdescr) {
 						}
 					}
 					/* 6to4 on WAN? need to run ifconfig on stf0 then */
-					if ($config['interfaces']['wan']['ipaddr6'] == "6to4") {
+					if (($config['interfaces']['wan']['ipaddr6'] ?? null) == "6to4") {
 						unset($ifconfiginfo);
 						exec("/sbin/ifconfig stf0", $ifconfiginfo);
 
@@ -272,9 +273,9 @@ function get_interface_info($ifdescr) {
 					}
 
 					/* GRE tunnel on WAN? need to run ifconfig on gif0 then */
-					if ($config['interfaces']['wan']['tunnel6'] || ($config['interfaces']['wan']['ipaddr6'] == "aiccu" ) ) {
+					if (!empty($config['interfaces']['wan']['tunnel6']) || (($config['interfaces']['wan']['ipaddr6'] ?? null) == "aiccu" ) ) {
 						$tunif = 'gif0';
-						if  ($config['interfaces']['wan']['ipaddr6'] == "aiccu" && isset($config['interfaces']['wan']['aiccu']['ayiya']) ) {
+						if  (($config['interfaces']['wan']['ipaddr6'] ?? null) == "aiccu" && isset($config['interfaces']['wan']['aiccu']['ayiya']) ) {
 							$tunif = 'tun0';
 						}
 						unset($ifconfiginfo);
@@ -330,45 +331,45 @@ function get_interface_info($ifdescr) {
                 <td width="78%" class="listr"> 
                   <?=htmlspecialchars($ifinfo['status']);?>
                 </td>
-              </tr><?php if ($ifinfo['dhcplink']): ?>
+              </tr><?php if (!empty($ifinfo['dhcplink'])): ?>
 			  <tr> 
 				<td width="22%" class="vncellt">DHCP</td>
 				<td width="78%" class="listr"> 
 				  <?=htmlspecialchars($ifinfo['dhcplink']);?>&nbsp;&nbsp;
-				  <?php if ($ifinfo['dhcplink'] == "up"): ?>
+				  <?php if (($ifinfo['dhcplink'] ?? null) == "up"): ?>
 				  <input type="submit" name="submit" value="Release" class="formbtns">
 				  <?php else: ?>
 				  <input type="submit" name="submit" value="Renew" class="formbtns">
 				  <?php endif; ?>
 				</td>
-			  </tr><?php endif; if ($ifinfo['pppoelink']): ?>
+			  </tr><?php endif; if (!empty($ifinfo['pppoelink'])): ?>
               <tr> 
                 <td width="22%" class="vncellt">PPPoE</td>
                 <td width="78%" class="listr"> 
                   <?=htmlspecialchars($ifinfo['pppoelink']);?>&nbsp;&nbsp;
-				  <?php if ($ifinfo['pppoelink'] == "up"): ?>
+				  <?php if (($ifinfo['pppoelink'] ?? null) == "up"): ?>
 				  <input type="submit" name="submit" value="Disconnect" class="formbtns">
 				  <?php else: ?>
 				  <input type="submit" name="submit" value="Connect" class="formbtns">
 				  <?php endif; ?>
                 </td>
-              </tr><?php  endif; if ($ifinfo['pptplink']): ?>
+              </tr><?php  endif; if (!empty($ifinfo['pptplink'])): ?>
               <tr> 
                 <td width="22%" class="vncellt">PPTP</td>
                 <td width="78%" class="listr"> 
                   <?=htmlspecialchars($ifinfo['pptplink']);?>&nbsp;&nbsp;
-				  <?php if ($ifinfo['pptplink'] == "up"): ?>
+				  <?php if (($ifinfo['pptplink'] ?? null) == "up"): ?>
 				  <input type="submit" name="submit" value="Disconnect" class="formbtns">
 				  <?php else: ?>
 				  <input type="submit" name="submit" value="Connect" class="formbtns">
 				  <?php endif; ?>
                 </td>
-              </tr><?php  endif; if ($ifinfo['modemlink']): ?>
+              </tr><?php  endif; if (!empty($ifinfo['modemlink'])): ?>
               <tr> 
                 <td width="22%" class="vncellt">Modem</td>
                 <td width="78%" class="listr"> 
                   <?=htmlspecialchars($ifinfo['modemlink']);?>&nbsp;&nbsp;
-				  <?php if ($ifinfo['modemlink'] == "up"): ?>
+				  <?php if (($ifinfo['modemlink'] ?? null) == "up"): ?>
 				  <input type="submit" name="submit" value="Disconnect" class="formbtns">
 				  <?php else: ?>
 				  <input type="submit" name="submit" value="Connect" class="formbtns">
@@ -381,7 +382,7 @@ function get_interface_info($ifdescr) {
                   <?=htmlspecialchars($ifinfo['macaddr']);?>
                 </td>
               </tr><?php if ($ifinfo['status'] != "down"): ?>
-			  <?php if ($ifinfo['dhcplink'] != "down" && $ifinfo['pppoelink'] != "down" && $ifinfo['pptplink'] != "down" && $ifinfo['modemlink'] != "down"): ?>
+			  <?php if (($ifinfo['dhcplink'] ?? null) != "down" && ($ifinfo['pppoelink'] ?? null) != "down" && ($ifinfo['pptplink'] ?? null) != "down" && ($ifinfo['modemlink'] ?? null) != "down"): ?>
 			
 			  <?php if (!empty($ifaddr4s)): ?>
               	<tr> 
@@ -392,7 +393,7 @@ function get_interface_info($ifdescr) {
 		    		endforeach; ?></td>
               </tr>
               <?php endif; ?>
-			  <?php if ($ifinfo['gateway']): ?>
+			  <?php if (!empty($ifinfo['gateway'])): ?>
               <tr> 
                 <td width="22%" class="vncellt">IPv4 gateway</td>
                 <td width="78%" class="listr"> 
@@ -408,14 +409,14 @@ function get_interface_info($ifdescr) {
 				  endforeach; ?></td>
 		      </tr>
               <?php endif; ?>
-			  <?php if ($ifinfo['gateway6']): ?>
+			  <?php if (!empty($ifinfo['gateway6'])): ?>
               <tr> 
                 <td width="22%" class="vncellt">IPv6 gateway</td>
                 <td width="78%" class="listr"> 
                   <?=htmlspecialchars($ifinfo['gateway6']);?>
                   &nbsp; </td>
               </tr><?php endif; ?>
-	          <?php if ($config['interfaces']['wan']['ipaddr6'] == "aiccu" && $ifdescr == "wan"): ?>
+	          <?php if (($config['interfaces']['wan']['ipaddr6'] ?? null) == "aiccu" && $ifdescr == "wan"): ?>
               <tr> 
                 <td width="22%" class="vncellt">AICCU address</td>
                 <td width="78%" class="listr"> 
@@ -432,19 +433,19 @@ function get_interface_info($ifdescr) {
 				 		echo "$resolver<br>";
 				    	endforeach; ?></td>
               </tr>
-			  <?php endif; endif; if ($ifinfo['media']): ?>
+			  <?php endif; endif; if (!empty($ifinfo['media'])): ?>
               <tr> 
                 <td width="22%" class="vncellt">Media</td>
                 <td width="78%" class="listr"> 
                   <?=htmlspecialchars($ifinfo['media']);?>
                 </td>
-              </tr><?php endif; ?><?php if ($ifinfo['channel']): ?>
+              </tr><?php endif; ?><?php if (!empty($ifinfo['channel'])): ?>
               <tr> 
                 <td width="22%" class="vncellt">Channel</td>
                 <td width="78%" class="listr"> 
                   <?=htmlspecialchars($ifinfo['channel']);?>
                 </td>
-              </tr><?php endif; ?><?php if ($ifinfo['ssid']): ?>
+              </tr><?php endif; ?><?php if (!empty($ifinfo['ssid'])): ?>
               <tr> 
                 <td width="22%" class="vncellt">SSID</td>
                 <td width="78%" class="listr"> 

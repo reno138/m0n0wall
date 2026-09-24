@@ -32,19 +32,19 @@
 $pgtitle = array("Firewall", "Traffic shaper", "Pipes");
 require("guiconfig.inc");
 
-if (!is_array($config['shaper']['pipe'])) {
+if (!is_array($config['shaper']['pipe'] ?? null)) {
 	$config['shaper']['pipe'] = array();
 }
-if (!is_array($config['shaper']['queue'])) {
+if (!is_array($config['shaper']['queue'] ?? null)) {
 	$config['shaper']['queue'] = array();
 }
 $a_pipes = &$config['shaper']['pipe'];
 
-if (isset($_POST['del_x']) && is_array($_POST['entries'])) {
+if (isset($_POST['del_x']) && is_array($_POST['entries'] ?? null)) {
 	foreach ($_POST['entries'] as $entry) {
-		if ($a_pipes[$entry]) {
+		if (!empty($a_pipes[$entry])) {
 			/* check that no rule references this pipe */
-			if (is_array($config['shaper']['rule'])) {
+			if (is_array($config['shaper']['rule'] ?? null)) {
 				foreach ($config['shaper']['rule'] as $rule) {
 					if (isset($rule['targetpipe']) && ($rule['targetpipe'] == $entry)) {
 						$input_errors[] = "This pipe cannot be deleted because it is still referenced by a rule.";
@@ -54,9 +54,9 @@ if (isset($_POST['del_x']) && is_array($_POST['entries'])) {
 			}
 
 			/* check that no queue references this pipe */
-			if (is_array($config['shaper']['queue'])) {
+			if (is_array($config['shaper']['queue'] ?? null)) {
 				foreach ($config['shaper']['queue'] as $queue) {
-					if ($queue['targetpipe'] == $entry) {
+					if (($queue['targetpipe'] ?? null) == $entry) {
 						$input_errors[] = "This pipe cannot be deleted because it is still referenced by a queue.";
 						break;
 					}
@@ -65,24 +65,24 @@ if (isset($_POST['del_x']) && is_array($_POST['entries'])) {
 		}
 	}
 	
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 		foreach ($_POST['entries'] as $entry) {
 			// Scheduler: delete matching jobs
-			croen_update_job('shaper-set_pipe_bandwidth', $a_pipes[$entry]['descr']);
+			croen_update_job('shaper-set_pipe_bandwidth', $a_pipes[$entry]['descr'] ?? null);
 			unset($a_pipes[$entry]);
 
 			/* renumber all rules and queues */
-			if (is_array($config['shaper']['rule'])) {
+			if (is_array($config['shaper']['rule'] ?? null)) {
 				for ($i = 0; isset($config['shaper']['rule'][$i]); $i++) {
 					$currule = &$config['shaper']['rule'][$i];
 					if (isset($currule['targetpipe']) && ($currule['targetpipe'] > $entry))
 						$currule['targetpipe']--;
 				}
 			}
-			if (is_array($config['shaper']['queue'])) {
+			if (is_array($config['shaper']['queue'] ?? null)) {
 				for ($i = 0; isset($config['shaper']['queue'][$i]); $i++) {
 					$curqueue = &$config['shaper']['queue'][$i];
-					if ($curqueue['targetpipe'] > $entry)
+					if (($curqueue['targetpipe'] ?? null) > $entry)
 						$curqueue['targetpipe']--;
 				}
 			}
@@ -98,8 +98,8 @@ if (isset($_POST['del_x']) && is_array($_POST['entries'])) {
 ?>
 <?php include("fbegin.inc"); ?>
 <form action="firewall_shaper.php" method="post">
-<?php if ($input_errors) print_input_errors($input_errors); ?>
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
 <?php if (file_exists($d_shaperconfdirty_path)): ?><p>
 <?php print_info_box_np("The traffic shaper configuration has been changed.<br>You must apply the changes in order for them to take effect.");?><br>
 <input name="apply" type="submit" class="formbtn" id="apply" value="Apply changes"></p>
@@ -138,31 +138,31 @@ if (isset($_POST['del_x']) && is_array($_POST['entries'])) {
                         <td class="listlr"> 
                           <?=($i+1);?></td>
                         <td class="listr"> 
-                          <?=htmlspecialchars($pipe['bandwidth']);?>
+                          <?=htmlspecialchars($pipe['bandwidth'] ?? '');?>
                           Kbit/s </td>
                         <td class="listr"> 
-                          <?php if ($pipe['delay']): ?>
+                          <?php if (!empty($pipe['delay'])): ?>
                           <?=$pipe['delay'];?>
                           ms 
                           <?php endif; ?>
                           &nbsp; </td>
                         <td class="listr"> 
-                          <?php if ($pipe['plr']): ?>
+                          <?php if (!empty($pipe['plr'])): ?>
                           <?=$pipe['plr'];?>
                           <?php endif; ?>
                           &nbsp; </td>
                         <td class="listr"> 
-                          <?php if ($pipe['qsize']): ?>
+                          <?php if (!empty($pipe['qsize'])): ?>
                           <?=htmlspecialchars($pipe['qsize']);?>
                           <?php endif; ?>
                           &nbsp; </td>
                         <td class="listr"> 
-                          <?php if ($pipe['mask']): ?>
+                          <?php if (!empty($pipe['mask'])): ?>
                           <?=$pipe['mask'];?>
                           <?php endif; ?>
                           &nbsp; </td>
                         <td class="listbg"> 
-                          <?=htmlspecialchars($pipe['descr']);?>
+                          <?=htmlspecialchars($pipe['descr'] ?? '');?>
                           &nbsp; </td>
                         <td valign="middle" nowrap class="list"> <a href="firewall_shaper_pipes_edit.php?id=<?=$i;?>"><img src="e.gif" title="edit pipe" width="17" height="17" border="0"></a></td>
                       </tr>

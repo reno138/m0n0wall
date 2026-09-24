@@ -32,7 +32,7 @@
 $pgtitle = array("Firewall", "Aliases");
 require("guiconfig.inc");
 
-if (!is_array($config['aliases']['alias']))
+if (!is_array($config['aliases']['alias'] ?? null))
 	$config['aliases']['alias'] = array();
 
 aliases_sort();
@@ -40,7 +40,7 @@ $a_aliases = &$config['aliases']['alias'];
 
 if ($_POST) {
 	
-	if ($_POST['apply']) {
+	if (!empty($_POST['apply'])) {
 		$retval = 0;
 		if (!file_exists($d_sysrebootreqd_path)) {
 			config_lock();
@@ -57,9 +57,9 @@ if ($_POST) {
 	}
 }
 
-if (isset($_POST['del_x']) && is_array($_POST['entries'])) {
+if (isset($_POST['del_x']) && is_array($_POST['entries'] ?? null)) {
 	foreach ($_POST['entries'] as $entry) {
-		if ($a_aliases[$entry])
+		if (!empty($a_aliases[$entry]))
 			unset($a_aliases[$entry]);
 	}	
 	
@@ -71,7 +71,7 @@ if (isset($_POST['del_x']) && is_array($_POST['entries'])) {
 ?>
 <?php include("fbegin.inc"); ?>
 <form action="firewall_aliases.php" method="post">
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
 <?php if (file_exists($d_aliasesdirty_path)): ?><p>
 <?php print_info_box_np("The alias list has been changed.<br>You must apply the changes in order for them to take effect.");?><br>
 <input name="apply" type="submit" class="formbtn" id="apply" value="Apply changes"></p>
@@ -88,13 +88,13 @@ if (isset($_POST['del_x']) && is_array($_POST['entries'])) {
                 <tr>
 				  <td class="listt"><input type="checkbox" name="entries[]" value="<?=$i;?>" style="margin: 0 5px 0 0; padding: 0; width: 15px; height: 15px;"></td>
                   <td class="listlr">
-                    <?=htmlspecialchars($alias['name']);?>
+                    <?=htmlspecialchars($alias['name'] ?? '');?>
                   </td>
                   <td class="listr">
-                    <?=htmlspecialchars($alias['address']);?>
+                    <?=htmlspecialchars($alias['address'] ?? '');?>
                   </td>
                   <td class="listbg">
-                    <?=htmlspecialchars($alias['descr']);?>&nbsp;
+                    <?=htmlspecialchars($alias['descr'] ?? '');?>&nbsp;
                   </td>
                   <td valign="middle" nowrap class="list"> <a href="firewall_aliases_edit.php?id=<?=$i;?>"><img src="e.gif" title="edit alias" width="17" height="17" border="0" alt="edit alias"></a></td>
 				</tr>

@@ -32,23 +32,23 @@
 require("guiconfig.inc");
 
 unset($index);
-if ($_GET['index'])
+if (!empty($_GET['index']))
 	$index = (int)$_GET['index'];
-else if ($_POST['index'])
+else if (!empty($_POST['index']))
 	$index = (int)$_POST['index'];
 	
-if (!$index)
+if (empty($index))
 	exit;
 
 $optcfg = &$config['interfaces']['opt' . $index];
-$pconfig['descr'] = $optcfg['descr'];
-$pconfig['bridge'] = $optcfg['bridge'];
-$pconfig['ipaddr'] = $optcfg['ipaddr'];
-$pconfig['subnet'] = $optcfg['subnet'];
+$pconfig['descr'] = $optcfg['descr'] ?? null;
+$pconfig['bridge'] = $optcfg['bridge'] ?? null;
+$pconfig['ipaddr'] = $optcfg['ipaddr'] ?? null;
+$pconfig['subnet'] = $optcfg['subnet'] ?? null;
 $pconfig['enable'] = isset($optcfg['enable']);
 if (ipv6enabled()) {
 	$pconfig['ipv6ra'] = isset($optcfg['ipv6ra']);
-	$pconfig['ipv6ramtu'] = $optcfg['ipv6ramtu'];
+	$pconfig['ipv6ramtu'] = $optcfg['ipv6ramtu'] ?? null;
 	
 	if (isset($optcfg['ipv6rao'])) {
 		$pconfig['raflags'] = "Other";
@@ -58,15 +58,15 @@ if (ipv6enabled()) {
 		$pconfig['raflags'] = "None";
 	}
 	
-	if ($optcfg['ipaddr6'] == "6to4") {
+	if (($optcfg['ipaddr6'] ?? null) == "6to4") {
 		$pconfig['ipv6mode'] = "6to4";
-	} else if ($optcfg['ipaddr6'] == "DHCP-PD") {
+	} else if (($optcfg['ipaddr6'] ?? null) == "DHCP-PD") {
 		$pconfig['ipv6mode'] = "DHCP-PD";
-		$pconfig['slalen'] = $optcfg['slalen'];
-		$pconfig['slaid'] = $optcfg['slaid'];
-	} else if ($optcfg['ipaddr6']) {
-		$pconfig['ipaddr6'] = $optcfg['ipaddr6'];
-		$pconfig['subnet6'] = $optcfg['subnet6'];
+		$pconfig['slalen'] = $optcfg['slalen'] ?? null;
+		$pconfig['slaid'] = $optcfg['slaid'] ?? null;
+	} else if (!empty($optcfg['ipaddr6'])) {
+		$pconfig['ipaddr6'] = $optcfg['ipaddr6'] ?? null;
+		$pconfig['subnet6'] = $optcfg['subnet6'] ?? null;
 		$pconfig['ipv6mode'] = "static";
 	} else {
 		$pconfig['ipv6mode'] = "disabled";
@@ -79,18 +79,18 @@ if ($_POST) {
 	$pconfig = $_POST;
 
 	/* input validation */
-	if ($_POST['enable']) {
+	if (!empty($_POST['enable'])) {
 	
 		/* description unique? */
 		for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
 			if ($i != $index) {
-				if ($config['interfaces']['opt' . $i]['descr'] == $_POST['descr']) {
+				if (($config['interfaces']['opt' . $i]['descr'] ?? null) == ($_POST['descr'] ?? null)) {
 					$input_errors[] = "An interface with the specified description already exists.";
 				}
 			}
 		}
 		
-		if ($_POST['bridge']) {
+		if (!empty($_POST['bridge'])) {
 			/* captive portal on? */
 			if (isset($config['captiveportal']['enable'])) {
 				$input_errors[] = "Interfaces cannot be bridged while the captive portal is enabled.";
@@ -101,18 +101,18 @@ if ($_POST) {
 		
 			do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 		
-			if (($_POST['ipaddr'] && !is_ipaddr($_POST['ipaddr']))) {
+			if ((!empty($_POST['ipaddr']) && !is_ipaddr($_POST['ipaddr']))) {
 				$input_errors[] = "A valid IP address must be specified.";
 			}
-			if (($_POST['subnet'] && !is_numeric($_POST['subnet']))) {
+			if ((!empty($_POST['subnet']) && !is_numeric($_POST['subnet']))) {
 				$input_errors[] = "A valid subnet bit count must be specified.";
 			}
 
 			if (ipv6enabled()) {
-				if ($_POST['ipv6mode'] == "static" && !is_ipaddr6($_POST['ipaddr6'])) {
+				if (($_POST['ipv6mode'] ?? null) == "static" && !is_ipaddr6($_POST['ipaddr6'] ?? '')) {
 					$input_errors[] = "A valid IPv6 address must be specified.";
 				}
-				if ($_POST['ipv6ramtu'] && ($_POST['ipv6ramtu'] < 56 || $_POST['ipv6ramtu'] > 1500)) {
+				if (!empty($_POST['ipv6ramtu']) && (($_POST['ipv6ramtu'] ?? null) < 56 || ($_POST['ipv6ramtu'] ?? null) > 1500)) {
 					$input_errors[] = "A valid RA MTU must be specified (56 - 1500).";
 				}
 			}
@@ -122,48 +122,48 @@ if ($_POST) {
 		croen_update_job(Array('interface-enable', 'interface-disable'), 'opt'.$index);
 	}
 	
-	if (!$input_errors) {
-		$optcfg['descr'] = $_POST['descr'];
-		$optcfg['ipaddr'] = $_POST['ipaddr'];
-		$optcfg['subnet'] = $_POST['subnet'];
-		$optcfg['bridge'] = $_POST['bridge'];
-		$optcfg['enable'] = $_POST['enable'] ? true : false;
+	if (empty($input_errors)) {
+		$optcfg['descr'] = $_POST['descr'] ?? null;
+		$optcfg['ipaddr'] = $_POST['ipaddr'] ?? null;
+		$optcfg['subnet'] = $_POST['subnet'] ?? null;
+		$optcfg['bridge'] = $_POST['bridge'] ?? null;
+		$optcfg['enable'] = !empty($_POST['enable']) ? true : false;
 		
 		if (ipv6enabled()) {
-			if ($_POST['raflags'] == "Managed") {
+			if (($_POST['raflags'] ?? null) == "Managed") {
 				unset($optcfg['ipv6rao']);
 				$optcfg['ipv6ram'] = true;
-			} else if ($_POST['raflags'] == "Other") {
+			} else if (($_POST['raflags'] ?? null) == "Other") {
 				unset($optcfg['ipv6ram']);
 				$optcfg['ipv6rao'] = true;
-			} else if ($_POST['raflags'] == "None") {
+			} else if (($_POST['raflags'] ?? null) == "None") {
 				unset($optcfg['ipv6rao']);
 				unset($optcfg['ipv6ram']);
 			}
-			if ($_POST['ipv6mode'] == "6to4") {
+			if (($_POST['ipv6mode'] ?? null) == "6to4") {
 				$optcfg['ipaddr6'] = "6to4";
 				unset($optcfg['subnet6']);
-				$optcfg['ipv6ra'] = $_POST['ipv6ra'] ? true : false;
-				$optcfg['ipv6ram'] = $_POST['ipv6ram'] ? true : false;
-				$optcfg['ipv6ramtu'] = $_POST['ipv6ramtu'];
-				$optcfg['ipv6rao'] = $_POST['ipv6rao'] ? true : false;
-			} else if ($_POST['ipv6mode'] == "DHCP-PD") {
+				$optcfg['ipv6ra'] = !empty($_POST['ipv6ra']) ? true : false;
+				$optcfg['ipv6ram'] = !empty($_POST['ipv6ram']) ? true : false;
+				$optcfg['ipv6ramtu'] = $_POST['ipv6ramtu'] ?? null;
+				$optcfg['ipv6rao'] = !empty($_POST['ipv6rao']) ? true : false;
+			} else if (($_POST['ipv6mode'] ?? null) == "DHCP-PD") {
 				$optcfg['ipaddr6'] = "DHCP-PD";
 				unset($optcfg['subnet6']);
 				unset($optcfg['slaid']);
-				if ($_POST['slaid'] != null) 
-					$optcfg['slaid'] = $_POST['slaid'];
-				$optcfg['slalen'] = 64 - $_POST['ispfix'];
-				$pconfig['slalen'] = 64 - $_POST['ispfix'];
-				$optcfg['ipv6ra'] = $_POST['ipv6ra'] ? true : false;
-				$optcfg['ipv6ramtu'] = $_POST['ipv6ramtu'];
-			} else if ($_POST['ipv6mode'] == "static") {
-				$optcfg['ipaddr6'] = $_POST['ipaddr6'];
-				$optcfg['subnet6'] = $_POST['subnet6'];
-				$optcfg['ipv6ra'] = $_POST['ipv6ra'] ? true : false;
-				$optcfg['ipv6ram'] = $_POST['ipv6ram'] ? true : false;
-				$optcfg['ipv6ramtu'] = $_POST['ipv6ramtu'];
-				$optcfg['ipv6rao'] = $_POST['ipv6rao'] ? true : false;
+				if (($_POST['slaid'] ?? null) != null) 
+					$optcfg['slaid'] = $_POST['slaid'] ?? null;
+				$optcfg['slalen'] = 64 - ($_POST['ispfix'] ?? null);
+				$pconfig['slalen'] = 64 - ($_POST['ispfix'] ?? null);
+				$optcfg['ipv6ra'] = !empty($_POST['ipv6ra']) ? true : false;
+				$optcfg['ipv6ramtu'] = $_POST['ipv6ramtu'] ?? null;
+			} else if (($_POST['ipv6mode'] ?? null) == "static") {
+				$optcfg['ipaddr6'] = $_POST['ipaddr6'] ?? null;
+				$optcfg['subnet6'] = $_POST['subnet6'] ?? null;
+				$optcfg['ipv6ra'] = !empty($_POST['ipv6ra']) ? true : false;
+				$optcfg['ipv6ram'] = !empty($_POST['ipv6ram']) ? true : false;
+				$optcfg['ipv6ramtu'] = $_POST['ipv6ramtu'] ?? null;
+				$optcfg['ipv6rao'] = !empty($_POST['ipv6rao']) ? true : false;
 			} else {
 				unset($optcfg['ipaddr6']);
 				unset($optcfg['subnet6']);
@@ -181,7 +181,7 @@ if ($_POST) {
 			
 			/* is this the captive portal interface? */
 			if (isset($config['captiveportal']['enable']) && 
-				($config['captiveportal']['interface'] == ('opt' . $index))) {
+				(($config['captiveportal']['interface'] ?? null) == ('opt' . $index))) {
 				captiveportal_configure();
 			}
 			config_unlock();
@@ -190,7 +190,7 @@ if ($_POST) {
 	}
 }
 
-$pgtitle = array("Interfaces", "Optional $index (" . htmlspecialchars($optcfg['descr']) . ")");
+$pgtitle = array("Interfaces", "Optional $index (" . htmlspecialchars($optcfg['descr'] ?? '') . ")");
 ?>
 
 <?php include("fbegin.inc"); ?>
@@ -221,14 +221,14 @@ function enable_change(enable_over) {
 }
 //-->
 </script>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
-<?php if ($savemsg) print_info_box($savemsg); ?>
-<?php if ($optcfg['if']): ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
+<?php if (!empty($optcfg['if'])): ?>
 		<table width="100%" border="0" cellpadding="0" cellspacing="0" summary="tab pane">
 		  <tr><td class="tabnavtbl">
 		  <ul id="tabnav">
 			<li class="tabact">Primary configuration</li>
-			<li class="tabinact1"><a href="interfaces_secondaries.php?if=opt<?=htmlspecialchars($index)?>&amp;ifname=<?=urlencode("Optional " . htmlspecialchars($index) . " (" . htmlspecialchars($optcfg['descr']) . ")"); ?>">Secondary IPs</a></li>
+			<li class="tabinact1"><a href="interfaces_secondaries.php?if=opt<?=htmlspecialchars($index)?>&amp;ifname=<?=urlencode("Optional " . htmlspecialchars($index) . " (" . htmlspecialchars($optcfg['descr'] ?? '') . ")"); ?>">Secondary IPs</a></li>
 		  </ul>
 		  </td></tr>
 		  <tr> 
@@ -239,13 +239,13 @@ function enable_change(enable_over) {
                 <tr> 
                   <td width="22%" valign="top" class="vtable">&nbsp;</td>
                   <td width="78%" class="vtable">
-<input name="enable" type="checkbox" value="yes" <?php if ($pconfig['enable']) echo "checked"; ?> onClick="enable_change(false)">
+<input name="enable" type="checkbox" value="yes" <?php if (!empty($pconfig['enable'])) echo "checked"; ?> onClick="enable_change(false)">
                     <strong>Enable Optional <?=htmlspecialchars($index);?> interface</strong></td>
 				</tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncell">Description</td>
                   <td width="78%" class="vtable"> 
-                    <input name="descr" type="text" class="formfld" id="descr" size="30" value="<?=htmlspecialchars($pconfig['descr']);?>">
+                    <input name="descr" type="text" class="formfld" id="descr" size="30" value="<?=htmlspecialchars($pconfig['descr'] ?? '');?>">
 					<br> <span class="vexpl">Enter a description (name) for the interface here.</span>
 				 </td>
 				</tr>
@@ -259,7 +259,7 @@ function enable_change(enable_over) {
                   <td width="22%" valign="top" class="vncellreq">Bridge with</td>
                   <td width="78%" class="vtable">
 					<select name="bridge" class="formfld" id="bridge" onChange="enable_change(false)">
-				  	<option <?php if (!$pconfig['bridge']) echo "selected";?> value="">none</option>
+				  	<option <?php if (empty($pconfig['bridge'])) echo "selected";?> value="">none</option>
                       <?php $opts = array('lan' => "LAN", 'wan' => "WAN");
 					  	for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
 							if ($i != $index)
@@ -267,7 +267,7 @@ function enable_change(enable_over) {
 									$config['interfaces']['opt' . $i]['descr'] . ")";
 						}
 					foreach ($opts as $opt => $optname): ?>
-                      <option <?php if ($opt == $pconfig['bridge']) echo "selected";?> value="<?=htmlspecialchars($opt);?>"> 
+                      <option <?php if ($opt == ($pconfig['bridge'] ?? null)) echo "selected";?> value="<?=htmlspecialchars($opt);?>"> 
                       <?=htmlspecialchars($optname);?>
                       </option>
                       <?php endforeach; ?>
@@ -276,11 +276,11 @@ function enable_change(enable_over) {
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">IP address</td>
                   <td width="78%" class="vtable"> 
-                    <?=$mandfldhtml;?><input name="ipaddr" type="text" class="formfld" id="ipaddr" size="20" value="<?=htmlspecialchars($pconfig['ipaddr']);?>">
+                    <?=$mandfldhtml;?><input name="ipaddr" type="text" class="formfld" id="ipaddr" size="20" value="<?=htmlspecialchars($pconfig['ipaddr'] ?? '');?>">
                     /
                 	<select name="subnet" class="formfld" id="subnet">
 					<?php for ($i = 31; $i > 0; $i--): ?>
-					<option value="<?=$i;?>" <?php if ($i == $pconfig['subnet']) echo "selected"; ?>><?=$i;?></option>
+					<option value="<?=$i;?>" <?php if ($i == ($pconfig['subnet'] ?? null)) echo "selected"; ?>><?=$i;?></option>
 					<?php endfor; ?>
                     </select>
 				 </td>
@@ -293,7 +293,7 @@ function enable_change(enable_over) {
                       <?php $opts = array('disabled', 'static', '6to4','DHCP-PD');
 						foreach ($opts as $opt) {
 							echo "<option value=\"$opt\"";
-							if ($opt == $pconfig['ipv6mode']) echo "selected";
+							if ($opt == ($pconfig['ipv6mode'] ?? null)) echo "selected";
 							echo ">$opt</option>\n";
 						}
 						?>
@@ -304,12 +304,12 @@ function enable_change(enable_over) {
                 <tr> 
                   <td valign="top" class="vncellreq">IPv6 address</td>
                   <td class="vtable"> 
-                    <input name="ipaddr6" type="text" class="formfld" id="ipaddr6" size="30" value="<?=htmlspecialchars($pconfig['ipaddr6']);?>">
+                    <input name="ipaddr6" type="text" class="formfld" id="ipaddr6" size="30" value="<?=htmlspecialchars($pconfig['ipaddr6'] ?? '');?>">
                     / 
                     <select name="subnet6" class="formfld" id="subnet6">
                       <?php for ($i = 127; $i > 0; --$i): ?>
                       <option value="<?=$i;?>" <?php
-                        if ($i == $pconfig['subnet6'] || (!isset($pconfig['subnet6']) && $i == 64)) echo "selected";
+                        if ($i == ($pconfig['subnet6'] ?? null) || (!isset($pconfig['subnet6']) && $i == 64)) echo "selected";
                       ?>>
                       <?=$i;?>
                       </option>
@@ -319,12 +319,12 @@ function enable_change(enable_over) {
                 <tr> 
                   <td valign="top" class="vncellreq">IPv6 Prefix Delegation</td>
                   <td class="vtable"> 
-                    <input name="slaid" type="text" class="formfld" id="slaid" size="4" value="<?=htmlspecialchars($pconfig['slaid']);?>">
+                    <input name="slaid" type="text" class="formfld" id="slaid" size="4" value="<?=htmlspecialchars($pconfig['slaid'] ?? '');?>">
                     / 
                     <select name="ispfix" class="formfld" id="ispfix">
                       <?php for ($l = 64; $l > 0; --$l): ?>
                       <option value="<?=$l;?>" <?php
-                        if ($l == 64 - $pconfig['slalen'] || (!isset($pconfig['slalen']) && $l == 64)) echo "selected";
+                        if ($l == 64 - ($pconfig['slalen'] ?? null) || (!isset($pconfig['slalen']) && $l == 64)) echo "selected";
                       ?>>
                       <?=$l;?>
                       </option>
@@ -337,7 +337,7 @@ function enable_change(enable_over) {
                <tr> 
                   <td valign="top" class="vncellreq">IPv6 RA</td>
                   <td class="vtable"> 
-					<input type="checkbox" name="ipv6ra" id="ipv6ra" onchange="enable_change(false)" value="1" <?php if ($pconfig['ipv6ra']) echo "checked";?> > <strong>Send IPv6 router advertisements</strong><br>
+					<input type="checkbox" name="ipv6ra" id="ipv6ra" onchange="enable_change(false)" value="1" <?php if (!empty($pconfig['ipv6ra'])) echo "checked";?> > <strong>Send IPv6 router advertisements</strong><br>
 					If this option is checked, other hosts on this interface will be able to automatically configure
 					their IPv6 address based on prefix and gateway information that the firewall provides to them.
 					This option should normally be enabled.<br>
@@ -345,14 +345,14 @@ function enable_change(enable_over) {
                       <?php $opts = array('None', 'Managed', 'Other');
 						foreach ($opts as $opt) {
 							echo "<option value=\"$opt\"";
-							if ($opt == $pconfig['raflags']) echo " selected";
+							if ($opt == ($pconfig['raflags'] ?? null)) echo " selected";
 							echo ">$opt</option>\n";
 						}
 						?>
                     </select><br>
 					If Managed is selected, other hosts on this interface will use DHCPv6 for BOTH address and non address allocation configuration.<br>
 					If Other is selected, other hosts on this interface will use DHCPv6 for non address allocation only, like DNS.<br>
-                    <strong>MTU</strong> <input name="ipv6ramtu" type="text" class="formfld" id="ipv6ramtu" size="4" value="<?=htmlspecialchars($pconfig['ipv6ramtu']);?>"> bytes <br>
+                    <strong>MTU</strong> <input name="ipv6ramtu" type="text" class="formfld" id="ipv6ramtu" size="4" value="<?=htmlspecialchars($pconfig['ipv6ramtu'] ?? '');?>"> bytes <br>
                     Enter the MTU you want advertised here.<br>
 				</td>
                 </tr>

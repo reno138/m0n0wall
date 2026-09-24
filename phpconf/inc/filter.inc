@@ -68,7 +68,7 @@ function filter_configure_ipf_superseded($ipv4only = false) {
 	lock_file("{$g['varrun_path']}/filter.lock");
 
 	/* set TCP timeouts */
-	if ($config['filter']['tcpidletimeout'] && $g['booting']) {
+	if (!empty($config['filter']['tcpidletimeout']) && $g['booting']) {
 		$tcpidletimeout = $config['filter']['tcpidletimeout']*2;
 		
 		/* ipfilter now needs to be disabled briefly in order to change the timeout value :( */
@@ -173,7 +173,7 @@ function filter_nat_rules_generate_if($if, $src, $dst, $target, $portmap = true)
 	$rangelow = 1024;
 	$rangehigh = 64535;
 	
-	if ($config['nat']['portrange-low'] && $config['nat']['portrange-high']) {
+	if (!empty($config['nat']['portrange-low']) && !empty($config['nat']['portrange-high'])) {
 		$rangelow = $config['nat']['portrange-low'];
 		$rangehigh = $config['nat']['portrange-high'];
 	}
@@ -197,38 +197,40 @@ function filter_nat_rules_generate_if($if, $src, $dst, $target, $portmap = true)
 function filter_nat_rules_generate() {
 	global $config, $g;
 	
-	$wancfg = $config['interfaces']['wan'];
-	$lancfg = $config['interfaces']['lan'];
+	$wancfg = $config['interfaces']['wan'] ?? null;
+	$lancfg = $config['interfaces']['lan'] ?? null;
 	
-	$pptpdcfg = $config['pptpd'];
-	$l2tpdcfg = $config['l2tp'];
+	$pptpdcfg = $config['pptpd'] ?? null;
+	$l2tpdcfg = $config['l2tp'] ?? null;
 	$wanif = get_real_wan_interface();
 	
-	$lansa = gen_subnet($lancfg['ipaddr'], $lancfg['subnet']);
+	$lansa = gen_subnet($lancfg['ipaddr'] ?? '', $lancfg['subnet'] ?? '');
 	
 	$natrules = "";
 	
 	/* any 1:1 mappings? */
-	if (is_array($config['nat']['onetoone'])) {
+	if (is_array($config['nat']['onetoone'] ?? null)) {
 		foreach ($config['nat']['onetoone'] as $natent) {
-			if (!is_numeric($natent['subnet']))
+			if (!is_numeric($natent['subnet'] ?? null))
 				$sn = 32;
 			else
 				$sn = $natent['subnet'];
 			
-			if (!$natent['interface'] || ($natent['interface'] == "wan"))
+			if (empty($natent['interface']) || ($natent['interface'] == "wan"))
 				$natif = $wanif;
 			else
-				$natif = $config['interfaces'][$natent['interface']]['if'];
+				$natif = $config['interfaces'][$natent['interface']]['if'] ?? null;
 			
-			$natrules .= "bimap {$natif} {$natent['internal']}/{$sn} -> {$natent['external']}/{$sn}\n";
+			$natent_internal = $natent['internal'] ?? '';
+			$natent_external = $natent['external'] ?? '';
+			$natrules .= "bimap {$natif} {$natent_internal}/{$sn} -> {$natent_external}/{$sn}\n";
 		}
 	}
 	
 	/* outbound rules - advanced or standard */
 	if (isset($config['nat']['advancedoutbound']['enable'])) {
 		/* advanced outbound rules */
-		if (is_array($config['nat']['advancedoutbound']['rule'])) {
+		if (is_array($config['nat']['advancedoutbound']['rule'] ?? null)) {
 			foreach ($config['nat']['advancedoutbound']['rule'] as $obent) {				
 				$dst = "";
 				$src = "";
@@ -238,49 +240,49 @@ function filter_nat_rules_generate() {
 						$dst = "! to ";
 					else
 						$dst = "to ";
-					$dst .= $obent['destination']['network'];
+					$dst .= $obent['destination']['network'] ?? '';
 				}
-				$src .= $obent['source']['network'];
+				$src .= $obent['source']['network'] ?? '';
 				
-				if (!$obent['interface'] || ($obent['interface'] == "wan"))
+				if (empty($obent['interface']) || ($obent['interface'] == "wan"))
 					$natif = $wanif;
 				else
-					$natif = $config['interfaces'][$obent['interface']]['if'];
+					$natif = $config['interfaces'][$obent['interface']]['if'] ?? null;
 				
 				$natrules .= filter_nat_rules_generate_if($natif, $src, $dst,
-					$obent['target'], !isset($obent['noportmap']));
+					$obent['target'] ?? null, !isset($obent['noportmap']));
 			}
 		}	
 	} else {
 		/* standard outbound rules (one for each interface) */
 		$natrules .= filter_nat_rules_generate_if($wanif,
-			$lansa . "/" . $lancfg['subnet'], "", null);
+			$lansa . "/" . ($lancfg['subnet'] ?? ''), "", null);
 	
 		/* optional interfaces */
 		for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
 			$optcfg = $config['interfaces']['opt' . $i];
 			
-			if (isset($optcfg['enable']) && !$optcfg['bridge']) {
-				$optsa = gen_subnet($optcfg['ipaddr'], $optcfg['subnet']);
+			if (isset($optcfg['enable']) && empty($optcfg['bridge'])) {
+				$optsa = gen_subnet($optcfg['ipaddr'] ?? '', $optcfg['subnet'] ?? '');
 				$natrules .= filter_nat_rules_generate_if($wanif, 
-					$optsa . "/" . $optcfg['subnet'], "", null);
+					$optsa . "/" . ($optcfg['subnet'] ?? ''), "", null);
 			}
 		}
 		
 		/* PPTP subnet */
-		if ($pptpdcfg['mode'] == "server") {
+		if (($pptpdcfg['mode'] ?? null) == "server") {
 			$natrules .= filter_nat_rules_generate_if($wanif,
-				$pptpdcfg['remoteip'] . "/" . 
-				subnet_size_to_cidr($pptpdcfg['nunits'] ? $pptpdcfg['nunits'] : 16),
+				($pptpdcfg['remoteip'] ?? '') . "/" . 
+				subnet_size_to_cidr(!empty($pptpdcfg['nunits']) ? $pptpdcfg['nunits'] : 16),
 				"", null);
 		}
 		
 		/* static routes */
-		if (is_array($config['staticroutes']['route'])) {
+		if (is_array($config['staticroutes']['route'] ?? null)) {
 			foreach ($config['staticroutes']['route'] as $route) {
-				if ($route['interface'] != "wan")
+				if (($route['interface'] ?? null) != "wan")
 					$natrules .= filter_nat_rules_generate_if($wanif,
-						$route['network'], "", null);
+						$route['network'] ?? '', "", null);
 			}
 		}
 	}
@@ -301,13 +303,13 @@ function filter_nat_rules_generate() {
 	if (isset($config['nat']['rule'])) {
 		foreach ($config['nat']['rule'] as $rule) {
 		
-			$extport = explode("-", $rule['external-port']);
-			$target = alias_expand_host($rule['target']);
+			$extport = explode("-", $rule['external-port'] ?? '');
+			$target = alias_expand_host($rule['target'] ?? '');
 			
 			if (!$target)
 				continue;	/* unresolvable alias */
 			
-			if ($rule['external-address']) {
+			if (!empty($rule['external-address'])) {
 				if ($rule['external-address'] == 'wan') {
 					$extaddr = get_current_wan_address(false) . "/32";
 				} else {
@@ -316,27 +318,30 @@ function filter_nat_rules_generate() {
 			} else
 				$extaddr = "0/0";
 			
-			if (!$rule['interface'] || ($rule['interface'] == "wan"))
+			if (empty($rule['interface']) || ($rule['interface'] == "wan"))
 				$natif = $wanif;
 			else
-				$natif = $config['interfaces'][$rule['interface']]['if'];
+				$natif = $config['interfaces'][$rule['interface']]['if'] ?? null;
 			
-			if ((!$extport[1]) || ($extport[0] == $extport[1])) {
+			$rule_localport = $rule['local-port'] ?? '';
+			$rule_protocol = $rule['protocol'] ?? '';
+			
+			if ((empty($extport[1])) || ($extport[0] == $extport[1])) {
 				$natrules .=
 					"rdr $natif {$extaddr} port {$extport[0]} -> {$target} " .
-					"port {$rule['local-port']} {$rule['protocol']}";
+					"port {$rule_localport} {$rule_protocol}";
 			} else {
 				$natrules .=
 					"rdr $natif {$extaddr} port {$extport[0]}-{$extport[1]} " .
 					"-> {$target} " .
-					"port {$rule['local-port']} {$rule['protocol']}";
+					"port {$rule_localport} {$rule_protocol}";
 			}
 				
 			$natrules .= "\n";
 		}
 	}
 	
-	if ($pptpdcfg['mode'] == "redir" && $pptpdcfg['redir']) {
+	if (($pptpdcfg['mode'] ?? null) == "redir" && !empty($pptpdcfg['redir'])) {
 	
 		$natrules .= <<<EOD
 
@@ -353,7 +358,7 @@ EOD;
 function filter_rules_generate_ipv6() {
 	global $config, $g;
 	
-	if (ipv6enabled() && $config['interfaces']['lan']['ipaddr6']) {
+	if (ipv6enabled() && !empty($config['interfaces']['lan']['ipaddr6'])) {
 		return filter_rules_generate(true);
 	} else {
 		return <<<EOD
@@ -367,12 +372,12 @@ EOD;
 function filter_rules_generate($ipv6 = false) {
 	global $config, $g;
 	
-	$wancfg = $config['interfaces']['wan'];
-	$lancfg = $config['interfaces']['lan'];
-	$pptpdcfg = $config['pptpd'];
-	$l2tpdcfg = $config['l2tp'];
+	$wancfg = $config['interfaces']['wan'] ?? null;
+	$lancfg = $config['interfaces']['lan'] ?? null;
+	$pptpdcfg = $config['pptpd'] ?? null;
+	$l2tpdcfg = $config['l2tp'] ?? null;
 	
-	$lanif = $lancfg['if'];
+	$lanif = $lancfg['if'] ?? null;
 	$wanif = get_real_wan_interface($ipv6);
 	
 	$curwanip = get_current_wan_address($ipv6);
@@ -380,8 +385,8 @@ function filter_rules_generate($ipv6 = false) {
 	/* rule groups (optional interfaces: see below) */
 	$ifgroups = array("lan" => 100, "wan" => 200);
 	
-	$lanip = $lancfg[$ipv6 ? 'ipaddr6' : 'ipaddr'];
-	$lansn = $lancfg[$ipv6 ? 'subnet6' : 'subnet'];
+	$lanip = $lancfg[$ipv6 ? 'ipaddr6' : 'ipaddr'] ?? null;
+	$lansn = $lancfg[$ipv6 ? 'subnet6' : 'subnet'] ?? null;
 	if ($ipv6) {
 		if ($lanip == "6to4") {
 			$lanip = calc_6to4_address("lan");
@@ -389,7 +394,7 @@ function filter_rules_generate($ipv6 = false) {
 		}
 		if ($lanip == "DHCP-PD") {
 			$lansn = 64;
-			list($lanip,$lansn) = get_dhcppd_address($lancfg['if']);
+			list($lanip,$lansn) = get_dhcppd_address($lancfg['if'] ?? '');
 		}
 		
 		if (!$lanip) {
@@ -408,17 +413,17 @@ function filter_rules_generate($ipv6 = false) {
 	for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
 		$oc = $config['interfaces']['opt' . $i];
 		
-		if (isset($oc['enable']) && $oc['if']) {
+		if (isset($oc['enable']) && !empty($oc['if'])) {
 			$oic = array();
 			$oic['if'] = $oc['if'];
 			
-			if ($oc['bridge']) {
+			if (!empty($oc['bridge'])) {
 				if (!strstr($oc['bridge'], "opt") || 
 					 isset($config['interfaces'][$oc['bridge']]['enable'])) {
-					if ($ipv6 ? is_ipaddr6($config['interfaces'][$oc['bridge']]['ipaddr6']) :
-								is_ipaddr($config['interfaces'][$oc['bridge']]['ipaddr'])) {
-						$oic['ip'] = $config['interfaces'][$oc['bridge']][$ipv6 ? 'ipaddr6' : 'ipaddr'];
-						$oic['sn'] = $config['interfaces'][$oc['bridge']][$ipv6 ? 'subnet6' : 'subnet'];
+					if ($ipv6 ? is_ipaddr6($config['interfaces'][$oc['bridge']]['ipaddr6'] ?? '') :
+								is_ipaddr($config['interfaces'][$oc['bridge']]['ipaddr'] ?? '')) {
+						$oic['ip'] = $config['interfaces'][$oc['bridge']][$ipv6 ? 'ipaddr6' : 'ipaddr'] ?? null;
+						$oic['sn'] = $config['interfaces'][$oc['bridge']][$ipv6 ? 'subnet6' : 'subnet'] ?? null;
 						if ($ipv6)
 							$oic['sa'] = gen_subnet6($oic['ip'], $oic['sn']);
 						else
@@ -429,30 +434,30 @@ function filter_rules_generate($ipv6 = false) {
 				$oic['bridge_if'] = $oc['bridge'];
 			} else {
 				if ($ipv6) {
-					if ($oc['ipaddr6'] == "6to4") {
+					if (($oc['ipaddr6'] ?? null) == "6to4") {
 						$oic['ip'] = calc_6to4_address('opt' . $i);
 						$oic['sn'] = 64;
-					} elseif ($oc['ipaddr6'] == "DHCP-PD") {
+					} elseif (($oc['ipaddr6'] ?? null) == "DHCP-PD") {
 						$oic['sn'] = 64;
 						list($oic['ip'],$oic['sn']) = get_dhcppd_address($oc['if']);
 					} else {
-						$oic['ip'] = $oc['ipaddr6'];
-						$oic['sn'] = $oc['subnet6'];
+						$oic['ip'] = $oc['ipaddr6'] ?? null;
+						$oic['sn'] = $oc['subnet6'] ?? null;
 					}
 					
 					/* IPv6: ignore interface if no address is set or 6to4 address not yet known */
 					if (!$oic['ip'])
 						continue;
 				} else {
-					$oic['ip'] = $oc['ipaddr'];
-					$oic['sn'] = $oc['subnet'];
+					$oic['ip'] = $oc['ipaddr'] ?? null;
+					$oic['sn'] = $oc['subnet'] ?? null;
 				}
 				
 				if ($ipv6)
 					$oic['sa'] = gen_subnet6($oic['ip'], $oic['sn']);
 				else
 					$oic['sa'] = gen_subnet($oic['ip'], $oic['sn']);
-				$oic['ipv6ra'] = $oc['ipv6ra'];
+				$oic['ipv6ra'] = $oc['ipv6ra'] ?? null;
 			}
 			
 			$optcfg['opt' . $i] = $oic;
@@ -460,16 +465,16 @@ function filter_rules_generate($ipv6 = false) {
 		}
 	}
 	
-	if ($pptpdcfg['mode'] == "server" && !$ipv6) {
-		$pptpip = $pptpdcfg['localip'];
-		$pptpsa = $pptpdcfg['remoteip'];
-		$pptpsn = subnet_size_to_cidr($pptpdcfg['nunits'] ? $pptpdcfg['nunits'] : 16);
+	if (($pptpdcfg['mode'] ?? null) == "server" && !$ipv6) {
+		$pptpip = $pptpdcfg['localip'] ?? null;
+		$pptpsa = $pptpdcfg['remoteip'] ?? null;
+		$pptpsn = subnet_size_to_cidr(!empty($pptpdcfg['nunits']) ? $pptpdcfg['nunits'] : 16);
 	}
 
-	if ($l2tpdcfg['mode'] == "server" && !$ipv6) {
-		$l2tpip = $l2tpdcfg['localip'];
-		$l2tpsa = $l2tpdcfg['remoteip'];
-		$l2tpsn = subnet_size_to_cidr($l2tpdcfg['nunits'] ? $l2tpdcfg['nunits'] : 16);
+	if (($l2tpdcfg['mode'] ?? null) == "server" && !$ipv6) {
+		$l2tpip = $l2tpdcfg['localip'] ?? null;
+		$l2tpsa = $l2tpdcfg['remoteip'] ?? null;
+		$l2tpsn = subnet_size_to_cidr(!empty($l2tpdcfg['nunits']) ? $l2tpdcfg['nunits'] : 16);
 	}
 	
 	if ($ipv6) {
@@ -509,15 +514,16 @@ EOD;
 
 		/* allow access to DHCP server on optional interfaces */
 		foreach ($optcfg as $on => $oc) {
-			if (((isset($config['dhcpd'][$on]['enable']) || isset($config['dhcrelay'][$on]['enable'])) && !$oc['bridge']) ||
-				($oc['bridge'] && (isset($config['dhcpd'][$oc['bridge_if']]['enable']) || isset($config['dhcrelay'][$oc['bridge_if']]['enable'])))) {
+			if (((isset($config['dhcpd'][$on]['enable']) || isset($config['dhcrelay'][$on]['enable'])) && empty($oc['bridge'])) ||
+				(!empty($oc['bridge']) && (isset($config['dhcpd'][$oc['bridge_if']]['enable']) || isset($config['dhcrelay'][$oc['bridge_if']]['enable'])))) {
 
+				$oc_ip = $oc['ip'] ?? '';
 				$ipfrules .= <<<EOD
 
 # allow access to DHCP server on {$on}
 pass in quick on {$oc['if']} proto udp from any port = 68 to 255.255.255.255 port = 67
-pass in quick on {$oc['if']} proto udp from any port = 68 to {$oc['ip']} port = 67
-pass out quick on {$oc['if']} proto udp from {$oc['ip']} port = 67 to any port = 68
+pass in quick on {$oc['if']} proto udp from any port = 68 to {$oc_ip} port = 67
+pass out quick on {$oc['if']} proto udp from {$oc_ip} port = 67 to any port = 68
 
 EOD;
 			}
@@ -538,8 +544,8 @@ EOD;
 			$ipfrules .= "# allow link-local traffic on {$on}\n";
 			$ipfrules .= "pass in quick on {$oc['if']} from fe80::/10 to fe80::/10\n";
 			$ipfrules .= "pass out quick on {$oc['if']} from fe80::/10 to fe80::/10\n";
-			if ((isset($config['dhcpd'][$on]['v6enable']) && !$oc['bridge']) ||
-					($oc['bridge'] && isset($config['dhcpd'][$oc['bridge_if']]['v6enable']))) {
+			if ((isset($config['dhcpd'][$on]['v6enable']) && empty($oc['bridge'])) ||
+					(!empty($oc['bridge']) && isset($config['dhcpd'][$oc['bridge_if']]['v6enable']))) {
 
 				$ipfrules .= <<<EOD
 
@@ -585,7 +591,7 @@ EOD;
 		/* when using IPv6 tunnels, allow ping to our WAN IPv6 address,
 		   as most tunnel brokers insist on getting replies or else will
 		   delete the tunnel after a while */
-		if ($curwanip && ($wancfg['tunnel6'] || $wancfg['ipaddr6'] == "aiccu")) {
+		if ($curwanip && (!empty($wancfg['tunnel6']) || ($wancfg['ipaddr6'] ?? null) == "aiccu")) {
 			$ipfrules .= <<<EOD
 
 # allow ping to make tunnel broker happy
@@ -596,9 +602,9 @@ EOD;
 		}
 	} else {
 		/* Need to pass IP protocol 41 if using 6to4 or GIF tunnel */
-		if (($wancfg['ipaddr6'] == "6to4" || $wancfg['tunnel6'] || $wancfg['ipaddr6'] == "aiccu") && $curwanip) {
+		if ((($wancfg['ipaddr6'] ?? null) == "6to4" || !empty($wancfg['tunnel6']) || ($wancfg['ipaddr6'] ?? null) == "aiccu") && $curwanip) {
 			$tunep = "any";
-			if ($wancfg['tunnel6'])
+			if (!empty($wancfg['tunnel6']))
 				$tunep = $wancfg['tunnel6'];
 			
 			$ipfrules .= <<<EOD
@@ -615,18 +621,18 @@ EOD;
 	   interface in question to avoid problems with complicated routing
 	   topologies */
 	$strtconf = 'route' . ($ipv6 ? '6' : '');
-	if (isset($config['filter']['bypassstaticroutes']) && is_array($config['staticroutes'][$strtconf]) && count($config['staticroutes'][$strtconf])) {
+	if (isset($config['filter']['bypassstaticroutes']) && is_array($config['staticroutes'][$strtconf] ?? null) && count($config['staticroutes'][$strtconf])) {
 		foreach ($config['staticroutes'][$strtconf] as $route) {
 			unset($sa);
 			
-			if ($route['interface'] == "lan") {
+			if (($route['interface'] ?? null) == "lan") {
 				$ip = $lanip;
 				$sa = $lansa;
 				$sn = $lansn;
 				$if = $lanif;
-			} else if (strstr($route['interface'], "opt")) {
-				$oc = $optcfg[$route['interface']];
-				if ($oc['ip']) {
+			} else if (strstr($route['interface'] ?? '', "opt")) {
+				$oc = $optcfg[$route['interface']] ?? null;
+				if (!empty($oc['ip'])) {
 					$ip = $oc['ip'];
 					$sa = $oc['sa'];
 					$sn = $oc['sn'];
@@ -634,13 +640,14 @@ EOD;
 				}
 			}
 			
-			if ($sa) {
+			if (!empty($sa)) {
+				$route_network = $route['network'] ?? '';
 				$ipfrules .= <<<EOD
 skip 2 in on {$if} from any to {$ip}
-pass in quick on {$if} from {$sa}/{$sn} to {$route['network']}
-pass in quick on {$if} from {$route['network']} to {$sa}/{$sn}
-pass out quick on {$if} from {$sa}/{$sn} to {$route['network']}
-pass out quick on {$if} from {$route['network']} to {$sa}/{$sn}
+pass in quick on {$if} from {$sa}/{$sn} to {$route_network}
+pass in quick on {$if} from {$route_network} to {$sa}/{$sn}
+pass out quick on {$if} from {$sa}/{$sn} to {$route_network}
+pass out quick on {$if} from {$route_network} to {$sa}/{$sn}
 
 EOD;
 			/* this would be a good place to insert code here to pass traffic from subnets to secondaries etc.*/
@@ -651,18 +658,18 @@ EOD;
 
 
 	/* pass traffic from/to secondary ip subnets and the firewall ip in that subnet only*/
-	if (is_array($config['secondaries']['secondary'])) {
+	if (is_array($config['secondaries']['secondary'] ?? null)) {
 		$a_secondaries = &$config['secondaries']['secondary'];
 		foreach ($a_secondaries as $secondary) {
-			if (!ipv6enabled() && is_ipaddr6($secondary['ipaddr'])){
+			if (!ipv6enabled() && is_ipaddr6($secondary['ipaddr'] ?? '')){
 				continue;
 			}
 			/*  this would be a good place to insert a nested foreach loop to pass traffic from secondary subnets to other secondary subnets etc.*/
-			$sif = $secondary['if'];
-			$if = $config['interfaces'][$sif]['if'];
-			$ip = $secondary['ipaddr'];
-			$sn = $secondary['prefix'];
-			if (is_ipaddr6($secondary['ipaddr'])) {
+			$sif = $secondary['if'] ?? null;
+			$if = $config['interfaces'][$sif]['if'] ?? null;
+			$ip = $secondary['ipaddr'] ?? null;
+			$sn = $secondary['prefix'] ?? null;
+			if (is_ipaddr6($secondary['ipaddr'] ?? '')) {
 				$sa = gen_subnet6($ip,$sn);
 			} else {
 				$sa = gen_subnet($ip,$sn);
@@ -688,19 +695,23 @@ block in $log quick on $wanif from $lansa/$lansn to any
 EOD;
 
 	foreach ($optcfg as $oc) {
-		if (!$oc['bridge'])
-			$ipfrules .= "block in $log quick on $wanif from {$oc['sa']}/{$oc['sn']} to any\n";
+		if (empty($oc['bridge'])) {
+			$oc_sa = $oc['sa'] ?? '';
+			$oc_sn = $oc['sn'] ?? '';
+			$ipfrules .= "block in $log quick on $wanif from {$oc_sa}/{$oc_sn} to any\n";
+		}
 	}
 	
 	/* allow PPTP traffic if PPTP client is enabled on WAN */
-	if ($wancfg['ipaddr'] == "pptp" && !$ipv6) {
+	if (($wancfg['ipaddr'] ?? null) == "pptp" && !$ipv6) {
+		$wancfg_if = $wancfg['if'] ?? '';
 		$ipfrules .= <<<EOD
 
 # allow PPTP client
-pass in quick on {$wancfg['if']} proto gre from any to any
-pass out quick on {$wancfg['if']} proto gre from any to any
-pass in quick on {$wancfg['if']} proto tcp from any port = 1723 to any
-pass out quick on {$wancfg['if']} proto tcp from any to any port = 1723
+pass in quick on {$wancfg_if} proto gre from any to any
+pass out quick on {$wancfg_if} proto gre from any to any
+pass in quick on {$wancfg_if} proto tcp from any port = 1723 to any
+pass out quick on {$wancfg_if} proto tcp from any to any port = 1723
 
 EOD;
 	}
@@ -725,7 +736,7 @@ EOD;
 	/* skip imposing spoof check if 'Disable Spoof Check On Bridge' is enabled */
 	$lanbridge = false;
 	foreach ($optcfg as $on => $oc) {
-		if ($oc['bridge'] && $oc['bridge_if'] == "lan") {
+		if (!empty($oc['bridge']) && ($oc['bridge_if'] ?? null) == "lan") {
 			$lanbridge = true;
 			break;
 		}
@@ -738,14 +749,14 @@ EOD;
 		/* omit for bridged interfaces when the filtering bridge is on */
 		$isbridged = false;
 		foreach ($optcfg as $on2 => $oc2) {
-			if ($oc2['bridge'] && $oc2['bridge_if'] == $on) {
+			if (!empty($oc2['bridge']) && ($oc2['bridge_if'] ?? null) == $on) {
 				$isbridged = true;
 				break;
 			}
 		}
 		
-		if ($oc['ip'] && !(($oc['bridge'] || $isbridged) && (isset($config['bridge']['filteringbridge']) || isset($config['bridge']['nospoofcheck'])) ))
-			$ipfrules .= filter_rules_spoofcheck_generate($on, $oc['if'], $oc['sa'], $oc['sn'], $log, $ipv6);
+		if (!empty($oc['ip']) && !((!empty($oc['bridge']) || $isbridged) && (isset($config['bridge']['filteringbridge']) || isset($config['bridge']['nospoofcheck'])) ))
+			$ipfrules .= filter_rules_spoofcheck_generate($on, $oc['if'], $oc['sa'] ?? null, $oc['sn'] ?? null, $log, $ipv6);
 	}
 	
 	/* block private networks on WAN? */
@@ -814,9 +825,9 @@ EOD;
 	
 	/* IPsec enabled? */
 	if (( isset($config['ipsec']['enable']) && 
-		((is_array($config['ipsec']['tunnel']) &&
+		((is_array($config['ipsec']['tunnel'] ?? null) &&
 		count($config['ipsec']['tunnel'])) ||
-			isset($config['ipsec']['mobileclients']['enable']) )) || ($l2tpdcfg['mode'] == "server") ) {
+			isset($config['ipsec']['mobileclients']['enable']) )) || (($l2tpdcfg['mode'] ?? null) == "server") ) {
 		
 		if ($curwanip)
 			$ipfrules .= filter_rules_ipsec_generate($wanif, $curwanip);
@@ -824,7 +835,7 @@ EOD;
 		$ipfrules .= filter_rules_ipsec_generate($lanif, $lanip);
 		
 		foreach ($optcfg as $on => $oc) {
-			if ($oc['ip'])
+			if (!empty($oc['ip']))
 				$ipfrules .= filter_rules_ipsec_generate($oc['if'], $oc['ip']);
 		}
 	}
@@ -881,7 +892,7 @@ EOD;
 	
 	}
 	
-	if (isset($config['ipsec']['enable']) || ($l2tpdcfg['mode'] == "server") ) {
+	if (isset($config['ipsec']['enable']) || (($l2tpdcfg['mode'] ?? null) == "server") ) {
 		$ipfrules .= <<<EOD
 
 # always pass outgoing IPsec encapsulated packets
@@ -900,12 +911,12 @@ EOD;
 	}
 	
 	/* PPTPd enabled? */
-	if (!$ipv6 && $pptpdcfg['mode'] && ($pptpdcfg['mode'] != "off") && !isset($pptpdcfg['nofwrulegen'])) {
+	if (!$ipv6 && !empty($pptpdcfg['mode']) && ($pptpdcfg['mode'] != "off") && !isset($pptpdcfg['nofwrulegen'])) {
 	
 		if ($pptpdcfg['mode'] == "server")
 			$pptpdtarget = $curwanip;
 		else
-			$pptpdtarget = $pptpdcfg['redir'];
+			$pptpdtarget = $pptpdcfg['redir'] ?? null;
 		
 		if ($pptpdtarget) {
 			$ipfrules .= <<<EOD
@@ -921,6 +932,9 @@ EOD;
 	$ipfrules .= "\n# User-defined rules follow\n";
 	
 	$i = -1;
+	$ispptp = false;
+	$isl2tp = false;
+	$isipsec = false;
 	
 	if (isset($config['filter'][$ipv6 ? 'rule6' : 'rule']))
 		foreach ($config['filter'][$ipv6 ? 'rule6' : 'rule'] as $rule) {
@@ -932,18 +946,18 @@ EOD;
 			continue;
 		
 		/* does the rule deal with a PPTP, L2TP or IPsec interface? */
-		if ($rule['interface'] == "pptp") {
+		if (($rule['interface'] ?? null) == "pptp") {
 		
-			if ($pptpdcfg['mode'] != "server")
+			if (($pptpdcfg['mode'] ?? null) != "server")
 				continue;
 				
-			$nif = $pptpdcfg['nunits'];
+			$nif = $pptpdcfg['nunits'] ?? null;
 			if (!$nif)
 				$nif = 16;
 			$ispptp = true;
 			$isl2tp = false;
 			$isipsec = false;
-		} else if ($rule['interface'] == "ipsec") {
+		} else if (($rule['interface'] ?? null) == "ipsec") {
 		
 			if (!isset($config['ipsec']['enable']))
 				continue;
@@ -952,12 +966,12 @@ EOD;
 			$ispptp = false;
 			$isl2tp = false;
 			$isipsec = true;
-		} else if ($rule['interface'] == "l2tp") {
+		} else if (($rule['interface'] ?? null) == "l2tp") {
 		
-			if ($l2tpdcfg['mode'] != "server")
+			if (($l2tpdcfg['mode'] ?? null) != "server")
 				continue;
 				
-			$nif = $l2tpdcfg['nunits'];
+			$nif = $l2tpdcfg['nunits'] ?? null;
 			if (!$nif)
 				$nif = 16;
 			$ispptp = false;
@@ -965,7 +979,7 @@ EOD;
 			$isipsec = false;
 		} else {
 			
-			if (strstr($rule['interface'], "opt")) {
+			if (strstr($rule['interface'] ?? '', "opt")) {
 				if (!array_key_exists($rule['interface'], $optcfg))
 					continue;
 			}
@@ -975,37 +989,37 @@ EOD;
 			$isipsec = false;
 		}
 		
-		if ($pptpdcfg['mode'] != "server") {
-			if (($rule['source']['network'] == "pptp") ||
-				($rule['destination']['network'] == "pptp"))
+		if (($pptpdcfg['mode'] ?? null) != "server") {
+			if ((($rule['source']['network'] ?? null) == "pptp") ||
+				(($rule['destination']['network'] ?? null) == "pptp"))
 					continue;
 		}
-		if ($l2tpdcfg['mode'] != "server") {
-			if (($rule['source']['network'] == "l2tp") ||
-				($rule['destination']['network'] == "l2tp"))
+		if (($l2tpdcfg['mode'] ?? null) != "server") {
+			if ((($rule['source']['network'] ?? null) == "l2tp") ||
+				(($rule['destination']['network'] ?? null) == "l2tp"))
 					continue;
 		}
 		
-		if ($rule['source']['network'] && strstr($rule['source']['network'], "opt")) {
+		if (!empty($rule['source']['network']) && strstr($rule['source']['network'], "opt")) {
 			if (!array_key_exists($rule['source']['network'], $optcfg))
 				continue;
 		}
-		if ($rule['destination']['network'] && strstr($rule['destination']['network'], "opt")) {
+		if (!empty($rule['destination']['network']) && strstr($rule['destination']['network'], "opt")) {
 			if (!array_key_exists($rule['destination']['network'], $optcfg))
 				continue;
 		}
 		
 		/* check for unresolvable aliases */
-		if ($rule['source']['address'] && !alias_expand($rule['source']['address']))
+		if (!empty($rule['source']['address']) && !alias_expand($rule['source']['address']))
 			continue;
-		if ($rule['destination']['address'] && !alias_expand($rule['destination']['address']))
+		if (!empty($rule['destination']['address']) && !alias_expand($rule['destination']['address']))
 			continue;
 		
 		for ($iif = 0; $iif < $nif; $iif++) {
 			
 			if (!$ispptp && !$isipsec && !$isl2tp) {
 			
-				$groupnum = $ifgroups[$rule['interface']];
+				$groupnum = $ifgroups[$rule['interface'] ?? ''] ?? null;
 				
 				if (!$groupnum) {
 					printf("Invalid interface name in rule $i\n");
@@ -1013,7 +1027,7 @@ EOD;
 				}
 			}
 			
-			$type = $rule['type'];
+			$type = $rule['type'] ?? null;
 			if ($type != "pass" && $type != "block" && $type != "reject") {
 				/* default (for older rules) is pass */
 				$type = "pass";
@@ -1021,9 +1035,9 @@ EOD;
 
 			if ($type == "reject") {
 				/* special reject packet */
-				if ($rule['protocol'] == "tcp") {
+				if (($rule['protocol'] ?? null) == "tcp") {
 					$line = "block return-rst";
-				} else if ($rule['protocol'] == "udp") {
+				} else if (($rule['protocol'] ?? null) == "udp") {
 					$line = "block return-icmp(port-unr)";
 				} else {
 					$line = "block";
@@ -1053,11 +1067,11 @@ EOD;
 			/* source address */
 			if (isset($rule['source']['any'])) {
 				$src = "any";
-			} else if ($rule['source']['network']) {
+			} else if (!empty($rule['source']['network'])) {
 				
 				if (strstr($rule['source']['network'], "opt")) {
-					$src = $optcfg[$rule['source']['network']]['sa'] . "/" .
-						$optcfg[$rule['source']['network']]['sn'];
+					$src = ($optcfg[$rule['source']['network']]['sa'] ?? '') . "/" .
+						($optcfg[$rule['source']['network']]['sn'] ?? '');
 				} else {
 					switch ($rule['source']['network']) {
 						case 'wanip':
@@ -1074,11 +1088,11 @@ EOD;
 							break;
 					}
 				}
-			} else if ($rule['source']['address']) {
+			} else if (!empty($rule['source']['address'])) {
 				$src = alias_expand($rule['source']['address']);
 			}
 			
-			if (!$src || ($src == "/")) {
+			if (empty($src) || ($src == "/")) {
 				//printf("No source address found in rule $i\n");
 				break;
 			}
@@ -1089,12 +1103,12 @@ EOD;
 				$line .= "from $src ";
 			}
 			
-			if (in_array($rule['protocol'], array("tcp","udp","tcp/udp"))) {
+			if (in_array($rule['protocol'] ?? null, array("tcp","udp","tcp/udp"))) {
 				
-				if ($rule['source']['port']) {
+				if (!empty($rule['source']['port'])) {
 					$srcport = explode("-", $rule['source']['port']);
 					
-					if ((!$srcport[1]) || ($srcport[0] == $srcport[1])) {
+					if ((empty($srcport[1])) || ($srcport[0] == $srcport[1])) {
 						$line .= "port = {$srcport[0]} ";
 					} else if (($srcport[0] == 1) && ($srcport[1] == 65535)) {
 						/* no need for a port statement here */
@@ -1113,11 +1127,11 @@ EOD;
 			/* destination address */
 			if (isset($rule['destination']['any'])) {
 				$dst = "any";
-			} else if ($rule['destination']['network']) {
+			} else if (!empty($rule['destination']['network'])) {
 				
 				if (strstr($rule['destination']['network'], "opt")) {
-					$dst = $optcfg[$rule['destination']['network']]['sa'] . "/" .
-						$optcfg[$rule['destination']['network']]['sn'];
+					$dst = ($optcfg[$rule['destination']['network']]['sa'] ?? '') . "/" .
+						($optcfg[$rule['destination']['network']]['sn'] ?? '');
 				} else {
 					switch ($rule['destination']['network']) {
 						case 'wanip':
@@ -1134,11 +1148,11 @@ EOD;
 							break;
 					}
 				}
-			} else if ($rule['destination']['address']) {
+			} else if (!empty($rule['destination']['address'])) {
 				$dst = alias_expand($rule['destination']['address']);
 			}
 			
-			if (!$dst || ($dst == "/")) {
+			if (empty($dst) || ($dst == "/")) {
 				//printf("No destination address found in rule $i\n");
 				break;
 			}
@@ -1149,12 +1163,12 @@ EOD;
 				$line .= "to $dst ";
 			}
 			
-			if (in_array($rule['protocol'], array("tcp","udp","tcp/udp"))) {
+			if (in_array($rule['protocol'] ?? null, array("tcp","udp","tcp/udp"))) {
 				
-				if ($rule['destination']['port']) {
+				if (!empty($rule['destination']['port'])) {
 					$dstport = explode("-", $rule['destination']['port']);
 					
-					if ((!$dstport[1]) || ($dstport[0] == $dstport[1])) {
+					if ((empty($dstport[1])) || ($dstport[0] == $dstport[1])) {
 						$line .= "port = {$dstport[0]} ";
 					} else if (($dstport[0] == 1) && ($dstport[1] == 65535)) {
 						/* no need for a port statement here */
@@ -1170,7 +1184,7 @@ EOD;
 				}
 			}
 			
-			if (($rule['protocol'] == "icmp" || $rule['protocol'] == "ipv6-icmp") && $rule['icmptype']) {
+			if ((($rule['protocol'] ?? null) == "icmp" || ($rule['protocol'] ?? null) == "ipv6-icmp") && !empty($rule['icmptype'])) {
 				$line .= "icmp-type {$rule['icmptype']} ";
 			}
 			
@@ -1181,7 +1195,7 @@ EOD;
 					$line .= "keep frags ";
 			}
 			
-			if ($type == "reject" && $rule['protocol'] == "tcp") {
+			if ($type == "reject" && ($rule['protocol'] ?? null) == "tcp") {
 				/* special reject packet */
 				$line .= "flags S/SA ";
 			}
@@ -1216,18 +1230,19 @@ function filter_rules_spoofcheck_generate($ifname, $if, $sa, $sn, $log, $ipv6 = 
 	$ipfrules = "";
 
 	$strtconf = 'route' . ($ipv6 ? '6' : '');
-	if (is_array($config['staticroutes'][$strtconf]) && count($config['staticroutes'][$strtconf])) {
+	if (is_array($config['staticroutes'][$strtconf] ?? null) && count($config['staticroutes'][$strtconf])) {
 		/* count rules */
 		$n = 1;
 		foreach ($config['staticroutes'][$strtconf] as $route) {
-			if ($route['interface'] == $ifname)
+			if (($route['interface'] ?? null) == $ifname)
 				$n++;
 		}
 		
 		/* output skip rules */
 		foreach ($config['staticroutes'][$strtconf] as $route) {
-			if ($route['interface'] == $ifname) {
-				$ipfrules .= "skip $n in on $if from {$route['network']} to any\n";
+			if (($route['interface'] ?? null) == $ifname) {
+				$route_network = $route['network'] ?? '';
+				$ipfrules .= "skip $n in on $if from {$route_network} to any\n";
 				$n--;
 			}
 		}

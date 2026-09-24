@@ -32,20 +32,23 @@
 $pgtitle = array("Services", "Wake on LAN");
 require("guiconfig.inc");
 
-if (!is_array($config['wol']['wolentry'])) {
+if (!is_array($config['wol']['wolentry'] ?? null)) {
 	$config['wol']['wolentry'] = array();
 }
 wol_sort();
 $a_wol = &$config['wol']['wolentry'];
 
-if ($_POST || $_GET['mac']) {
+$mac = '';
+$if = '';
+
+if ($_POST || !empty($_GET['mac'])) {
 
 	foreach ($_POST as $pn => $pv) {
 		if (preg_match("/^del_(\d+)_x$/", $pn, $matches)) {
 			$id = $matches[1];
-			if ($a_wol[$id]) {
+			if (!empty($a_wol[$id])) {
 				// Scheduler: delete matching jobs
-				croen_update_job('wol', $a_wol[$id]['descr']);
+				croen_update_job('wol', $a_wol[$id]['descr'] ?? null);
 				unset($a_wol[$id]);
 				write_config();
 				header("Location: services_wol.php");
@@ -56,12 +59,12 @@ if ($_POST || $_GET['mac']) {
 	
 	unset($input_errors);
 	
-	if ($_GET['mac']) {
+	if (!empty($_GET['mac'])) {
 		$mac = $_GET['mac'];
-		$if = $_GET['if'];
+		$if = $_GET['if'] ?? '';
 	} else {
-		$mac = $_POST['mac_input'];
-		$if = $_POST['interface'];
+		$mac = $_POST['mac_input'] ?? '';
+		$if = $_POST['interface'] ?? '';
 	}
 	
 	$mac = str_replace("-", ":", $mac);
@@ -72,16 +75,16 @@ if ($_POST || $_GET['mac']) {
 	if (!$if)
 		$input_errors[] = "A valid interface must be specified.";
 
-	if (!$input_errors) {		
-		services_wol_send($config['interfaces'][$if]['ipaddr'], $config['interfaces'][$if]['subnet'], $mac);
+	if (empty($input_errors)) {		
+		services_wol_send($config['interfaces'][$if]['ipaddr'] ?? '', $config['interfaces'][$if]['subnet'] ?? '', $mac);
 		$savemsg = "Sent magic packet to {$mac}.";
 	}
 }
 
 ?>
 <?php include("fbegin.inc"); ?>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
 			<form action="services_wol.php" method="post" name="iform" id="iform">
 			  <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="content pane">
 			  <tr> 
@@ -91,8 +94,8 @@ if ($_POST || $_GET['mac']) {
                       <?php $interfaces = array('lan' => 'LAN');
 					  for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
 					    if (isset($config['interfaces']['opt' . $i]['enable']) &&
-							!$config['interfaces']['opt' . $i]['bridge'])
-					  		$interfaces['opt' . $i] = $config['interfaces']['opt' . $i]['descr'];
+							empty($config['interfaces']['opt' . $i]['bridge']))
+					  		$interfaces['opt' . $i] = $config['interfaces']['opt' . $i]['descr'] ?? '';
 					  }
 					  foreach ($interfaces as $iface => $ifacename): ?>
                       <option value="<?=$iface;?>" <?php if ($iface == $if) echo "selected"; ?>> 
@@ -131,17 +134,17 @@ Click the MAC address to wake up a computer. <br>
 			  <?php $i = 0; foreach ($a_wol as $wolent): ?>
                 <tr>
                   <td class="listlr">
-                    <?php if ($wolent['interface'] == "lan")
+                    <?php if (($wolent['interface'] ?? null) == "lan")
 							   echo "LAN";
 						   else
-						       echo $config['interfaces'][$wolent['interface']]['descr'];
+						       echo $config['interfaces'][$wolent['interface']]['descr'] ?? '';
 					?>&nbsp;
                   </td>
                   <td class="listr">
-                    <a href="?mac=<?=$wolent['mac'];?>&if=<?=$wolent['interface'];?>"><?=strtolower($wolent['mac']);?></a>&nbsp;
+                    <a href="?mac=<?=$wolent['mac'] ?? '';?>&if=<?=$wolent['interface'] ?? '';?>"><?=strtolower($wolent['mac'] ?? '');?></a>&nbsp;
                   </td>
                   <td class="listbg">
-                    <?=htmlspecialchars($wolent['descr']);?>&nbsp;
+                    <?=htmlspecialchars($wolent['descr'] ?? '');?>&nbsp;
                   </td>
                   <td valign="middle" nowrap class="list"> <a href="services_wol_edit.php?id=<?=$i;?>"><img src="e.gif" title="edit entry" width="17" height="17" border="0" alt="edit entry"></a>
                      &nbsp;<input name="del_<?=$i;?>" type="image" src="x.gif" width="17" height="17" title="delete entry" alt="delete entry" onclick="return confirm('Do you really want to delete this entry?')"></td>

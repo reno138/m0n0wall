@@ -32,19 +32,21 @@
 $pgtitle = array("Firewall", "NAT", "Edit Server NAT");
 require("guiconfig.inc");
 
-if (!is_array($config['nat']['servernat'])) {
+if (!is_array($config['nat']['servernat'] ?? null)) {
 	$config['nat']['servernat'] = array();
 }
 nat_server_rules_sort();
 $a_snat = &$config['nat']['servernat'];
 
-$id = $_GET['id'];
+$pconfig = array();
+
+$id = $_GET['id'] ?? null;
 if (isset($_POST['id']))
 	$id = $_POST['id'];
 
-if (isset($id) && $a_snat[$id]) {
-	$pconfig['ipaddr'] = $a_snat[$id]['ipaddr'];
-	$pconfig['descr'] = $a_snat[$id]['descr'];
+if (isset($id) && !empty($a_snat[$id])) {
+	$pconfig['ipaddr'] = $a_snat[$id]['ipaddr'] ?? null;
+	$pconfig['descr'] = $a_snat[$id]['descr'] ?? null;
 }
 
 if ($_POST) {
@@ -58,28 +60,28 @@ if ($_POST) {
 	
 	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 
-	if (($_POST['ipaddr'] && !is_ipaddr($_POST['ipaddr']))) {
+	if ((!empty($_POST['ipaddr']) && !is_ipaddr($_POST['ipaddr']))) {
 		$input_errors[] = "A valid external IP address must be specified.";
 	}
 	
-	if ($_POST['ipaddr'] == $config['interfaces']['wan']['ipaddr'])
+	if (($_POST['ipaddr'] ?? null) == ($config['interfaces']['wan']['ipaddr'] ?? null))
 		$input_errors[] = "The WAN IP address may not be used in a Server NAT entry.";
 	
 	/* check for overlaps with other server NAT */
 	foreach ($a_snat as $natent) {
-		if (isset($id) && ($a_snat[$id]) && ($a_snat[$id] === $natent))
+		if (isset($id) && !empty($a_snat[$id]) && ($a_snat[$id] === $natent))
 			continue;
 		
-		if ($_POST['ipaddr'] == $natent['ipaddr']) {
+		if (($_POST['ipaddr'] ?? null) == ($natent['ipaddr'] ?? null)) {
 			$input_errors[] = "There is already a server NAT entry for the specified external IP address.";
 			break;
 		}
 	}
 	
 	/* check for overlaps with 1:1 NAT */
-	if (is_array($config['nat']['onetoone'])) {
+	if (is_array($config['nat']['onetoone'] ?? null)) {
 		foreach ($config['nat']['onetoone'] as $natent) {
-			if (check_subnets_overlap($_POST['ipaddr'], 32, $natent['external'], $natent['subnet'])) {
+			if (check_subnets_overlap($_POST['ipaddr'] ?? '', 32, $natent['external'], $natent['subnet'])) {
 				$input_errors[] = "A 1:1 NAT mapping overlaps with the specified external IP address.";
 				break;
 			}
@@ -88,13 +90,13 @@ if ($_POST) {
 
 	if (!$input_errors) {
 		$natent = array();
-		$natent['ipaddr'] = $_POST['ipaddr'];
-		$natent['descr'] = $_POST['descr'];
+		$natent['ipaddr'] = $_POST['ipaddr'] ?? null;
+		$natent['descr'] = $_POST['descr'] ?? null;
 		
-		if (isset($id) && $a_snat[$id]) {
+		if (isset($id) && !empty($a_snat[$id])) {
 			/* modify all inbound NAT rules with this address */
 			for ($i = 0; isset($config['nat']['rule'][$i]); $i++) {
-				if ($config['nat']['rule'][$i]['external-address'] == $a_snat[$id]['ipaddr'])
+				if (($config['nat']['rule'][$i]['external-address'] ?? null) == ($a_snat[$id]['ipaddr'] ?? null))
 					$config['nat']['rule'][$i]['external-address'] = $natent['ipaddr'];
 			}
 			$a_snat[$id] = $natent;
@@ -111,19 +113,19 @@ if ($_POST) {
 }
 ?>
 <?php include("fbegin.inc"); ?>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
             <form action="firewall_nat_server_edit.php" method="post" name="iform" id="iform">
               <table width="100%" border="0" cellpadding="6" cellspacing="0">
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">External IP address</td>
                   <td width="78%" class="vtable"> 
-                    <?=$mandfldhtml;?><input name="ipaddr" type="text" class="formfld" id="ipaddr" size="20" value="<?=htmlspecialchars($pconfig['ipaddr']);?>">
+                    <?=$mandfldhtml;?><input name="ipaddr" type="text" class="formfld" id="ipaddr" size="20" value="<?=htmlspecialchars($pconfig['ipaddr'] ?? '');?>">
                     </td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncell">Description</td>
                   <td width="78%" class="vtable"> 
-                    <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr']);?>"> 
+                    <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr'] ?? '');?>"> 
                     <br> <span class="vexpl">You may enter a description here 
                     for your reference (not parsed).</span></td>
                 </tr>
@@ -131,7 +133,7 @@ if ($_POST) {
                   <td width="22%" valign="top">&nbsp;</td>
                   <td width="78%"> 
                     <input name="Submit" type="submit" class="formbtn" value="Save"> 
-                    <?php if (isset($id) && $a_snat[$id]): ?>
+                    <?php if (isset($id) && !empty($a_snat[$id])): ?>
                     <input name="id" type="hidden" value="<?=htmlspecialchars($id);?>"> 
                     <?php endif; ?>
                   </td>

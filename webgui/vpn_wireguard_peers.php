@@ -14,18 +14,18 @@
 $pgtitle = array("VPN", "WireGuard", "Peers");
 require("guiconfig.inc");
 
-if (!is_array($config['wireguard']['tunnel'])) {
+if (!is_array($config['wireguard']['tunnel'] ?? null)) {
 	$config['wireguard']['tunnel'] = array();
 }
 $a_tunnel = &$config['wireguard']['tunnel'];
 
-$tunidx = isset($_GET['tunnel']) ? $_GET['tunnel'] : $_POST['tunnel'];
+$tunidx = isset($_GET['tunnel']) ? $_GET['tunnel'] : ($_POST['tunnel'] ?? null);
 if (!is_numeric($tunidx) || !isset($a_tunnel[$tunidx])) {
 	header("Location: vpn_wireguard.php");
 	exit;
 }
 
-if (!is_array($a_tunnel[$tunidx]['peer'])) {
+if (!is_array($a_tunnel[$tunidx]['peer'] ?? null)) {
 	$a_tunnel[$tunidx]['peer'] = array();
 }
 $a_peer = &$a_tunnel[$tunidx]['peer'];
@@ -35,7 +35,7 @@ if ($_POST) {
 	foreach ($_POST as $pn => $pv) {
 		if (preg_match("/del_(\d+)_x/", $pn, $matches)) {
 			$id = $matches[1];
-			if ($a_peer[$id]) {
+			if (!empty($a_peer[$id])) {
 				unset($a_peer[$id]);
 				write_config();
 				touch($d_wireguardconfdirty_path);
@@ -52,7 +52,7 @@ $wgstatus = wg_get_peer_status($tunnel['if']);
 <?php include("fbegin.inc"); ?>
 <form action="vpn_wireguard_peers.php" method="post">
 <input type="hidden" name="tunnel" value="<?=htmlspecialchars($tunidx);?>">
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
 <?php if (file_exists($d_wireguardconfdirty_path)): ?><p>
 <?php print_info_box_np("The WireGuard configuration has been changed.<br>You must apply the changes in order for them to take effect.");?></p>
 <?php endif; ?>
@@ -63,7 +63,7 @@ $wgstatus = wg_get_peer_status($tunnel['if']);
 	$tabs = array('Tunnels' => 'vpn_wireguard.php');
 	$i = 0;
 	foreach ($a_tunnel as $t) {
-		$label = $t['descr'] ? $t['descr'] : $t['if'];
+		$label = !empty($t['descr']) ? $t['descr'] : $t['if'];
 		$tabs["Peers: " . htmlspecialchars($label)] = "vpn_wireguard_peers.php?tunnel=" . $i;
 		$i++;
 	}
@@ -90,27 +90,27 @@ $wgstatus = wg_get_peer_status($tunnel['if']);
 					} else {
 						$spans = $spane = "";
 					}
-					$st = $wgstatus[$peer['publickey']];
+					$st = $wgstatus[$peer['publickey'] ?? ''] ?? null;
 				?>
                 <tr valign="top">
-                  <td nowrap class="listlr"><?=$spans;?><?=htmlspecialchars($peer['name']);?><?=$spane;?></td>
-                  <td class="listr"><?=$spans;?><?=htmlspecialchars($peer['address']);?><?=$spane;?></td>
-                  <td class="listr"><?=$spans;?><span class="vexpl"><?=htmlspecialchars(substr($peer['publickey'], 0, 16));?>&hellip;</span><?=$spane;?></td>
+                  <td nowrap class="listlr"><?=$spans;?><?=htmlspecialchars($peer['name'] ?? '');?><?=$spane;?></td>
+                  <td class="listr"><?=$spans;?><?=htmlspecialchars($peer['address'] ?? '');?><?=$spane;?></td>
+                  <td class="listr"><?=$spans;?><span class="vexpl"><?=htmlspecialchars(substr($peer['publickey'] ?? '', 0, 16));?>&hellip;</span><?=$spane;?></td>
                   <td class="listr"><?=$spans;?>
-                    <?php if ($st && $st['latesthandshake'] > 0) {
-                            echo htmlspecialchars(format_duration(time() - $st['latesthandshake'])) . " ago";
+                    <?php if ($st && ($st['latesthandshake'] ?? null) > 0) {
+                            echo htmlspecialchars(format_duration(time() - ($st['latesthandshake'] ?? null))) . " ago";
                           } else {
                             echo "never";
                           } ?>
                   <?=$spane;?></td>
                   <td class="listr"><?=$spans;?>
                     <?php if ($st) {
-                            echo format_bytes($st['rx']) . " in / " . format_bytes($st['tx']) . " out";
+                            echo format_bytes($st['rx'] ?? null) . " in / " . format_bytes($st['tx'] ?? null) . " out";
                           } else {
                             echo "&mdash;";
                           } ?>
                   <?=$spane;?></td>
-                  <td class="listbg"><?=$spans;?><?=htmlspecialchars($peer['descr']);?>&nbsp;<?=$spane;?></td>
+                  <td class="listbg"><?=$spans;?><?=htmlspecialchars($peer['descr'] ?? '');?>&nbsp;<?=$spane;?></td>
                   <td valign="middle" nowrap class="list">
                     <a href="vpn_wireguard_export.php?tunnel=<?=$tunidx;?>&amp;id=<?=$i;?>&amp;fmt=conf" title="download configuration"><img src="down.gif" width="17" height="17" border="0" alt="download configuration"></a>
                     &nbsp;<a href="vpn_wireguard_export.php?tunnel=<?=$tunidx;?>&amp;id=<?=$i;?>&amp;fmt=qrpage" title="show QR code"><img src="log.gif" width="17" height="17" border="0" alt="show QR code"></a>
@@ -123,8 +123,8 @@ $wgstatus = wg_get_peer_status($tunnel['if']);
                   <td class="list"> <a href="vpn_wireguard_peer_edit.php?tunnel=<?=$tunidx;?>"><img src="plus.gif" title="add peer" width="17" height="17" border="0" alt="add peer"></a></td>
 				</tr>
               </table>
-              <p class="vexpl"><span class="vexpl"><strong>Tunnel <?=htmlspecialchars($tunnel['if']);?></strong>
-              &nbsp;<?=htmlspecialchars($tunnel['address']);?>/<?=htmlspecialchars($tunnel['subnet']);?>,
+              <p class="vexpl"><span class="vexpl"><strong>Tunnel <?=htmlspecialchars($tunnel['if'] ?? '');?></strong>
+              &nbsp;<?=htmlspecialchars($tunnel['address'] ?? '');?>/<?=htmlspecialchars($tunnel['subnet'] ?? '');?>,
               <?=wg_pool_free_count($tunnel);?> addresses free.</span></p>
 			</td>
 	</tr>

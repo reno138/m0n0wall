@@ -32,7 +32,7 @@
 $pgtitle = array("VPN", "IPsec", "Pre-shared keys");
 require("guiconfig.inc");
 
-if (!is_array($config['ipsec']['mobilekey'])) {
+if (!is_array($config['ipsec']['mobilekey'] ?? null)) {
 	$config['ipsec']['mobilekey'] = array();
 }
 ipsec_mobilekey_sort();
@@ -42,7 +42,7 @@ if ($_POST) {
 	foreach ($_POST as $pn => $pv) {
 		if (preg_match("/^del_(\d+)_x$/", $pn, $matches)) {
 			$id = $matches[1];
-			if ($a_mobilekey[$id]) {
+			if (!empty($a_mobilekey[$id])) {
 				unset($a_mobilekey[$id]);
 				write_config();
 				touch($d_ipsecconfdirty_path);
@@ -56,7 +56,7 @@ if ($_POST) {
 ?>
 <?php include("fbegin.inc"); ?>
 <form action="vpn_ipsec.php" method="post">
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
 <?php if (file_exists($d_ipsecconfdirty_path)): ?><p>
 <?php print_info_box_np("The IPsec tunnel configuration has been changed.<br>You must apply the changes in order for them to take effect.");?><br>
 <input name="apply" type="submit" class="formbtn" id="apply" value="Apply changes"></p>
@@ -86,10 +86,10 @@ if ($_POST) {
 			  <?php $i = 0; foreach ($a_mobilekey as $mobilekeyent): ?>
                 <tr> 
                   <td class="listlr">
-                    <?=htmlspecialchars($mobilekeyent['ident']);?>
+                    <?=htmlspecialchars($mobilekeyent['ident'] ?? '');?>
                   </td>
                   <td class="listr">
-                    <?=htmlspecialchars($mobilekeyent['pre-shared-key']);?>
+                    <?=htmlspecialchars($mobilekeyent['pre-shared-key'] ?? '');?>
                   </td>
                   <td class="list" nowrap> <a href="vpn_ipsec_keys_edit.php?id=<?=$i;?>"><img src="e.gif" title="edit key" width="17" height="17" border="0" alt="edit key"></a>
                      &nbsp;<input name="del_<?=$i;?>" type="image" src="x.gif" width="17" height="17" title="delete key" alt="delete key" onclick="return confirm('Do you really want to delete this key?')"></td>

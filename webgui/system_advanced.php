@@ -33,31 +33,31 @@ $pgtitle = array("System", "Advanced setup");
 require("guiconfig.inc");
 $pconfig['nospoofcheck'] = isset($config['bridge']['nospoofcheck']);
 $pconfig['mbmon'] = isset($config['system']['webgui']['mbmon']['enable']);
-$pconfig['cert'] = base64_decode($config['system']['webgui']['certificate']);
-$pconfig['key'] = base64_decode($config['system']['webgui']['private-key']);
+$pconfig['cert'] = base64_decode($config['system']['webgui']['certificate'] ?? '');
+$pconfig['key'] = base64_decode($config['system']['webgui']['private-key'] ?? '');
 $pconfig['disableconsolemenu'] = isset($config['system']['disableconsolemenu']);
 $pconfig['disablefirmwarecheck'] = isset($config['system']['disablefirmwarecheck']);
 $pconfig['allowipsecfrags'] = isset($config['filter']['allowipsecfrags']);
 $pconfig['expanddiags'] = isset($config['system']['webgui']['expanddiags']);
 if ($g['platform'] == "generic-pc" || $g['platform'] == "generic-pc-serial")
-	$pconfig['harddiskstandby'] = $config['system']['harddiskstandby'];
+	$pconfig['harddiskstandby'] = $config['system']['harddiskstandby'] ?? null;
 $pconfig['bypassstaticroutes'] = isset($config['filter']['bypassstaticroutes']);
 $pconfig['noantilockout'] = isset($config['system']['webgui']['noantilockout']);
-$pconfig['ipsecdnsinterval'] = $config['ipsec']['dns-interval'];
-$pconfig['tcpidletimeout'] = $config['filter']['tcpidletimeout'];
+$pconfig['ipsecdnsinterval'] = $config['ipsec']['dns-interval'] ?? null;
+$pconfig['tcpidletimeout'] = $config['filter']['tcpidletimeout'] ?? null;
 $pconfig['preferoldsa_enable'] = isset($config['ipsec']['preferoldsa']);
 $pconfig['polling_enable'] = isset($config['system']['polling']);
-$pconfig['ipfstatentries'] = $config['diag']['ipfstatentries'];
+$pconfig['ipfstatentries'] = $config['diag']['ipfstatentries'] ?? null;
 $pconfig['ralink_enable'] = isset($config['system']['ralink']);
-$pconfig['portrangelow'] = $config['nat']['portrange-low'];
-$pconfig['portrangehigh'] = $config['nat']['portrange-high'];
+$pconfig['portrangelow'] = $config['nat']['portrange-low'] ?? null;
+$pconfig['portrangehigh'] = $config['nat']['portrange-high'] ?? null;
 
 if ($_POST) {
 
 	unset($input_errors);
 	$savemsgadd = "";
 	
-	if ($_POST['gencert']) {
+	if (!empty($_POST['gencert'])) {
 		/* custom certificate generation requested */
 		$ck = generate_self_signed_cert("m0n0wall", $config['system']['hostname'] . "." . $config['system']['domain']);
 		
@@ -73,61 +73,61 @@ if ($_POST) {
 	$pconfig = $_POST;
 
 	/* input validation */
-	if ($_POST['ipsecdnsinterval'] && !is_numericint($_POST['ipsecdnsinterval'])) {
+	if (!empty($_POST['ipsecdnsinterval']) && !is_numericint($_POST['ipsecdnsinterval'])) {
 		$input_errors[] = "The IPsec DNS check interval must be an integer.";
 	}
-	if ($_POST['tcpidletimeout'] && !is_numericint($_POST['tcpidletimeout'])) {
+	if (!empty($_POST['tcpidletimeout']) && !is_numericint($_POST['tcpidletimeout'])) {
 		$input_errors[] = "The TCP idle timeout must be an integer.";
 	}
-	if ($_POST['ipfstatentries'] && !is_numericint($_POST['ipfstatentries'])) {
+	if (!empty($_POST['ipfstatentries']) && !is_numericint($_POST['ipfstatentries'])) {
 		$input_errors[] = "The 'firewall states displayed' value must be an integer.";
 	}
-	if (($_POST['cert'] && !$_POST['key']) || ($_POST['key'] && !$_POST['cert'])) {
+	if ((!empty($_POST['cert']) && empty($_POST['key'])) || (!empty($_POST['key']) && empty($_POST['cert']))) {
 		$input_errors[] = "Certificate and key must always be specified together.";
-	} else if ($_POST['cert'] && $_POST['key']) {
+	} else if (!empty($_POST['cert']) && !empty($_POST['key'])) {
 		if (!strstr($_POST['cert'], "BEGIN CERTIFICATE") || !strstr($_POST['cert'], "END CERTIFICATE"))
 			$input_errors[] = "This certificate does not appear to be valid.";
 		if (!strstr($_POST['key'], "BEGIN RSA PRIVATE KEY") || !strstr($_POST['key'], "END RSA PRIVATE KEY"))
 			$input_errors[] = "This key does not appear to be valid.";
 	}
-	if (($_POST['portrangelow'] || $_POST['portrangehigh']) &&
-		(!is_port($_POST['portrangelow']) || !is_port($_POST['portrangehigh'])))
+	if ((!empty($_POST['portrangelow']) || !empty($_POST['portrangehigh'])) &&
+		(!is_port($_POST['portrangelow'] ?? '') || !is_port($_POST['portrangehigh'] ?? '')))
 		$input_errors[] = "The outbound NAT port range start and end must be integers between 1 and 65535.";
 
-	if (!$input_errors) {
-		$config['bridge']['nospoofcheck'] = $_POST['nospoofcheck'] ? true : false;
-		$config['system']['webgui']['mbmon']['enable'] = $_POST['mbmon'] ? true : false;
-		$config['system']['webgui']['mbmon']['type'] = $_POST['mbmontype'];
-		$oldcert = $config['system']['webgui']['certificate'];
-		$oldkey = $config['system']['webgui']['private-key'];
-		$config['system']['webgui']['certificate'] = base64_encode($_POST['cert']);
-		$config['system']['webgui']['private-key'] = base64_encode($_POST['key']);
-		$config['system']['disableconsolemenu'] = $_POST['disableconsolemenu'] ? true : false;
-		$config['system']['disablefirmwarecheck'] = $_POST['disablefirmwarecheck'] ? true : false;
-		$config['filter']['allowipsecfrags'] = $_POST['allowipsecfrags'] ? true : false;
-		$config['system']['webgui']['expanddiags'] = $_POST['expanddiags'] ? true : false;
+	if (empty($input_errors)) {
+		$config['bridge']['nospoofcheck'] = !empty($_POST['nospoofcheck']) ? true : false;
+		$config['system']['webgui']['mbmon']['enable'] = !empty($_POST['mbmon']) ? true : false;
+		$config['system']['webgui']['mbmon']['type'] = $_POST['mbmontype'] ?? null;
+		$oldcert = $config['system']['webgui']['certificate'] ?? null;
+		$oldkey = $config['system']['webgui']['private-key'] ?? null;
+		$config['system']['webgui']['certificate'] = base64_encode($_POST['cert'] ?? '');
+		$config['system']['webgui']['private-key'] = base64_encode($_POST['key'] ?? '');
+		$config['system']['disableconsolemenu'] = !empty($_POST['disableconsolemenu']) ? true : false;
+		$config['system']['disablefirmwarecheck'] = !empty($_POST['disablefirmwarecheck']) ? true : false;
+		$config['filter']['allowipsecfrags'] = !empty($_POST['allowipsecfrags']) ? true : false;
+		$config['system']['webgui']['expanddiags'] = !empty($_POST['expanddiags']) ? true : false;
 		if ($g['platform'] == "generic-pc" || $g['platform'] == "generic-pc-serial") {
-			$oldharddiskstandby = $config['system']['harddiskstandby'];
-			$config['system']['harddiskstandby'] = $_POST['harddiskstandby'];
+			$oldharddiskstandby = $config['system']['harddiskstandby'] ?? null;
+			$config['system']['harddiskstandby'] = $_POST['harddiskstandby'] ?? null;
 		}
-		$config['system']['webgui']['noantilockout'] = $_POST['noantilockout'] ? true : false;
-		$config['filter']['bypassstaticroutes'] = $_POST['bypassstaticroutes'] ? true : false;
-		$oldtcpidletimeout = $config['filter']['tcpidletimeout'];
-		$config['filter']['tcpidletimeout'] = $_POST['tcpidletimeout'];
-		$oldipsecdnsinterval = $config['ipsec']['dns-interval'];
-		$config['ipsec']['dns-interval'] = $_POST['ipsecdnsinterval'];
+		$config['system']['webgui']['noantilockout'] = !empty($_POST['noantilockout']) ? true : false;
+		$config['filter']['bypassstaticroutes'] = !empty($_POST['bypassstaticroutes']) ? true : false;
+		$oldtcpidletimeout = $config['filter']['tcpidletimeout'] ?? null;
+		$config['filter']['tcpidletimeout'] = $_POST['tcpidletimeout'] ?? null;
+		$oldipsecdnsinterval = $config['ipsec']['dns-interval'] ?? null;
+		$config['ipsec']['dns-interval'] = $_POST['ipsecdnsinterval'] ?? null;
 		$oldpreferoldsa = isset($config['ipsec']['preferoldsa']);
-		$config['ipsec']['preferoldsa'] = $_POST['preferoldsa_enable'] ? true : false;
+		$config['ipsec']['preferoldsa'] = !empty($_POST['preferoldsa_enable']) ? true : false;
 		$oldpolling = isset($config['system']['polling']);
-		$config['system']['polling'] = $_POST['polling_enable'] ? true : false;
-		if (!$_POST['ipfstatentries'])
+		$config['system']['polling'] = !empty($_POST['polling_enable']) ? true : false;
+		if (empty($_POST['ipfstatentries']))
 			unset($config['diag']['ipfstatentries']);
 		else
-			$config['diag']['ipfstatentries'] = $_POST['ipfstatentries'];	
+			$config['diag']['ipfstatentries'] = $_POST['ipfstatentries'] ?? null;	
 		$oldralink = isset($config['system']['ralink']);
-		$config['system']['ralink'] = $_POST['ralink_enable'] ? true : false;
-		$config['nat']['portrange-low'] = $_POST['portrangelow'];
-		$config['nat']['portrange-high'] = $_POST['portrangehigh'];
+		$config['system']['ralink'] = !empty($_POST['ralink_enable']) ? true : false;
+		$config['nat']['portrange-low'] = $_POST['portrangelow'] ?? null;
+		$config['nat']['portrange-high'] = $_POST['portrangehigh'] ?? null;
 		
 		write_config();
 
@@ -139,7 +139,7 @@ if ($_POST) {
 			touch($d_sysrebootreqd_path);
 		}
 		if (($g['platform'] == "generic-pc" || $g['platform'] == "generic-pc-serial") && ($config['system']['harddiskstandby'] != $oldharddiskstandby)) {
-			if (!$config['system']['harddiskstandby']) {
+			if (empty($config['system']['harddiskstandby'])) {
 				// Reboot needed to deactivate standby due to a stupid ATA-protocol
 				touch($d_sysrebootreqd_path);
 				unset($config['system']['harddiskstandby']);
@@ -166,8 +166,8 @@ if ($_POST) {
 
 ?>
 <?php include("fbegin.inc"); ?>
-            <?php if ($input_errors) print_input_errors($input_errors); ?>
-            <?php if ($savemsg) print_info_box($savemsg); ?>
+            <?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
+            <?php if (!empty($savemsg)) print_info_box($savemsg); ?>
             <p><span class="vexpl"><span class="red"><strong>Note: </strong></span>the 
               options on this page are intended for use by advanced users only, 
               and there's <strong>NO</strong> support for them.</span></p>
@@ -182,7 +182,7 @@ if ($_POST) {
                 <tr> 
                   <td width="22%" valign="top" class="vncell">&nbsp;</td>
                   <td width="78%" class="vtable"> 
-				    <input name="nospoofcheck" type="checkbox" id="nospoofcheck" value="yes" <?php if ($pconfig['nospoofcheck']) echo "checked"; ?>>
+				    <input name="nospoofcheck" type="checkbox" id="nospoofcheck" value="yes" <?php if (!empty($pconfig['nospoofcheck'])) echo "checked"; ?>>
                     <strong>Disable Spoof Checking on bridge</strong><span class="vexpl"><br>
                     Spoof Checking blocks packets not sourced from the subnet of the
 					interface the packet was recieved on.<br>
@@ -204,14 +204,14 @@ if ($_POST) {
                 <tr> 
                   <td width="22%" valign="top" class="vncell">Certificate</td>
                   <td width="78%" class="vtable"> 
-                    <textarea name="cert" cols="65" rows="7" id="cert" class="formpre"><?=htmlspecialchars($pconfig['cert']);?></textarea>
+                    <textarea name="cert" cols="65" rows="7" id="cert" class="formpre"><?=htmlspecialchars($pconfig['cert'] ?? '');?></textarea>
                     <br> 
                     Paste a signed certificate in X.509 PEM format here.</td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncell">Key</td>
                   <td width="78%" class="vtable"> 
-                    <textarea name="key" cols="65" rows="7" id="key" class="formpre"><?=htmlspecialchars($pconfig['key']);?></textarea>
+                    <textarea name="key" cols="65" rows="7" id="key" class="formpre"><?=htmlspecialchars($pconfig['key'] ?? '');?></textarea>
                     <br> 
                     Paste an RSA private key in PEM format here.</td>
                 </tr>
@@ -231,29 +231,29 @@ if ($_POST) {
 				<tr>
                   <td valign="top" class="vncell">TCP idle timeout </td>
                   <td class="vtable">                    <span class="vexpl">
-                    <input name="tcpidletimeout" type="text" class="formfld" id="tcpidletimeout" size="8" value="<?=htmlspecialchars($pconfig['tcpidletimeout']);?>">
+                    <input name="tcpidletimeout" type="text" class="formfld" id="tcpidletimeout" size="8" value="<?=htmlspecialchars($pconfig['tcpidletimeout'] ?? '');?>">
                     seconds<br>
     Idle TCP connections will be removed from the state table after no packets have been received for the specified number of seconds. Don't set this too high or your state table could become full of connections that have been improperly shut down. The default is 2.5 hours.</span></td>
 			    </tr>
 				<tr> 
                   <td width="22%" valign="top" class="vncell">Static route filtering</td>
                   <td width="78%" class="vtable"> 
-                    <input name="bypassstaticroutes" type="checkbox" id="bypassstaticroutes" value="yes" <?php if ($pconfig['bypassstaticroutes']) echo "checked"; ?>>
+                    <input name="bypassstaticroutes" type="checkbox" id="bypassstaticroutes" value="yes" <?php if (!empty($pconfig['bypassstaticroutes'])) echo "checked"; ?>>
                     <strong>Bypass firewall rules for traffic on the same interface</strong><br>
 					This option only applies if you have defined one or more static routes. If it is enabled, traffic that enters and leaves through the same interface will not be checked by the firewall. This may be desirable in some situations where multiple subnets are connected to the same interface. </td>
                 </tr>
 				<tr>
                   <td valign="top" class="vncell">IPsec fragmented packets</td>
                   <td class="vtable">
-                    <input name="allowipsecfrags" type="checkbox" id="allowipsecfrags" value="yes" <?php if ($pconfig['allowipsecfrags']) echo "checked"; ?>>
+                    <input name="allowipsecfrags" type="checkbox" id="allowipsecfrags" value="yes" <?php if (!empty($pconfig['allowipsecfrags'])) echo "checked"; ?>>
                     <strong>Allow fragmented IPsec packets</strong><span class="vexpl"><br>
     This will cause m0n0wall to allow fragmented IP packets that are encapsulated in IPsec ESP packets.</span></td>
 			    </tr>
 				<tr>
                   <td valign="top" class="vncell">Outbound NAT port range</td>
                   <td class="vtable"><span class="vexpl">
-                    <input name="portrangelow" type="text" class="formfld" id="portrangelow" size="5" value="<?=htmlspecialchars($pconfig['portrangelow']);?>"> - 
-					<input name="portrangehigh" type="text" class="formfld" id="portrangehigh" size="5" value="<?=htmlspecialchars($pconfig['portrangehigh']);?>">
+                    <input name="portrangelow" type="text" class="formfld" id="portrangelow" size="5" value="<?=htmlspecialchars($pconfig['portrangelow'] ?? '');?>"> - 
+					<input name="portrangehigh" type="text" class="formfld" id="portrangehigh" size="5" value="<?=htmlspecialchars($pconfig['portrangehigh'] ?? '');?>">
                     <br>
     This setting controls the range from which ports are randomly picked for outbound NAT. Do not change this unless you know exactly what you're doing.</span></td>
 			    </tr>
@@ -270,11 +270,11 @@ if ($_POST) {
 					<tr>
 					<td > 
                     <select class="formfld" name="mbmontype" align="bottom">
-					<option <?php if(!$config['system']['webgui']['mbmon']['type'] == 'F') echo('selected');?> value="C">&deg;C</option>
-					<option <?php if($config['system']['webgui']['mbmon']['type'] == 'F') echo('selected');?> value="F">&deg;F</option>
+					<option <?php if(!($config['system']['webgui']['mbmon']['type'] ?? null) == 'F') echo('selected');?> value="C">&deg;C</option>
+					<option <?php if(($config['system']['webgui']['mbmon']['type'] ?? null) == 'F') echo('selected');?> value="F">&deg;F</option>
 					</select></td>
 					<td>
-						<input id="mbmon" <?php if ($pconfig['mbmon']) echo "checked"; ?>=""  name="mbmon" type="checkbox" value="yes"><strong> Enable Motherboard Monitoring</strong></td>
+						<input id="mbmon" <?php if (!empty($pconfig['mbmon'])) echo "checked"; ?>=""  name="mbmon" type="checkbox" value="yes"><strong> Enable Motherboard Monitoring</strong></td>
 						</tr>
 					</table>
 					<span class="vexpl">
@@ -283,21 +283,21 @@ if ($_POST) {
 				<tr> 
                   <td width="22%" valign="top" class="vncell">Console menu </td>
                   <td width="78%" class="vtable"> 
-                    <input name="disableconsolemenu" type="checkbox" id="disableconsolemenu" value="yes" <?php if ($pconfig['disableconsolemenu']) echo "checked"; ?>>
+                    <input name="disableconsolemenu" type="checkbox" id="disableconsolemenu" value="yes" <?php if (!empty($pconfig['disableconsolemenu'])) echo "checked"; ?>>
                     <strong>Disable console menu</strong><span class="vexpl"><br>
                     Changes to this option will take effect after a reboot.</span></td>
                 </tr>
 				<tr>
                   <td valign="top" class="vncell">Firmware version check </td>
                   <td class="vtable">
-                    <input name="disablefirmwarecheck" type="checkbox" id="disablefirmwarecheck" value="yes" <?php if ($pconfig['disablefirmwarecheck']) echo "checked"; ?>>
+                    <input name="disablefirmwarecheck" type="checkbox" id="disablefirmwarecheck" value="yes" <?php if (!empty($pconfig['disablefirmwarecheck'])) echo "checked"; ?>>
                     <strong>Disable firmware version check</strong><span class="vexpl"><br>
     This will cause m0n0wall not to check for newer firmware versions when the <a href="system_firmware.php">System: Firmware</a> page is viewed.</span></td>
 			    </tr>
 				<tr>
                   <td valign="top" class="vncell">IPsec DNS check interval</td>
                   <td class="vtable">                    <span class="vexpl">
-                    <input name="ipsecdnsinterval" type="text" class="formfld" id="ipsecdnsinterval" size="8" value="<?=htmlspecialchars($pconfig['ipsecdnsinterval']);?>">
+                    <input name="ipsecdnsinterval" type="text" class="formfld" id="ipsecdnsinterval" size="8" value="<?=htmlspecialchars($pconfig['ipsecdnsinterval'] ?? '');?>">
                     seconds<br>
     If at least one IPsec tunnel has a host name (instead of an IP address) as the remote gateway, a DNS lookup
     is performed at the interval specified here, and if the IP address that the host name resolved to has changed,
@@ -309,9 +309,9 @@ if ($_POST) {
                   <td width="78%" class="vtable"> 
                     <select name="harddiskstandby" class="formfld">
 					<?php $sbvals = array(1,2,3,4,5,10,15,20,30,60); ?>
-                      <option value="" <?php if(!$pconfig['harddiskstandby']) echo('selected');?>>Always on</option>
+                      <option value="" <?php if(empty($pconfig['harddiskstandby'])) echo('selected');?>>Always on</option>
 					<?php foreach ($sbvals as $sbval): ?>
-                      <option value="<?=$sbval;?>" <?php if($pconfig['harddiskstandby'] == $sbval) echo 'selected';?>><?=$sbval;?> minutes</option>
+                      <option value="<?=$sbval;?>" <?php if(($pconfig['harddiskstandby'] ?? null) == $sbval) echo 'selected';?>><?=$sbval;?> minutes</option>
 					<?php endforeach; ?>
                     </select>
                     <br>
@@ -322,13 +322,13 @@ if ($_POST) {
 				<tr> 
                   <td width="22%" valign="top" class="vncell">Navigation</td>
                   <td width="78%" class="vtable"> 
-                    <input name="expanddiags" type="checkbox" id="expanddiags" value="yes" <?php if ($pconfig['expanddiags']) echo "checked"; ?>>
+                    <input name="expanddiags" type="checkbox" id="expanddiags" value="yes" <?php if (!empty($pconfig['expanddiags'])) echo "checked"; ?>>
                     <strong>Keep diagnostics in navigation expanded </strong></td>
                 </tr>
 				<tr> 
                   <td width="22%" valign="top" class="vncell">webGUI anti-lockout</td>
                   <td width="78%" class="vtable"> 
-                    <input name="noantilockout" type="checkbox" id="noantilockout" value="yes" <?php if ($pconfig['noantilockout']) echo "checked"; ?>>
+                    <input name="noantilockout" type="checkbox" id="noantilockout" value="yes" <?php if (!empty($pconfig['noantilockout'])) echo "checked"; ?>>
                     <strong>Disable webGUI anti-lockout rule</strong><br>
 					By default, access to the webGUI on the LAN interface is always permitted, regardless of the user-defined filter rule set. Enable this feature to control webGUI access (make sure to have a filter rule in place that allows you in, or you will lock yourself out!).<br>
 					Hint: 
@@ -337,7 +337,7 @@ if ($_POST) {
 				<tr> 
                   <td width="22%" valign="top" class="vncell">IPsec SA preferral</td>
                   <td width="78%" class="vtable"> 
-                    <input name="preferoldsa_enable" type="checkbox" id="preferoldsa_enable" value="yes" <?php if ($pconfig['preferoldsa_enable']) echo "checked"; ?>>
+                    <input name="preferoldsa_enable" type="checkbox" id="preferoldsa_enable" value="yes" <?php if (!empty($pconfig['preferoldsa_enable'])) echo "checked"; ?>>
                     <strong>Prefer old IPsec SAs</strong><br>
 					By default, if several SAs match, the newest one is preferred.
 					Select this option to always prefer old SAs over new ones.
@@ -346,7 +346,7 @@ if ($_POST) {
 				<tr> 
                   <td width="22%" valign="top" class="vncell">Device polling</td>
                   <td width="78%" class="vtable"> 
-                    <input name="polling_enable" type="checkbox" id="polling_enable" value="yes" <?php if ($pconfig['polling_enable']) echo "checked"; ?>>
+                    <input name="polling_enable" type="checkbox" id="polling_enable" value="yes" <?php if (!empty($pconfig['polling_enable'])) echo "checked"; ?>>
                     <strong>Use device polling</strong><br>
 					Device polling is a technique that lets the system periodically poll network devices for new
 					data instead of relying on interrupts. This can reduce CPU load and therefore increase
@@ -357,7 +357,7 @@ if ($_POST) {
 				<tr>
                   <td valign="top" class="vncell">Firewall states displayed</td>
                   <td class="vtable">
-                    <input name="ipfstatentries" type="text" class="formfld" id="ipfstatentries" size="8" value="<?=htmlspecialchars($pconfig['ipfstatentries']);?>">
+                    <input name="ipfstatentries" type="text" class="formfld" id="ipfstatentries" size="8" value="<?=htmlspecialchars($pconfig['ipfstatentries'] ?? '');?>">
                     entries<br>
     				<span class="vexpl">Maxmimum number of firewall state entries to be displayed on the <a href="diag_ipfstat.php">Diagnostics: Firewall state</a> page.
     				Default is 300. Setting this to a very high value will cause a slowdown when viewing the
@@ -366,7 +366,7 @@ if ($_POST) {
 				<tr>
 				  <td width="22%" valign="top" class="vncell">Additional firmware</td>
                   <td width="78%" class="vtable"> 
-                    <input name="ralink_enable" type="checkbox" id="ralink_enable" value="yes" <?php if ($pconfig['ralink_enable']) echo "checked"; ?>>
+                    <input name="ralink_enable" type="checkbox" id="ralink_enable" value="yes" <?php if (!empty($pconfig['ralink_enable'])) echo "checked"; ?>>
                     <strong>Enable Ralink USB wireless devices</strong><br>
 					Load additional kernel modules that will allow using network devices that require a specific firmware module.
 					Do not enable any of these modules if all of your network interfaces show up as expected.

@@ -35,7 +35,7 @@ require("guiconfig.inc");
 
 <?php
 if ($_POST) {
-    if ($_POST['vouchers']) {
+    if (!empty($_POST['vouchers'])) {
         $test_results = voucher_auth($_POST['vouchers'], 1);
         echo "<p><table border=\"0\" cellspacing=\"0\" cellpadding=\"4\" width=\"100%\">\n";
         foreach ($test_results as $result) {
@@ -72,7 +72,7 @@ $tabs = array('Users' => 'status_captiveportal.php',
   <tr>
     <td valign="top" class="vncellreq">Voucher(s)</td>
     <td class="vtable">
-    <textarea name="vouchers" cols="65" rows="3" type="text" id="vouchers" class="formpre"><?=htmlspecialchars($_POST['vouchers']);?></textarea>
+    <textarea name="vouchers" cols="65" rows="3" type="text" id="vouchers" class="formpre"><?=htmlspecialchars($_POST['vouchers'] ?? '');?></textarea>
     <br>
 Enter multiple vouchers separated by space or newline. The remaining time, if valid, will be shown for each voucher.</td>      
   </tr>      

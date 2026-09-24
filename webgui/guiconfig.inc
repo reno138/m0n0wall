@@ -94,7 +94,7 @@ $tcpflags = array("fin", "syn", "rst", "psh", "ack", "urg");
 $specialnets = array("wanip" => "WAN address", "lan" => "LAN net", "pptp" => "PPTP clients", "l2tp" => "L2TP clients");
 
 for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-	$specialnets['opt' . $i] = $config['interfaces']['opt' . $i]['descr'] . " net";
+	$specialnets['opt' . $i] = ($config['interfaces']['opt' . $i]['descr'] ?? '') . " net";
 }
 	
 $medias = array("auto" => "autoselect", "100full" => "100BASE-TX full-duplex",
@@ -525,7 +525,7 @@ function ipsec_ca_sort() {
 function dynamic_tab_menu(&$tabs) {
 	global $allowed, $config;
 	
-	if ($_SERVER['REMOTE_USER'] == $config['system']['username']) {
+	if (($_SERVER['REMOTE_USER'] ?? null) == ($config['system']['username'] ?? null)) {
 		$authorized = &$tabs;
 	} else {
 		$authorized = &$allowed;

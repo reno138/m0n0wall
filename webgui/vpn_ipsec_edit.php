@@ -32,14 +32,14 @@
 $pgtitle = array("VPN", "IPsec", "Edit tunnel");
 require("guiconfig.inc");
 
-if (!is_array($config['ipsec']['tunnel'])) {
+if (!is_array($config['ipsec']['tunnel'] ?? null)) {
 	$config['ipsec']['tunnel'] = array();
 }
 $a_ipsec = &$config['ipsec']['tunnel'];
 
 $specialsrcdst = explode(" ", "lan");
 
-$id = $_GET['id'];
+$id = $_GET['id'] ?? null;
 if (isset($_POST['id']))
 	$id = $_POST['id'];
 	
@@ -54,10 +54,13 @@ function is_specialnet($net) {
 
 function address_to_pconfig($adr, &$padr, &$pmask) {
 		
-	if ($adr['network'])
+	if (!empty($adr['network']))
 		$padr = $adr['network'];
-	else if ($adr['address']) {
-		list($padr, $pmask) = explode("/", $adr['address']);
+	else if (!empty($adr['address'])) {
+		/* a single host has no /bits part -> explode() returns one element */
+		$addrparts = explode("/", $adr['address']);
+		$padr = $addrparts[0];
+		$pmask = $addrparts[1] ?? null;
 		if (is_null($pmask))
 			$pmask = 32;
 	}
@@ -76,10 +79,10 @@ function pconfig_to_address(&$adr, $padr, $pmask) {
 	}
 }
 
-if (isset($id) && $a_ipsec[$id]) {
+if (isset($id) && !empty($a_ipsec[$id])) {
 	$pconfig['disabled'] = isset($a_ipsec[$id]['disabled']);
 	$pconfig['natt'] = isset($a_ipsec[$id]['natt']);
-	$pconfig['dpddelay'] = $a_ipsec[$id]['dpddelay'];
+	$pconfig['dpddelay'] = $a_ipsec[$id]['dpddelay'] ?? null;
 	//$pconfig['auto'] = isset($a_ipsec[$id]['auto']);
 
 	if (!isset($a_ipsec[$id]['local-subnet']))
@@ -87,14 +90,17 @@ if (isset($id) && $a_ipsec[$id]) {
 	else
 		address_to_pconfig($a_ipsec[$id]['local-subnet'], $pconfig['localnet'], $pconfig['localnetmask']);
 		
-	if ($a_ipsec[$id]['interface'])
+	if (!empty($a_ipsec[$id]['interface']))
 		$pconfig['interface'] = $a_ipsec[$id]['interface'];
 	else
 		$pconfig['interface'] = "wan";
 		
-	list($pconfig['remotenet'],$pconfig['remotebits']) = explode("/", $a_ipsec[$id]['remote-subnet']);
-	$pconfig['remotegw'] = $a_ipsec[$id]['remote-gateway'];
-	$pconfig['p1mode'] = $a_ipsec[$id]['p1']['mode'];
+	/* an unspecified remote subnet has no /bits part -> explode() returns one element */
+	$remoteparts = explode("/", $a_ipsec[$id]['remote-subnet'] ?? '');
+	$pconfig['remotenet'] = $remoteparts[0] ?? null;
+	$pconfig['remotebits'] = $remoteparts[1] ?? null;
+	$pconfig['remotegw'] = $a_ipsec[$id]['remote-gateway'] ?? null;
+	$pconfig['p1mode'] = $a_ipsec[$id]['p1']['mode'] ?? null;
 	
 	if (isset($a_ipsec[$id]['p1']['myident']['myaddress']))
 		$pconfig['p1myidentt'] = 'myaddress';
@@ -112,21 +118,21 @@ if (isset($id) && $a_ipsec[$id]) {
 		$pconfig['p1myident'] = $a_ipsec[$id]['p1']['myident']['asn1dn'];
 	}
 	
-	$pconfig['p1ealgo'] = $a_ipsec[$id]['p1']['encryption-algorithm'];
-	$pconfig['p1halgo'] = $a_ipsec[$id]['p1']['hash-algorithm'];
-	$pconfig['p1dhgroup'] = $a_ipsec[$id]['p1']['dhgroup'];
-	$pconfig['p1lifetime'] = $a_ipsec[$id]['p1']['lifetime'];
-	$pconfig['p1authentication_method'] = $a_ipsec[$id]['p1']['authentication_method'];
-	$pconfig['p1pskey'] = $a_ipsec[$id]['p1']['pre-shared-key'];
-	$pconfig['p1cert'] = base64_decode($a_ipsec[$id]['p1']['cert']);
-	$pconfig['p1peercert'] = base64_decode($a_ipsec[$id]['p1']['peercert']);
-	$pconfig['p1privatekey'] = base64_decode($a_ipsec[$id]['p1']['private-key']);
-	$pconfig['p2proto'] = $a_ipsec[$id]['p2']['protocol'];
-	$pconfig['p2ealgos'] = $a_ipsec[$id]['p2']['encryption-algorithm-option'];
-	$pconfig['p2halgos'] = $a_ipsec[$id]['p2']['hash-algorithm-option'];
-	$pconfig['p2pfsgroup'] = $a_ipsec[$id]['p2']['pfsgroup'];
-	$pconfig['p2lifetime'] = $a_ipsec[$id]['p2']['lifetime'];
-	$pconfig['descr'] = $a_ipsec[$id]['descr'];
+	$pconfig['p1ealgo'] = $a_ipsec[$id]['p1']['encryption-algorithm'] ?? null;
+	$pconfig['p1halgo'] = $a_ipsec[$id]['p1']['hash-algorithm'] ?? null;
+	$pconfig['p1dhgroup'] = $a_ipsec[$id]['p1']['dhgroup'] ?? null;
+	$pconfig['p1lifetime'] = $a_ipsec[$id]['p1']['lifetime'] ?? null;
+	$pconfig['p1authentication_method'] = $a_ipsec[$id]['p1']['authentication_method'] ?? null;
+	$pconfig['p1pskey'] = $a_ipsec[$id]['p1']['pre-shared-key'] ?? null;
+	$pconfig['p1cert'] = base64_decode($a_ipsec[$id]['p1']['cert'] ?? '');
+	$pconfig['p1peercert'] = base64_decode($a_ipsec[$id]['p1']['peercert'] ?? '');
+	$pconfig['p1privatekey'] = base64_decode($a_ipsec[$id]['p1']['private-key'] ?? '');
+	$pconfig['p2proto'] = $a_ipsec[$id]['p2']['protocol'] ?? null;
+	$pconfig['p2ealgos'] = $a_ipsec[$id]['p2']['encryption-algorithm-option'] ?? null;
+	$pconfig['p2halgos'] = $a_ipsec[$id]['p2']['hash-algorithm-option'] ?? null;
+	$pconfig['p2pfsgroup'] = $a_ipsec[$id]['p2']['pfsgroup'] ?? null;
+	$pconfig['p2lifetime'] = $a_ipsec[$id]['p2']['lifetime'] ?? null;
+	$pconfig['descr'] = $a_ipsec[$id]['descr'] ?? null;
 	
 } else {
 	/* defaults */
@@ -146,10 +152,10 @@ if (isset($id) && $a_ipsec[$id]) {
 }
 
 if ($_POST) {
-	if (is_specialnet($_POST['localnettype'])) {
+	if (is_specialnet($_POST['localnettype'] ?? null)) {
 		$_POST['localnet'] = $_POST['localnettype'];
 		$_POST['localnetmask'] = 0;
-	} else if ($_POST['localnettype'] == "single") {
+	} else if (($_POST['localnettype'] ?? null) == "single") {
 		$_POST['localnetmask'] = 32;
 	}
 	
@@ -157,118 +163,118 @@ if ($_POST) {
 	$pconfig = $_POST;
 
 	/* input validation */
-	if ($_POST['p1authentication_method'] == "pre_shared_key") {
+	if (($_POST['p1authentication_method'] ?? null) == "pre_shared_key") {
 		$reqdfields = explode(" ", "localnet remotenet remotebits remotegw p1pskey p2ealgos p2halgos");
 		$reqdfieldsn = explode(",", "Local network,Remote network,Remote network bits,Remote gateway,Pre-Shared Key,P2 Encryption Algorithms,P2 Hash Algorithms");
 	}
 	else {
 		$reqdfields = explode(" ", "localnet remotenet remotebits remotegw p2ealgos p2halgos");
 		$reqdfieldsn = explode(",", "Local network,Remote network,Remote network bits,Remote gateway,P2 Encryption Algorithms,P2 Hash Algorithms");	
-		if (!strstr($_POST['p1cert'], "BEGIN CERTIFICATE") || !strstr($_POST['p1cert'], "END CERTIFICATE"))
+		if (!strstr($_POST['p1cert'] ?? '', "BEGIN CERTIFICATE") || !strstr($_POST['p1cert'] ?? '', "END CERTIFICATE"))
 			$input_errors[] = "This certificate does not appear to be valid.";
-		if (!strstr($_POST['p1privatekey'], "BEGIN RSA PRIVATE KEY") || !strstr($_POST['p1privatekey'], "END RSA PRIVATE KEY"))
+		if (!strstr($_POST['p1privatekey'] ?? '', "BEGIN RSA PRIVATE KEY") || !strstr($_POST['p1privatekey'] ?? '', "END RSA PRIVATE KEY"))
 			$input_errors[] = "This key does not appear to be valid.";	
-		if ($_POST['p1peercert']!="" && (!strstr($_POST['p1peercert'], "BEGIN CERTIFICATE") || !strstr($_POST['p1peercert'], "END CERTIFICATE")))
+		if (($_POST['p1peercert'] ?? null)!="" && (!strstr($_POST['p1peercert'], "BEGIN CERTIFICATE") || !strstr($_POST['p1peercert'], "END CERTIFICATE")))
 			$input_errors[] = "This peer certificate does not appear to be valid.";	
 	}
 	
 	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
-	if (($_POST['dpddelay'] && !is_numeric($_POST['dpddelay']))) {
+	if ((!empty($_POST['dpddelay']) && !is_numeric($_POST['dpddelay']))) {
 		$input_errors[] = "The DPD interval must be an integer.";
 	}
 	
-	if (!is_specialnet($_POST['localnettype'])) {
-		if (($_POST['localnet'] && !is_ipaddr4or6($_POST['localnet']))) {
+	if (!is_specialnet($_POST['localnettype'] ?? null)) {
+		if ((!empty($_POST['localnet']) && !is_ipaddr4or6($_POST['localnet']))) {
 			$input_errors[] = "A valid local network IP address must be specified.";
 		}
-		if (($_POST['localnetmask'] && !is_numeric($_POST['localnetmask']))) {
+		if ((!empty($_POST['localnetmask']) && !is_numeric($_POST['localnetmask']))) {
 			$input_errors[] = "A valid local network bit count must be specified.";
 		}
 	}
-	if (($_POST['p1lifetime'] && !is_numeric($_POST['p1lifetime']))) {
+	if ((!empty($_POST['p1lifetime']) && !is_numeric($_POST['p1lifetime']))) {
 		$input_errors[] = "The P1 lifetime must be an integer.";
 	}
-	if (($_POST['p2lifetime'] && !is_numeric($_POST['p2lifetime']))) {
+	if ((!empty($_POST['p2lifetime']) && !is_numeric($_POST['p2lifetime']))) {
 		$input_errors[] = "The P2 lifetime must be an integer.";
 	}
-	if ($_POST['remotebits'] && (!is_numeric($_POST['remotebits']) || ($_POST['remotebits'] < 0) || ($_POST['remotebits'] > 128))) {
+	if (!empty($_POST['remotebits']) && (!is_numeric($_POST['remotebits']) || ($_POST['remotebits'] < 0) || ($_POST['remotebits'] > 128))) {
 		$input_errors[] = "The remote network bits are invalid.";
 	}
-	if (($_POST['remotenet'] && !is_ipaddr4or6($_POST['remotenet']))) {
+	if ((!empty($_POST['remotenet']) && !is_ipaddr4or6($_POST['remotenet']))) {
 		$input_errors[] = "A valid remote network address must be specified.";
 	}
-	if (($_POST['remotegw'] && !is_ipaddr4or6($_POST['remotegw']) && !is_domain($_POST['remotegw']))) {
+	if ((!empty($_POST['remotegw']) && !is_ipaddr4or6($_POST['remotegw']) && !is_domain($_POST['remotegw']))) {
 		$input_errors[] = "A valid remote gateway address or host name must be specified.";
 	}
-	if (($_POST['remotenet'] && is_ipaddr6($_POST['remotenet'])) && ($_POST['remotegw'] && !is_ipaddr6($_POST['remotegw']))) {
+	if ((!empty($_POST['remotenet']) && is_ipaddr6($_POST['remotenet'])) && (!empty($_POST['remotegw']) && !is_ipaddr6($_POST['remotegw']))) {
 		$input_errors[] = "You can not set an ipv6 remote subnet to an ipv4 remote gateway";
 	}	
-	if (($_POST['remotenet'] && is_ipaddr($_POST['remotenet'])) && ($_POST['remotegw'] && is_ipaddr6($_POST['remotegw']))) {
+	if ((!empty($_POST['remotenet']) && is_ipaddr($_POST['remotenet'])) && (!empty($_POST['remotegw']) && is_ipaddr6($_POST['remotegw']))) {
 		$input_errors[] = "You can not set an ipv4 remote subnet to an ipv6 remote gateway";
 	}	
-	if ((($_POST['p1myidentt'] == "address") && !is_ipaddr4or6($_POST['p1myident']))) {
+	if (((($_POST['p1myidentt'] ?? null) == "address") && !is_ipaddr4or6($_POST['p1myident'] ?? ''))) {
 		$input_errors[] = "A valid IP address for 'My identifier' must be specified.";
 	}
-	if ((($_POST['p1myidentt'] == "fqdn") && !is_domain($_POST['p1myident']))) {
+	if (((($_POST['p1myidentt'] ?? null) == "fqdn") && !is_domain($_POST['p1myident'] ?? null))) {
 		$input_errors[] = "A valid domain name for 'My identifier' must be specified.";
 	}
-	if ($_POST['p1myidentt'] == "user_fqdn") {
-		$ufqdn = explode("@",$_POST['p1myident']);
-		if (!is_domain($ufqdn[1])) 
+	if (($_POST['p1myidentt'] ?? null) == "user_fqdn") {
+		$ufqdn = explode("@",$_POST['p1myident'] ?? '');
+		if (!is_domain($ufqdn[1] ?? null)) 
 			$input_errors[] = "A valid User FQDN in the form of user@my.domain.com for 'My identifier' must be specified.";
 	}
 	
-	if ($_POST['p1myidentt'] == "myaddress")
+	if (($_POST['p1myidentt'] ?? null) == "myaddress")
 		$_POST['p1myident'] = "";
 
-	if (!$input_errors) {
-		$ipsecent['disabled'] = $_POST['disabled'] ? true : false;
+	if (empty($input_errors)) {
+		$ipsecent['disabled'] = !empty($_POST['disabled']) ? true : false;
 		//$ipsecent['auto'] = $_POST['auto'] ? true : false;
-		$ipsecent['dpddelay'] = $pconfig['dpddelay'];
-		$ipsecent['interface'] = $pconfig['interface'];
-		$ipsecent['natt'] = $_POST['natt'] ? true : false;
-		pconfig_to_address($ipsecent['local-subnet'], $_POST['localnet'], $_POST['localnetmask']);
+		$ipsecent['dpddelay'] = $pconfig['dpddelay'] ?? null;
+		$ipsecent['interface'] = $pconfig['interface'] ?? null;
+		$ipsecent['natt'] = !empty($_POST['natt']) ? true : false;
+		pconfig_to_address($ipsecent['local-subnet'], $_POST['localnet'] ?? null, $_POST['localnetmask'] ?? null);
 		$ipsecent['remote-subnet'] = $_POST['remotenet'] . "/" . $_POST['remotebits'];
 		$ipsecent['remote-gateway'] = $_POST['remotegw'];
-		$ipsecent['p1']['mode'] = $_POST['p1mode'];
+		$ipsecent['p1']['mode'] = $_POST['p1mode'] ?? null;
 		
 		$ipsecent['p1']['myident'] = array();
-		switch ($_POST['p1myidentt']) {
+		switch ($_POST['p1myidentt'] ?? null) {
 			case 'myaddress':
 				$ipsecent['p1']['myident']['myaddress'] = true;
 				break;
 			case 'address':
-				$ipsecent['p1']['myident']['address'] = $_POST['p1myident'];
+				$ipsecent['p1']['myident']['address'] = $_POST['p1myident'] ?? null;
 				break;
 			case 'fqdn':
-				$ipsecent['p1']['myident']['fqdn'] = $_POST['p1myident'];
+				$ipsecent['p1']['myident']['fqdn'] = $_POST['p1myident'] ?? null;
 				break;
 			case 'user_fqdn':
-				$ipsecent['p1']['myident']['ufqdn'] = $_POST['p1myident'];
+				$ipsecent['p1']['myident']['ufqdn'] = $_POST['p1myident'] ?? null;
 				break;
 			case 'asn1dn':
-				$ipsecent['p1']['myident']['asn1dn'] = $_POST['p1myident'];
+				$ipsecent['p1']['myident']['asn1dn'] = $_POST['p1myident'] ?? null;
 				break;
 		}
 		
-		$ipsecent['p1']['encryption-algorithm'] = $_POST['p1ealgo'];
-		$ipsecent['p1']['hash-algorithm'] = $_POST['p1halgo'];
-		$ipsecent['p1']['dhgroup'] = $_POST['p1dhgroup'];
-		$ipsecent['p1']['lifetime'] = $_POST['p1lifetime'];
-		$ipsecent['p1']['pre-shared-key'] = $_POST['p1pskey'];
-		$ipsecent['p1']['private-key'] = base64_encode($_POST['p1privatekey']);
-		$ipsecent['p1']['cert'] = base64_encode($_POST['p1cert']);
-		$ipsecent['p1']['peercert'] = base64_encode($_POST['p1peercert']);
-		$ipsecent['p1']['authentication_method'] = $_POST['p1authentication_method'];
-		$ipsecent['p2']['protocol'] = $_POST['p2proto'];
-		$ipsecent['p2']['encryption-algorithm-option'] = $_POST['p2ealgos'];
-		$ipsecent['p2']['hash-algorithm-option'] = $_POST['p2halgos'];
-		$ipsecent['p2']['pfsgroup'] = $_POST['p2pfsgroup'];
-		$ipsecent['p2']['lifetime'] = $_POST['p2lifetime'];
-		$ipsecent['descr'] = $_POST['descr'];
+		$ipsecent['p1']['encryption-algorithm'] = $_POST['p1ealgo'] ?? null;
+		$ipsecent['p1']['hash-algorithm'] = $_POST['p1halgo'] ?? null;
+		$ipsecent['p1']['dhgroup'] = $_POST['p1dhgroup'] ?? null;
+		$ipsecent['p1']['lifetime'] = $_POST['p1lifetime'] ?? null;
+		$ipsecent['p1']['pre-shared-key'] = $_POST['p1pskey'] ?? null;
+		$ipsecent['p1']['private-key'] = base64_encode($_POST['p1privatekey'] ?? '');
+		$ipsecent['p1']['cert'] = base64_encode($_POST['p1cert'] ?? '');
+		$ipsecent['p1']['peercert'] = base64_encode($_POST['p1peercert'] ?? '');
+		$ipsecent['p1']['authentication_method'] = $_POST['p1authentication_method'] ?? null;
+		$ipsecent['p2']['protocol'] = $_POST['p2proto'] ?? null;
+		$ipsecent['p2']['encryption-algorithm-option'] = $_POST['p2ealgos'] ?? null;
+		$ipsecent['p2']['hash-algorithm-option'] = $_POST['p2halgos'] ?? null;
+		$ipsecent['p2']['pfsgroup'] = $_POST['p2pfsgroup'] ?? null;
+		$ipsecent['p2']['lifetime'] = $_POST['p2lifetime'] ?? null;
+		$ipsecent['descr'] = $_POST['descr'] ?? null;
 		
-		if (isset($id) && $a_ipsec[$id])
+		if (isset($id) && !empty($a_ipsec[$id]))
 			$a_ipsec[$id] = $ipsecent;
 		else
 			$a_ipsec[] = $ipsecent;
@@ -321,7 +327,7 @@ function methodsel_change() {
 }
 //-->
 </script>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
             <form action="vpn_ipsec_edit.php" method="post" name="iform" id="iform">
               <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="content pane">
                 <tr> 
@@ -331,7 +337,7 @@ function methodsel_change() {
 				<tr> 
                   <td width="22%" valign="top" class="vncellreq">Disabled</td>
                   <td width="78%" class="vtable"> 
-                    <input name="disabled" type="checkbox" id="disabled" value="yes" <?php if ($pconfig['disabled']) echo "checked"; ?>>
+                    <input name="disabled" type="checkbox" id="disabled" value="yes" <?php if (!empty($pconfig['disabled'])) echo "checked"; ?>>
                     <strong>Disable this tunnel</strong><br>
                     <span class="vexpl">Set this option to disable this tunnel without
 					removing it from the list.</span></td>
@@ -339,7 +345,7 @@ function methodsel_change() {
 				<!-- <tr> 
 				  <td width="22%" valign="top" class="vncellreq">Auto-establish</td>
 				  <td width="78%" class="vtable"> 
-					<input name="auto" type="checkbox" id="auto" value="yes" <?php if ($pconfig['auto']) echo "checked"; ?>>
+					<input name="auto" type="checkbox" id="auto" value="yes" <?php if (!empty($pconfig['auto'])) echo "checked"; ?>>
 					<strong>Automatically establish this tunnel</strong><br>
 					<span class="vexpl">Set this option to automatically re-establish this tunnel after reboots/reconfigures. If this is not set, the tunnel is established on demand.</span></td>
 				</tr> -->
@@ -348,10 +354,10 @@ function methodsel_change() {
                   <td width="78%" class="vtable"><select name="interface" class="formfld">
                       <?php $interfaces = array('wan' => 'WAN', 'lan' => 'LAN');
 					  for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-							$interfaces['opt' . $i] = $config['interfaces']['opt' . $i]['descr'];
+							$interfaces['opt' . $i] = $config['interfaces']['opt' . $i]['descr'] ?? '';
 					  }
 					  foreach ($interfaces as $iface => $ifacename): ?>
-                      <option value="<?=$iface;?>" <?php if ($iface == $pconfig['interface']) echo "selected"; ?>> 
+                      <option value="<?=$iface;?>" <?php if ($iface == ($pconfig['interface'] ?? null)) echo "selected"; ?>> 
                       <?=htmlspecialchars($ifacename);?>
                       </option>
                       <?php endforeach; ?>
@@ -361,7 +367,7 @@ function methodsel_change() {
 				<tr> 
                   <td width="22%" valign="top" class="vncellreq">NAT-T</td>
                   <td width="78%" class="vtable"> 
-                    <input name="natt" type="checkbox" id="natt" value="yes" <?php if ($pconfig['natt']) echo "checked"; ?>>
+                    <input name="natt" type="checkbox" id="natt" value="yes" <?php if (!empty($pconfig['natt'])) echo "checked"; ?>>
                     <strong>Enable NAT Traversal (NAT-T)</strong><br>
                     <span class="vexpl">Set this option to enable the use of NAT-T (i.e. the encapsulation of ESP in UDP packets) if needed,
                     	which can help with clients that are behind restrictive firewalls.</span></td>
@@ -369,7 +375,7 @@ function methodsel_change() {
                 <tr> 
 				  <td width="22%" valign="top" class="vncellreq">DPD interval</td>
 				  <td width="78%" class="vtable"> 
-					<input name="dpddelay" type="text" class="formfld" id="dpddelay" size="5" value="<?php echo htmlspecialchars($pconfig['dpddelay']); ?>"> seconds<br>
+					<input name="dpddelay" type="text" class="formfld" id="dpddelay" size="5" value="<?php echo htmlspecialchars($pconfig['dpddelay'] ?? ''); ?>"> seconds<br>
 					<span class="vexpl">Enter a value here to enable Dead Peer Detection (e.g. 60 seconds).</span></td>
 				</tr>
                 <tr> 
@@ -380,23 +386,23 @@ function methodsel_change() {
                         <td>Type:&nbsp;&nbsp;</td>
 						<td></td>
                         <td><select name="localnettype" class="formfld" onChange="typesel_change()">
-                            <?php $sel = is_specialnet($pconfig['localnet']); ?>
-                            <option value="single" <?php if (($pconfig['localnetmask'] == 32) && !$sel) { echo "selected"; $sel = 1; } ?>> 
+                            <?php $sel = is_specialnet($pconfig['localnet'] ?? null); ?>
+                            <option value="single" <?php if ((($pconfig['localnetmask'] ?? null) == 32) && !$sel) { echo "selected"; $sel = 1; } ?>> 
                             Single host</option>
                             <option value="network" <?php if (!$sel) echo "selected"; ?>> 
                             Network</option>
-                            <option value="lan" <?php if ($pconfig['localnet'] == "lan") { echo "selected"; } ?>> 
+                            <option value="lan" <?php if (($pconfig['localnet'] ?? null) == "lan") { echo "selected"; } ?>> 
                             LAN subnet</option>
                           </select></td>
                       </tr>
                       <tr> 
                         <td>Address:&nbsp;&nbsp;</td>
 						<td><?=$mandfldhtmlspc;?></td>
-                        <td><input name="localnet" type="text" class="formfld" id="localnet" size="20" value="<?php if (!is_specialnet($pconfig['localnet'])) echo htmlspecialchars($pconfig['localnet']);?>">
+                        <td><input name="localnet" type="text" class="formfld" id="localnet" size="20" value="<?php if (!is_specialnet($pconfig['localnet'] ?? null)) echo htmlspecialchars($pconfig['localnet'] ?? '');?>">
                           / 
                           <select name="localnetmask" class="formfld" id="localnetmask">
                             <?php for ($i = 127; $i >= 0; $i--): ?>
-                            <option value="<?=$i;?>" <?php if ($i == $pconfig['localnetmask']) echo "selected"; ?>>
+                            <option value="<?=$i;?>" <?php if ($i == ($pconfig['localnetmask'] ?? null)) echo "selected"; ?>>
                             <?=$i;?>
                             </option>
                             <?php endfor; ?>
@@ -407,11 +413,11 @@ function methodsel_change() {
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">Remote subnet</td>
                   <td width="78%" class="vtable"> 
-                    <?=$mandfldhtml;?><input name="remotenet" type="text" class="formfld" id="remotenet" size="20" value="<?=$pconfig['remotenet'];?>">
+                    <?=$mandfldhtml;?><input name="remotenet" type="text" class="formfld" id="remotenet" size="20" value="<?=$pconfig['remotenet'] ?? '';?>">
                     / 
                     <select name="remotebits" class="formfld" id="remotebits">
                       <?php for ($i = 128; $i >= 0; $i--): ?>
-                      <option value="<?=$i;?>" <?php if ($i == $pconfig['remotebits']) echo "selected"; ?>> 
+                      <option value="<?=$i;?>" <?php if ($i == ($pconfig['remotebits'] ?? null)) echo "selected"; ?>> 
                       <?=$i;?>
                       </option>
                       <?php endfor; ?>
@@ -420,14 +426,14 @@ function methodsel_change() {
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">Remote gateway</td>
                   <td width="78%" class="vtable"> 
-                    <?=$mandfldhtml;?><input name="remotegw" type="text" class="formfld" id="remotegw" size="20" value="<?=$pconfig['remotegw'];?>"> 
+                    <?=$mandfldhtml;?><input name="remotegw" type="text" class="formfld" id="remotegw" size="20" value="<?=$pconfig['remotegw'] ?? '';?>"> 
                     <br>
                     Enter the public IP address or host name of the remote gateway. For ipv6, use an ipv6 IP address.</td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncell">Description</td>
                   <td width="78%" class="vtable"> 
-                    <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr']);?>"> 
+                    <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr'] ?? '');?>"> 
                     <br> <span class="vexpl">You may enter a description here 
                     for your reference (not parsed).</span></td>
                 </tr>
@@ -443,7 +449,7 @@ function methodsel_change() {
                   <td width="78%" class="vtable">
 					<select name="p1mode" class="formfld">
                       <?php $modes = explode(" ", "main aggressive"); foreach ($modes as $mode): ?>
-                      <option value="<?=$mode;?>" <?php if ($mode == $pconfig['p1mode']) echo "selected"; ?>> 
+                      <option value="<?=$mode;?>" <?php if ($mode == ($pconfig['p1mode'] ?? null)) echo "selected"; ?>> 
                       <?=htmlspecialchars($mode);?>
                       </option>
                       <?php endforeach; ?>
@@ -455,11 +461,11 @@ function methodsel_change() {
                   <td width="78%" class="vtable">
 					<select name="p1myidentt" class="formfld">
                       <?php foreach ($my_identifier_list as $mode => $modename): ?>
-                      <option value="<?=$mode;?>" <?php if ($mode == $pconfig['p1myidentt']) echo "selected"; ?>> 
+                      <option value="<?=$mode;?>" <?php if ($mode == ($pconfig['p1myidentt'] ?? null)) echo "selected"; ?>> 
                       <?=htmlspecialchars($modename);?>
                       </option>
                       <?php endforeach; ?>
-                    </select> <input name="p1myident" type="text" class="formfld" id="p1myident" size="30" value="<?=$pconfig['p1myident'];?>"> 
+                    </select> <input name="p1myident" type="text" class="formfld" id="p1myident" size="30" value="<?=$pconfig['p1myident'] ?? '';?>"> 
                   </td>
                 </tr>
                 <tr> 
@@ -467,7 +473,7 @@ function methodsel_change() {
                   <td width="78%" class="vtable">
 					<select name="p1ealgo" class="formfld">
                       <?php foreach ($p1_ealgos as $algo => $algoname): ?>
-                      <option value="<?=$algo;?>" <?php if ($algo == $pconfig['p1ealgo']) echo "selected"; ?>> 
+                      <option value="<?=$algo;?>" <?php if ($algo == ($pconfig['p1ealgo'] ?? null)) echo "selected"; ?>> 
                       <?=htmlspecialchars($algoname);?>
                       </option>
                       <?php endforeach; ?>
@@ -479,7 +485,7 @@ function methodsel_change() {
                   <td width="78%" class="vtable">
 					<select name="p1halgo" class="formfld">
                       <?php foreach ($p1_halgos as $algo => $algoname): ?>
-                      <option value="<?=$algo;?>" <?php if ($algo == $pconfig['p1halgo']) echo "selected"; ?>> 
+                      <option value="<?=$algo;?>" <?php if ($algo == ($pconfig['p1halgo'] ?? null)) echo "selected"; ?>> 
                       <?=htmlspecialchars($algoname);?>
                       </option>
                       <?php endforeach; ?>
@@ -491,7 +497,7 @@ function methodsel_change() {
                   <td width="78%" class="vtable">
 					<select name="p1dhgroup" class="formfld">
                       <?php foreach ($p1_keygroups as $keygroup => $keygroupname): ?>
-                      <option value="<?=$keygroup;?>" <?php if ($keygroup == $pconfig['p1dhgroup']) echo "selected"; ?>> 
+                      <option value="<?=$keygroup;?>" <?php if ($keygroup == ($pconfig['p1dhgroup'] ?? null)) echo "selected"; ?>> 
                       <?=htmlspecialchars($keygroupname);?>
                       </option>
                       <?php endforeach; ?>
@@ -501,7 +507,7 @@ function methodsel_change() {
                 <tr> 
                   <td width="22%" valign="top" class="vncell">Lifetime</td>
                   <td width="78%" class="vtable"> 
-                    <input name="p1lifetime" type="text" class="formfld" id="p1lifetime" size="20" value="<?=$pconfig['p1lifetime'];?>">
+                    <input name="p1lifetime" type="text" class="formfld" id="p1lifetime" size="20" value="<?=$pconfig['p1lifetime'] ?? '';?>">
                     seconds</td>
                 </tr>
                 <tr> 
@@ -509,7 +515,7 @@ function methodsel_change() {
                   <td width="78%" class="vtable">
 					<select name="p1authentication_method" class="formfld" onChange="methodsel_change()">
                       <?php foreach ($p1_authentication_methods as $method => $methodname): ?>
-                      <option value="<?=$method;?>" <?php if ($method == $pconfig['p1authentication_method']) echo "selected"; ?>> 
+                      <option value="<?=$method;?>" <?php if ($method == ($pconfig['p1authentication_method'] ?? null)) echo "selected"; ?>> 
                       <?=htmlspecialchars($methodname);?>
                       </option>
                       <?php endforeach; ?>
@@ -519,27 +525,27 @@ function methodsel_change() {
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">Pre-Shared Key</td>
                   <td width="78%" class="vtable"> 
-                    <?=$mandfldhtml;?><input name="p1pskey" type="text" class="formfld" id="p1pskey" size="40" value="<?=htmlspecialchars($pconfig['p1pskey']);?>"> 
+                    <?=$mandfldhtml;?><input name="p1pskey" type="text" class="formfld" id="p1pskey" size="40" value="<?=htmlspecialchars($pconfig['p1pskey'] ?? '');?>"> 
                   </td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">Certificate</td>
                   <td width="78%" class="vtable"> 
-                    <textarea name="p1cert" cols="65" rows="7" id="p1cert" class="formpre"><?=htmlspecialchars($pconfig['p1cert']);?></textarea>
+                    <textarea name="p1cert" cols="65" rows="7" id="p1cert" class="formpre"><?=htmlspecialchars($pconfig['p1cert'] ?? '');?></textarea>
                     <br> 
                     Paste a certificate in X.509 PEM format here.</td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">Key</td>
                   <td width="78%" class="vtable"> 
-                    <textarea name="p1privatekey" cols="65" rows="7" id="p1privatekey" class="formpre"><?=htmlspecialchars($pconfig['p1privatekey']);?></textarea>
+                    <textarea name="p1privatekey" cols="65" rows="7" id="p1privatekey" class="formpre"><?=htmlspecialchars($pconfig['p1privatekey'] ?? '');?></textarea>
                     <br> 
                     Paste an RSA private key in PEM format here.</td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncell">Peer certificate</td>
                   <td width="78%" class="vtable"> 
-                    <textarea name="p1peercert" cols="65" rows="7" id="p1peercert" class="formpre"><?=htmlspecialchars($pconfig['p1peercert']);?></textarea>
+                    <textarea name="p1peercert" cols="65" rows="7" id="p1peercert" class="formpre"><?=htmlspecialchars($pconfig['p1peercert'] ?? '');?></textarea>
                     <br> 
                     Paste the peer X.509 certificate in PEM format here.<br>
                     Leave this blank if you want to use a CA certificate for identity validation.</td>
@@ -556,7 +562,7 @@ function methodsel_change() {
                   <td width="78%" class="vtable">
 					<select name="p2proto" class="formfld">
                       <?php foreach ($p2_protos as $proto => $protoname): ?>
-                      <option value="<?=$proto;?>" <?php if ($proto == $pconfig['p2proto']) echo "selected"; ?>> 
+                      <option value="<?=$proto;?>" <?php if ($proto == ($pconfig['p2proto'] ?? null)) echo "selected"; ?>> 
                       <?=htmlspecialchars($protoname);?>
                       </option>
                       <?php endforeach; ?>
@@ -567,7 +573,7 @@ function methodsel_change() {
                   <td width="22%" valign="top" class="vncellreq">Encryption algorithms</td>
                   <td width="78%" class="vtable"> 
                     <?php foreach ($p2_ealgos as $algo => $algoname): ?>
-                    <input type="checkbox" name="p2ealgos[]" value="<?=$algo;?>" <?php if (in_array($algo, $pconfig['p2ealgos'])) echo "checked"; ?>> 
+                    <input type="checkbox" name="p2ealgos[]" value="<?=$algo;?>" <?php if (in_array($algo, $pconfig['p2ealgos'] ?? array())) echo "checked"; ?>> 
                     <?=htmlspecialchars($algoname);?>
                     <br> 
                     <?php endforeach; ?>
@@ -580,7 +586,7 @@ function methodsel_change() {
                   <td width="22%" valign="top" class="vncellreq">Hash algorithms</td>
                   <td width="78%" class="vtable"> 
                     <?php foreach ($p2_halgos as $algo => $algoname): ?>
-                    <input type="checkbox" name="p2halgos[]" value="<?=$algo;?>" <?php if (in_array($algo, $pconfig['p2halgos'])) echo "checked"; ?>> 
+                    <input type="checkbox" name="p2halgos[]" value="<?=$algo;?>" <?php if (in_array($algo, $pconfig['p2halgos'] ?? array())) echo "checked"; ?>> 
                     <?=htmlspecialchars($algoname);?>
                     <br> 
                     <?php endforeach; ?>
@@ -591,7 +597,7 @@ function methodsel_change() {
                   <td width="78%" class="vtable">
 					<select name="p2pfsgroup" class="formfld">
                       <?php foreach ($p2_pfskeygroups as $keygroup => $keygroupname): ?>
-                      <option value="<?=$keygroup;?>" <?php if ($keygroup == $pconfig['p2pfsgroup']) echo "selected"; ?>> 
+                      <option value="<?=$keygroup;?>" <?php if ($keygroup == ($pconfig['p2pfsgroup'] ?? null)) echo "selected"; ?>> 
                       <?=htmlspecialchars($keygroupname);?>
                       </option>
                       <?php endforeach; ?>
@@ -600,14 +606,14 @@ function methodsel_change() {
                 <tr> 
                   <td width="22%" valign="top" class="vncell">Lifetime</td>
                   <td width="78%" class="vtable"> 
-                    <input name="p2lifetime" type="text" class="formfld" id="p2lifetime" size="20" value="<?=$pconfig['p2lifetime'];?>">
+                    <input name="p2lifetime" type="text" class="formfld" id="p2lifetime" size="20" value="<?=$pconfig['p2lifetime'] ?? '';?>">
                     seconds</td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top">&nbsp;</td>
                   <td width="78%"> 
                     <input name="Submit" type="submit" class="formbtn" value="Save"> 
-                    <?php if (isset($id) && $a_ipsec[$id]): ?>
+                    <?php if (isset($id) && !empty($a_ipsec[$id])): ?>
                     <input name="id" type="hidden" value="<?=htmlspecialchars($id);?>"> 
                     <?php endif; ?>
                   </td>

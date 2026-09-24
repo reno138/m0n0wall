@@ -41,7 +41,7 @@ function clientcmp($a, $b) {
 
 voucher_lock();
 
-if (!is_array($config['voucher']['roll'])) {
+if (!is_array($config['voucher']['roll'] ?? null)) {
     $config['voucher']['roll'] = array();
 }
 $a_roll = &$config['voucher']['roll'];
@@ -53,7 +53,7 @@ foreach($a_roll as $rollent) {
     $minutes = $rollent['minutes'];
     $active_vouchers = voucher_read_active_db($roll);
     foreach($active_vouchers as $voucher => $line) {
-        list($timestamp, $minutes) = explode(",", $line);
+        list($timestamp, $minutes) = array_pad(explode(",", $line), 2, null);
         $remaining = (($timestamp + 60*$minutes) - time());
         if ($remaining > 0) {
             $dbent[0] = $voucher;
@@ -66,7 +66,7 @@ foreach($a_roll as $rollent) {
     }
 }
 
-if ($_GET['order']) { 
+if (!empty($_GET['order'])) { 
     $order = $_GET['order'];
     usort($db, "clientcmp");
 }
@@ -91,11 +91,11 @@ $tabs = array('Users' => 'status_captiveportal.php',
 
 <table width="100%" border="0" cellpadding="0" cellspacing="0" summary="content pane">
   <tr>
-    <td class="listhdrr"><a href="?order=0&showact=<?=htmlspecialchars($_GET['showact']);?>">Voucher</a></td>
-    <td class="listhdrr"><a href="?order=1&showact=<?=htmlspecialchars($_GET['showact']);?>">Roll</a></td>
-    <td class="listhdrr"><a href="?order=2&showact=<?=htmlspecialchars($_GET['showact']);?>">Activated at</a></td>
-    <td class="listhdrr"><a href="?order=3&showact=<?=htmlspecialchars($_GET['showact']);?>">Expires in</a></td>
-    <td class="listhdr"><a href="?order=4&showact=<?=htmlspecialchars($_GET['showact']);?>">Expires at</a></td>
+    <td class="listhdrr"><a href="?order=0&showact=<?=htmlspecialchars($_GET['showact'] ?? '');?>">Voucher</a></td>
+    <td class="listhdrr"><a href="?order=1&showact=<?=htmlspecialchars($_GET['showact'] ?? '');?>">Roll</a></td>
+    <td class="listhdrr"><a href="?order=2&showact=<?=htmlspecialchars($_GET['showact'] ?? '');?>">Activated at</a></td>
+    <td class="listhdrr"><a href="?order=3&showact=<?=htmlspecialchars($_GET['showact'] ?? '');?>">Expires in</a></td>
+    <td class="listhdr"><a href="?order=4&showact=<?=htmlspecialchars($_GET['showact'] ?? '');?>">Expires at</a></td>
     <td class="list"></td>
   </tr>
 <?php foreach ($db as $dbent): ?>

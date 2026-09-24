@@ -45,7 +45,7 @@ if ($_POST) {
 	$reqdfieldsn = explode(",", "Host,ttl");
 	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 
-	if (!is_numericint($_POST['ttl']) || ($_POST['ttl'] < 1) || ($_POST['ttl'] > MAX_TTL)) {
+	if (!is_numericint($_POST['ttl'] ?? '') || (($_POST['ttl'] ?? '') < 1) || (($_POST['ttl'] ?? '') > MAX_TTL)) {
 		$input_errors[] = "Maximum number of hops must be between 1 and {MAX_TTL}";
 	}
 
@@ -53,8 +53,8 @@ if ($_POST) {
 		$do_traceroute = true;
 		$host = $_POST['host'];
 		$ttl = $_POST['ttl'];
-		$resolve = $_POST['resolve'];
-		$ipv6 = $_POST['ipv6'];
+		$resolve = $_POST['resolve'] ?? null;
+		$ipv6 = $_POST['ipv6'] ?? null;
 	}
 }
 if (!isset($do_traceroute)) {
@@ -78,7 +78,7 @@ if (!isset($do_traceroute)) {
   </td></tr>
   <tr> 
     <td class="tabcont">
-<?php if ($input_errors) print_input_errors($input_errors); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
 			<form action="diag_traceroute.php" method="post" name="iform" id="iform">
 			  <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="content pane">
                 <tr>

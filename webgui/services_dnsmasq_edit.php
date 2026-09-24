@@ -32,23 +32,23 @@
 $pgtitle = array("Services", "DNS forwarder", "Edit host");
 require("guiconfig.inc");
 
-if (!is_array($config['dnsmasq']['hosts'])) {
+if (!is_array($config['dnsmasq']['hosts'] ?? null)) {
 	$config['dnsmasq']['hosts'] = array();
 }
 hosts_sort();
 $a_hosts = &$config['dnsmasq']['hosts'];
 
-$id = $_GET['id'];
+$id = $_GET['id'] ?? null;
 if (isset($_POST['id']))
 	$id = $_POST['id'];
 
-if (isset($id) && $a_hosts[$id]) {
-	$pconfig['host'] = $a_hosts[$id]['host'];
-	$pconfig['domain'] = $a_hosts[$id]['domain'];
-	$pconfig['ip'] = $a_hosts[$id]['ip'];
-	$pconfig['aliases'] = $a_hosts[$id]['aliases'];
+if (isset($id) && !empty($a_hosts[$id])) {
+	$pconfig['host'] = $a_hosts[$id]['host'] ?? null;
+	$pconfig['domain'] = $a_hosts[$id]['domain'] ?? null;
+	$pconfig['ip'] = $a_hosts[$id]['ip'] ?? null;
+	$pconfig['aliases'] = $a_hosts[$id]['aliases'] ?? null;
 	$pconfig['mx'] = isset($a_hosts[$id]['mx']);
-	$pconfig['descr'] = $a_hosts[$id]['descr'];
+	$pconfig['descr'] = $a_hosts[$id]['descr'] ?? null;
 }
 
 if ($_POST) {
@@ -62,44 +62,44 @@ if ($_POST) {
 	
 	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
-	if (($_POST['host'] && (!is_hostname($_POST['host'])) && ($_POST['host'] != '*') )) {
+	if ((!empty($_POST['host']) && (!is_hostname($_POST['host'])) && ($_POST['host'] != '*') )) {
 		$input_errors[] = "A valid host must be specified.";
 	}
-	if (($_POST['domain'] && !is_domain($_POST['domain']))) {
+	if ((!empty($_POST['domain']) && !is_domain($_POST['domain']))) {
 		$input_errors[] = "A valid domain must be specified.";
 	}
-	if (($_POST['ip'] && !is_ipaddr4or6($_POST['ip']))) {
+	if ((!empty($_POST['ip']) && !is_ipaddr4or6($_POST['ip']))) {
 			$input_errors[] = "A valid IP address must be specified.";
 	}
 
 	/* check for overlaps */
 	foreach ($a_hosts as $hostent) {
-		if (isset($id) && ($a_hosts[$id]) && ($a_hosts[$id] === $hostent))
+		if (isset($id) && (!empty($a_hosts[$id])) && ($a_hosts[$id] === $hostent))
 			continue;
 
-		if (($hostent['aliases']) && ($_POST['aliases'])) {
+		if ((!empty($hostent['aliases'])) && (!empty($_POST['aliases']))) {
 			$duplicates = array_intersect(explode(' ', $hostent['aliases']), explode(' ', $_POST['aliases']));
 			if (count($duplicates)) {
 				$input_errors[] = 'The alias(es) '. implode(', ', $duplicates) . ' already exists.';
 				break;
 			}
 		}
-		if (($hostent['host'] == $_POST['host']) && ($hostent['domain'] == $_POST['domain']) && ((is_ipaddr($_POST['ip']) && is_ipaddr($hostent['ip'])) || (is_ipaddr6($_POST['ip']) && is_ipaddr6($hostent['ip'])) )) {
+		if ((($hostent['host'] ?? null) == ($_POST['host'] ?? null)) && (($hostent['domain'] ?? null) == ($_POST['domain'] ?? null)) && ((is_ipaddr($_POST['ip'] ?? '') && is_ipaddr($hostent['ip'] ?? '')) || (is_ipaddr6($_POST['ip'] ?? '') && is_ipaddr6($hostent['ip'] ?? '')) )) {
 			$input_errors[] = "This host/domain already exists.";
 			break;
 		}
 	}
 
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 		$hostent = array();
-		$hostent['host'] = $_POST['host'];
-		$hostent['domain'] = $_POST['domain'];
-		$hostent['ip'] = $_POST['ip'];
-		$hostent['aliases'] = $_POST['aliases'];
-		$hostent['mx'] = ($_POST['mx']) ? true : false;
-		$hostent['descr'] = $_POST['descr'];
+		$hostent['host'] = $_POST['host'] ?? null;
+		$hostent['domain'] = $_POST['domain'] ?? null;
+		$hostent['ip'] = $_POST['ip'] ?? null;
+		$hostent['aliases'] = $_POST['aliases'] ?? null;
+		$hostent['mx'] = (!empty($_POST['mx'])) ? true : false;
+		$hostent['descr'] = $_POST['descr'] ?? null;
 
-		if (isset($id) && $a_hosts[$id])
+		if (isset($id) && !empty($a_hosts[$id]))
 			$a_hosts[$id] = $hostent;
 		else
 			$a_hosts[] = $hostent;
@@ -114,13 +114,13 @@ if ($_POST) {
 }
 ?>
 <?php include("fbegin.inc"); ?>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
             <form action="services_dnsmasq_edit.php" method="post" name="iform" id="iform">
               <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="content pane">
                 <tr>
                   <td width="22%" valign="top" class="vncell">Host</td>
                   <td width="78%" class="vtable"> 
-                    <input name="host" type="text" class="formfld" id="host" size="40" value="<?=htmlspecialchars($pconfig['host']);?>">
+                    <input name="host" type="text" class="formfld" id="host" size="40" value="<?=htmlspecialchars($pconfig['host'] ?? '');?>">
                     <br> <span class="vexpl">Name of the host, without
                     domain part, or * for wildcard.<br>
                     e.g. <em>myhost</em></span></td>
@@ -128,21 +128,21 @@ if ($_POST) {
 				<tr>
                   <td width="22%" valign="top" class="vncellreq">Domain</td>
                   <td width="78%" class="vtable"> 
-                    <?=$mandfldhtml;?><input name="domain" type="text" class="formfld" id="domain" size="40" value="<?=htmlspecialchars($pconfig['domain']);?>">
+                    <?=$mandfldhtml;?><input name="domain" type="text" class="formfld" id="domain" size="40" value="<?=htmlspecialchars($pconfig['domain'] ?? '');?>">
                     <br> <span class="vexpl">Domain of the host<br>
                     e.g. <em>blah.com</em></span></td>
                 </tr>
 				<tr>
                   <td width="22%" valign="top" class="vncellreq">IP address</td>
                   <td width="78%" class="vtable"> 
-                    <?=$mandfldhtml;?><input name="ip" type="text" class="formfld" id="ip" size="40" value="<?=htmlspecialchars($pconfig['ip']);?>">
+                    <?=$mandfldhtml;?><input name="ip" type="text" class="formfld" id="ip" size="40" value="<?=htmlspecialchars($pconfig['ip'] ?? '');?>">
                     <br> <span class="vexpl">IP address of the host<br>
                     e.g. <em>192.168.100.100</em></span></td>
                 </tr>
                 <tr>
                   <td width="22%" valign="top" class="vncell">Aliases</td>
                   <td width="78%" class="vtable"> 
-                    <input name="aliases" type="text" class="formfld" id="aliases" size="40" value="<?=htmlspecialchars($pconfig['aliases']);?>">
+                    <input name="aliases" type="text" class="formfld" id="aliases" size="40" value="<?=htmlspecialchars($pconfig['aliases'] ?? '');?>">
                     <br> <span class="vexpl">Aliases to the host, without
                     domain part, and separated by spaces.<br>
                     e.g. <em>mail smtp pop imap</em></span></td>
@@ -150,13 +150,13 @@ if ($_POST) {
                 <tr>
                   <td width="22%" valign="top" class="vncell">Extra settings</td>
                   <td width="78%" class="vtable"> 
-                    <input name="mx" type="checkbox" id="mx" value="yes" <?php if ($pconfig['mx']) echo "checked";?>>
+                    <input name="mx" type="checkbox" id="mx" value="yes" <?php if (!empty($pconfig['mx'])) echo "checked";?>>
                     This host is the MX for its domain.</td>
                 </tr>
 				<tr>
                   <td width="22%" valign="top" class="vncell">Description</td>
                   <td width="78%" class="vtable"> 
-                    <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr']);?>">
+                    <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr'] ?? '');?>">
                     <br> <span class="vexpl">You may enter a description here
                     for your reference (not parsed).</span></td>
                 </tr>
@@ -164,7 +164,7 @@ if ($_POST) {
                   <td width="22%" valign="top">&nbsp;</td>
                   <td width="78%"> 
                     <input name="Submit" type="submit" class="formbtn" value="Save">
-                    <?php if (isset($id) && $a_hosts[$id]): ?>
+                    <?php if (isset($id) && !empty($a_hosts[$id])): ?>
                     <input name="id" type="hidden" value="<?=htmlspecialchars($id);?>">
                     <?php endif; ?>
                   </td>

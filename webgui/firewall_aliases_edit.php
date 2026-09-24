@@ -32,20 +32,22 @@
 $pgtitle = array("Firewall", "Aliases", "Edit alias");
 require("guiconfig.inc");
 
-if (!is_array($config['aliases']['alias']))
+if (!is_array($config['aliases']['alias'] ?? null))
 	$config['aliases']['alias'] = array();
 
 aliases_sort();
 $a_aliases = &$config['aliases']['alias'];
 
-$id = $_GET['id'];
+$id = $_GET['id'] ?? null;
 if (isset($_POST['id']))
 	$id = $_POST['id'];
 
-if (isset($id) && $a_aliases[$id]) {
+if (isset($id) && !empty($a_aliases[$id])) {
 	$pconfig['name'] = $a_aliases[$id]['name'];
-	list($pconfig['address'],$pconfig['address_subnet']) = 
-		explode('/', $a_aliases[$id]['address']);
+	/* a host alias has no /bits part -> explode() returns one element */
+	$addrparts = explode('/', $a_aliases[$id]['address'] ?? '');
+	$pconfig['address'] = $addrparts[0] ?? null;
+	$pconfig['address_subnet'] = $addrparts[1] ?? null;
 	if ($pconfig['address_subnet'])
 		$pconfig['type'] = "network";
 	else
@@ -62,44 +64,44 @@ if ($_POST) {
 	$reqdfields = explode(" ", "name address");
 	$reqdfieldsn = explode(",", "Name,Address");
 	
-	if ($_POST['type'] == "network") {
+	if (($_POST['type'] ?? null) == "network") {
 		$reqdfields[] = "address_subnet";
 		$reqdfieldsn[] = "Subnet bit count";
 	}
 	
 	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
-	if (($_POST['name'] && !is_validaliasname($_POST['name']))) {
+	if ((!empty($_POST['name']) && !is_validaliasname($_POST['name']))) {
 		$input_errors[] = "The alias name may only consist of the characters a-z, A-Z, 0-9 and '-' (dash).";
 	}
-	if (($_POST['address'] && !is_ipaddr($_POST['address']))) {
+	if ((!empty($_POST['address']) && !is_ipaddr($_POST['address']))) {
 		$input_errors[] = "A valid address must be specified.";
 	}
-	if (($_POST['address_subnet'] && !is_numeric($_POST['address_subnet']))) {
+	if ((!empty($_POST['address_subnet']) && !is_numeric($_POST['address_subnet']))) {
 		$input_errors[] = "A valid subnet bit count must be specified.";
 	}
 	
 	/* check for name conflicts */
 	foreach ($a_aliases as $alias) {
-		if (isset($id) && ($a_aliases[$id]) && ($a_aliases[$id] === $alias))
+		if (isset($id) && (!empty($a_aliases[$id])) && ($a_aliases[$id] === $alias))
 			continue;
 
-		if ($alias['name'] == $_POST['name']) {
+		if (($alias['name'] ?? null) == ($_POST['name'] ?? null)) {
 			$input_errors[] = "An alias with this name already exists.";
 			break;
 		}
 	}
 
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 		$alias = array();
 		$alias['name'] = $_POST['name'];
-		if ($_POST['type'] == "network")
+		if (($_POST['type'] ?? null) == "network")
 			$alias['address'] = $_POST['address'] . "/" . $_POST['address_subnet'];
 		else
 			$alias['address'] = $_POST['address'];
-		$alias['descr'] = $_POST['descr'];
+		$alias['descr'] = $_POST['descr'] ?? null;
 
-		if (isset($id) && $a_aliases[$id])
+		if (isset($id) && !empty($a_aliases[$id]))
 			$a_aliases[$id] = $alias;
 		else
 			$a_aliases[] = $alias;
@@ -129,12 +131,12 @@ function typesel_change() {
 }
 //-->
 </script>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
             <form action="firewall_aliases_edit.php" method="post" name="iform" id="iform">
               <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="content pane">
                 <tr> 
                   <td valign="top" class="vncellreq">Name</td>
-                  <td class="vtable"><?=$mandfldhtml;?><input name="name" type="text" class="formfld" id="name" size="40" value="<?=htmlspecialchars($pconfig['name']);?>"> 
+                  <td class="vtable"><?=$mandfldhtml;?><input name="name" type="text" class="formfld" id="name" size="40" value="<?=htmlspecialchars($pconfig['name'] ?? '');?>"> 
                     <br> <span class="vexpl">The name of the alias may only consist 
                     of the characters a-z, A-Z, 0-9 and '-' (dash).</span></td>
                 </tr>
@@ -142,18 +144,18 @@ function typesel_change() {
                   <td valign="top" class="vncellreq">Type</td>
                   <td class="vtable"> 
                     <select name="type" class="formfld" id="type" onChange="typesel_change()">
-                      <option value="host" <?php if ($pconfig['type'] == "host") echo "selected"; ?>>Host</option>
-                      <option value="network" <?php if ($pconfig['type'] == "network") echo "selected"; ?>>Network</option>
+                      <option value="host" <?php if (($pconfig['type'] ?? null) == "host") echo "selected"; ?>>Host</option>
+                      <option value="network" <?php if (($pconfig['type'] ?? null) == "network") echo "selected"; ?>>Network</option>
                     </select>
                   </td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">Address</td>
-                  <td width="78%" class="vtable"><?=$mandfldhtml;?><input name="address" type="text" class="formfld" id="address" size="20" value="<?=htmlspecialchars($pconfig['address']);?>">
+                  <td width="78%" class="vtable"><?=$mandfldhtml;?><input name="address" type="text" class="formfld" id="address" size="20" value="<?=htmlspecialchars($pconfig['address'] ?? '');?>">
                     / 
                     <select name="address_subnet" class="formfld" id="address_subnet">
                       <?php for ($i = 32; $i >= 1; $i--): ?>
-                      <option value="<?=$i;?>" <?php if ($i == $pconfig['address_subnet']) echo "selected"; ?>> 
+                      <option value="<?=$i;?>" <?php if ($i == ($pconfig['address_subnet'] ?? null)) echo "selected"; ?>> 
                       <?=$i;?>
                       </option>
                       <?php endfor; ?>
@@ -162,14 +164,14 @@ function typesel_change() {
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncell">Description</td>
-                  <td width="78%" class="vtable"> <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr']);?>"> 
+                  <td width="78%" class="vtable"> <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr'] ?? '');?>"> 
                     <br> <span class="vexpl">You may enter a description here 
                     for your reference (not parsed).</span></td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top">&nbsp;</td>
                   <td width="78%"> <input name="Submit" type="submit" class="formbtn" value="Save"> 
-                    <?php if (isset($id) && $a_aliases[$id]): ?>
+                    <?php if (isset($id) && !empty($a_aliases[$id])): ?>
                     <input name="id" type="hidden" value="<?=htmlspecialchars($id);?>"> 
                     <?php endif; ?>
                   </td>

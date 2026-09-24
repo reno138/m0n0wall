@@ -652,10 +652,10 @@ function vpn_ipsec_l2tp_configure() {
 	global $config, $g;
 	
 	$syscfg = $config['system'];
-	$l2tpdcfg = $config['l2tp'];
+	$l2tpdcfg = $config['l2tp'] ?? array();
 	
 	if ($g['booting']) {
-		if (!$l2tpdcfg['mode'] || ($l2tpdcfg['mode'] == "off"))
+		if (empty($l2tpdcfg['mode']) || ($l2tpdcfg['mode'] == "off"))
 			return 0;
 		
 		echo "Configuring L2TP VPN service... ";
@@ -675,7 +675,7 @@ function vpn_ipsec_l2tp_configure() {
 	if (!file_exists("{$g['varetc_path']}/mpd-vpn-l2tp"))
 		mkdir("{$g['varetc_path']}/mpd-vpn-l2tp");
 		
-	switch ($l2tpdcfg['mode']) {
+	switch ($l2tpdcfg['mode'] ?? null) {
 		
 		case 'server':
 			
@@ -686,12 +686,13 @@ function vpn_ipsec_l2tp_configure() {
 				return 1;
 			}
 			
-			$nunits = $l2tpdcfg['nunits'];
+			$nunits = $l2tpdcfg['nunits'] ?? null;
 			if (!$nunits)
 				$nunits = 16;
 			
-			$startip = $l2tpdcfg['remoteip'];
-			$endip = long2ip(ip2long($l2tpdcfg['remoteip']) + $nunits - 1);
+			$startip = $l2tpdcfg['remoteip'] ?? '';
+			$endip = long2ip(ip2long($startip) + $nunits - 1);
+			$localip = $l2tpdcfg['localip'] ?? '';
 			
 			$mpdconf = <<<EOD
 startup:
@@ -709,19 +710,19 @@ l2tp:
 	set iface down-script /usr/local/sbin/vpn-linkdown
 	
 	set ipcp yes vjcomp
-	set ipcp ranges {$l2tpdcfg['localip']} ippool pool2
+	set ipcp ranges {$localip} ippool pool2
 
 EOD;
 			
 			$dnsservers = array();
 			
-			if (is_array($l2tpdcfg['dnsserver']) && ($l2tpdcfg['dnsserver'][0])) {
+			if (is_array($l2tpdcfg['dnsserver'] ?? null) && !empty($l2tpdcfg['dnsserver'][0])) {
 				$dnsservers = array_filter($l2tpdcfg['dnsserver'], "is_ipaddr");
 			} else if (isset($config['dnsmasq']['enable'])) {
 				$dnsservers[] = $config['interfaces']['lan']['ipaddr'];
-				if ($syscfg['dnsserver'][0] && is_ipaddr($syscfg['dnsserver'][0]))
+				if (!empty($syscfg['dnsserver'][0]) && is_ipaddr($syscfg['dnsserver'][0]))
 					$dnsservers[] =  $syscfg['dnsserver'][0];
-			} else if (is_array($syscfg['dnsserver']) && ($syscfg['dnsserver'][0])) {
+			} else if (is_array($syscfg['dnsserver'] ?? null) && !empty($syscfg['dnsserver'][0])) {
 				$dnsservers = array_slice(array_filter($syscfg['dnsserver'], "is_ipaddr"), 0, 2);
 			}
 			
@@ -745,8 +746,10 @@ EOD;
 			
 			
 			if (isset($l2tpdcfg['radius']['enable'])) {
+				$radiusserver = $l2tpdcfg['radius']['server'] ?? '';
+				$radiussecret = $l2tpdcfg['radius']['secret'] ?? '';
 				$mpdconf .= <<<EOD
-	set radius server {$l2tpdcfg['radius']['server']} "{$l2tpdcfg['radius']['secret']}"
+	set radius server {$radiusserver} "{$radiussecret}"
 	set radius retries 3
 	set radius timeout 10
 	set auth enable radius-auth
@@ -775,9 +778,13 @@ EOD;
 			
 			$mpdsecret = "";
 			
-			if (is_array($l2tpdcfg['user'])) {
-				foreach ($l2tpdcfg['user'] as $user)
-					$mpdsecret .= "{$user['name']} \"{$user['password']}\" {$user['ip']}\n";
+			if (is_array($l2tpdcfg['user'] ?? null)) {
+				foreach ($l2tpdcfg['user'] as $user) {
+					$uname = $user['name'] ?? '';
+					$upassword = $user['password'] ?? '';
+					$uip = $user['ip'] ?? '';
+					$mpdsecret .= "{$uname} \"{$upassword}\" {$uip}\n";
+				}
 			}
 
 			fwrite($fd, $mpdsecret);
@@ -811,7 +818,7 @@ function vpn_localnet_determine($adr, &$sa, &$sn,$rgip) {
 	global $config, $g;
 
 	if (isset($adr)) {
-		if ($adr['network']) {			
+		if (!empty($adr['network'])) {			
 			switch ($adr['network']) {
 				case 'lan':
 					if (ipv6enabled() && (is_ipaddr6($rgip))) {
@@ -824,8 +831,8 @@ function vpn_localnet_determine($adr, &$sa, &$sn,$rgip) {
 						break;
 					}
 			}
-		} else if ($adr['address']) {
-			list($sa,$sn) = explode("/", $adr['address']);
+		} else if (!empty($adr['address'])) {
+			list($sa,$sn) = array_pad(explode("/", $adr['address']), 2, null);
 			if (is_null($sn))
 				$sn = 32;
 		}
@@ -839,7 +846,7 @@ function vpn_endpoint_determine($tunnel, $curwanip,$rgip) {
 	
 	global $g, $config;
 	
-	if ((!$tunnel['interface']) || ($tunnel['interface'] == "wan")) {
+	if ((empty($tunnel['interface'])) || ($tunnel['interface'] == "wan")) {
 		if ($curwanip)
 			return $curwanip;
 		else
@@ -851,13 +858,13 @@ function vpn_endpoint_determine($tunnel, $curwanip,$rgip) {
 				return $config['interfaces']['lan']['ipaddr'];
 			}
 	} else {
-		$oc = $config['interfaces'][$tunnel['interface']];
+		$oc = $config['interfaces'][$tunnel['interface']] ?? null;
 		
-		if (isset($oc['enable']) && $oc['if']) {
+		if (isset($oc['enable']) && !empty($oc['if'])) {
 			if (ipv6enabled() && (is_ipaddr6($rgip))) {
-				return $oc['ipaddr6'];
+				return $oc['ipaddr6'] ?? null;
 			} else {
-				return $oc['ipaddr'];
+				return $oc['ipaddr'] ?? null;
 			}
 		}
 	}

@@ -35,11 +35,11 @@ require("guiconfig.inc");
 if ($_POST) {
 
 	$savemsg = "";
-	if ($_POST['nattable']) {
+	if (!empty($_POST['nattable'])) {
 		filter_flush_nat_table();
 		$savemsg = "The NAT table has been flushed successfully.";
 	}
-	if ($_POST['statetable']) {
+	if (!empty($_POST['statetable'])) {
 		filter_flush_state_table();
 		if (ipv6enabled())
     		filter_flush_state_table_ipv6();
@@ -50,8 +50,8 @@ if ($_POST) {
 }
 ?>
 <?php include("fbegin.inc"); ?>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
             <form action="diag_resetstate.php" method="post" name="iform" id="iform">
               <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="content pane">
                 <tr> 

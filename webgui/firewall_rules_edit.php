@@ -31,7 +31,7 @@
 
 require("guiconfig.inc");
 
-if ($ipv6rules = ($_GET['type'] == 'ipv6')) {
+if ($ipv6rules = (($_GET['type'] ?? null) == 'ipv6')) {
 	$configname = 'rule6';
 	$typelink = '&type=ipv6';
 	$maxnetmask = 128;
@@ -51,11 +51,11 @@ if (!is_array($config['filter'][$configname])) {
 filter_rules_sort();
 $a_filter = &$config['filter'][$configname];
 
-$id = $_GET['id'];
-if (is_numeric($_POST['id']))
+$id = $_GET['id'] ?? null;
+if (is_numeric($_POST['id'] ?? null))
 	$id = $_POST['id'];
 	
-$after = $_GET['after'];
+$after = $_GET['after'] ?? null;
 
 if (isset($_POST['after']))
 	$after = $_POST['after'];
@@ -79,9 +79,9 @@ function address_to_pconfig($adr, &$padr, &$pmask, &$pnot, &$pbeginport, &$pendp
 		
 	if (isset($adr['any']))
 		$padr = "any";
-	else if ($adr['network'])
+	else if (!empty($adr['network']))
 		$padr = $adr['network'];
-	else if ($adr['address']) {
+	else if (!empty($adr['address'])) {
 		list($padr, $pmask) = explode("/", $adr['address']);
 		if (!$pmask)
 			$pmask = $maxnetmask;
@@ -92,7 +92,7 @@ function address_to_pconfig($adr, &$padr, &$pmask, &$pnot, &$pbeginport, &$pendp
 	else
 		$pnot = 0;
 	
-	if ($adr['port']) {
+	if (!empty($adr['port'])) {
 		list($pbeginport, $pendport) = explode("-", $adr['port']);
 		if (!$pendport)
 			$pendport = $pbeginport;
@@ -127,7 +127,7 @@ function pconfig_to_address(&$adr, $padr, $pmask, $pnot, $pbeginport, $pendport)
 	}
 }
 
-if (isset($id) && $a_filter[$id]) {
+if (isset($id) && !empty($a_filter[$id])) {
 	$pconfig['interface'] = $a_filter[$id]['interface'];
 	
 	if (!isset($a_filter[$id]['type']))
@@ -158,7 +158,7 @@ if (isset($id) && $a_filter[$id]) {
 	
 } else {
 	/* defaults */
-	if ($_GET['if'])
+	if (!empty($_GET['if']))
 		$pconfig['interface'] = $_GET['if'];
 	$pconfig['type'] = "pass";
 	$pconfig['src'] = "any";
@@ -177,9 +177,9 @@ if ($_POST) {
 		$_POST['dstendport'] = 0;
 	} else {
 	
-		if ($_POST['srcbeginport_cust'] && !$_POST['srcbeginport'])
+		if (!empty($_POST['srcbeginport_cust']) && empty($_POST['srcbeginport']))
 			$_POST['srcbeginport'] = $_POST['srcbeginport_cust'];
-		if ($_POST['srcendport_cust'] && !$_POST['srcendport'])
+		if (!empty($_POST['srcendport_cust']) && empty($_POST['srcendport']))
 			$_POST['srcendport'] = $_POST['srcendport_cust'];
 	
 		if ($_POST['srcbeginport'] == "any") {
@@ -192,9 +192,9 @@ if ($_POST) {
 		if ($_POST['srcendport'] == "any")
 			$_POST['srcendport'] = $_POST['srcbeginport'];
 		
-		if ($_POST['dstbeginport_cust'] && !$_POST['dstbeginport'])
+		if (!empty($_POST['dstbeginport_cust']) && empty($_POST['dstbeginport']))
 			$_POST['dstbeginport'] = $_POST['dstbeginport_cust'];
-		if ($_POST['dstendport_cust'] && !$_POST['dstendport'])
+		if (!empty($_POST['dstendport_cust']) && empty($_POST['dstendport']))
 			$_POST['dstendport'] = $_POST['dstendport_cust'];
 		
 		if ($_POST['dstbeginport'] == "any") {
@@ -305,25 +305,25 @@ if ($_POST) {
 		else
 			unset($filterent['protocol']);
 	
-		if (($_POST['proto'] == "icmp" || $_POST['proto'] == "ipv6-icmp") && $_POST['icmptype'])
+		if (($_POST['proto'] == "icmp" || $_POST['proto'] == "ipv6-icmp") && !empty($_POST['icmptype']))
 			$filterent['icmptype'] = $_POST['icmptype'];
 		else
 			unset($filterent['icmptype']);
 		
 		pconfig_to_address($filterent['source'], $_POST['src'],
-			$_POST['srcmask'], $_POST['srcnot'],
+			$_POST['srcmask'], $_POST['srcnot'] ?? null,
 			$_POST['srcbeginport'], $_POST['srcendport']);
 			
 		pconfig_to_address($filterent['destination'], $_POST['dst'],
-			$_POST['dstmask'], $_POST['dstnot'],
+			$_POST['dstmask'], $_POST['dstnot'] ?? null,
 			$_POST['dstbeginport'], $_POST['dstendport']);
 		
-		$filterent['disabled'] = $_POST['disabled'] ? true : false;
-		$filterent['log'] = $_POST['log'] ? true : false;
-		$filterent['frags'] = $_POST['frags'] ? true : false;
+		$filterent['disabled'] = !empty($_POST['disabled']) ? true : false;
+		$filterent['log'] = !empty($_POST['log']) ? true : false;
+		$filterent['frags'] = !empty($_POST['frags']) ? true : false;
 		$filterent['descr'] = $_POST['descr'];
 		
-		if (isset($id) && $a_filter[$id])
+		if (isset($id) && !empty($a_filter[$id]))
 			$a_filter[$id] = $filterent;
 		else {
 			if (is_numeric($after))
@@ -442,7 +442,7 @@ function dst_rep_change() {
 }
 //-->
 </script>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
             <form action="firewall_rules_edit.php<?=($typelink?'?' . $typelink:'')?>" method="post" name="iform" id="iform">
               <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="content pane">
                 <tr> 
@@ -450,7 +450,7 @@ function dst_rep_change() {
                   <td width="78%" class="vtable">
 					<select name="type" class="formfld">
                       <?php $types = explode(" ", "Pass Block Reject"); foreach ($types as $type): ?>
-                      <option value="<?=strtolower($type);?>" <?php if (strtolower($type) == strtolower($pconfig['type'])) echo "selected"; ?>>
+                      <option value="<?=strtolower($type);?>" <?php if (strtolower($type) == strtolower($pconfig['type'] ?? '')) echo "selected"; ?>>
                       <?=htmlspecialchars($type);?>
                       </option>
                       <?php endforeach; ?>
@@ -462,7 +462,7 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">Disabled</td>
                   <td width="78%" class="vtable"> 
-                    <input name="disabled" type="checkbox" id="disabled" value="yes" <?php if ($pconfig['disabled']) echo "checked"; ?>>
+                    <input name="disabled" type="checkbox" id="disabled" value="yes" <?php if (!empty($pconfig['disabled'])) echo "checked"; ?>>
                     <strong>Disable this rule</strong><br>
                     <span class="vexpl">Set this option to disable this rule without
 					removing it from the list.</span></td>
@@ -480,7 +480,7 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
 					  	$interfaces['opt' . $i] = $config['interfaces']['opt' . $i]['descr'];
 					  }
 					  foreach ($interfaces as $iface => $ifacename): ?>
-                      <option value="<?=$iface;?>" <?php if ($iface == $pconfig['interface']) echo "selected"; ?>>
+                      <option value="<?=$iface;?>" <?php if ($iface == ($pconfig['interface'] ?? null)) echo "selected"; ?>>
                       <?=htmlspecialchars($ifacename);?>
                       </option>
                       <?php endforeach; ?>
@@ -497,7 +497,7 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
                             (!$ipv6rules ? 'ICMP IPv6 IGMP' : 'IPv6-ICMP IPv6-NONXT IPv6-OPTS IPv6-ROUTE IPv6-FRAG') .
                             ' ESP AH GRE any');
                         foreach ($protocols as $proto): ?>
-                            <option value="<?=strtolower($proto);?>" <?php if (strtolower($proto) == $pconfig['proto'])
+                            <option value="<?=strtolower($proto);?>" <?php if (strtolower($proto) == ($pconfig['proto'] ?? null))
                             echo "selected"; ?>><?=htmlspecialchars($proto);?></option>
                         <?php endforeach; ?>
                     </select> <br>
@@ -549,7 +549,7 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
                       }
 					  
 					  foreach ($icmptypes as $icmptype => $descr): ?>
-                      <option value="<?=$icmptype;?>" <?php if ($icmptype == $pconfig['icmptype']) echo "selected"; ?>>
+                      <option value="<?=$icmptype;?>" <?php if ($icmptype == ($pconfig['icmptype'] ?? null)) echo "selected"; ?>>
                       <?=htmlspecialchars($descr);?>
                       </option>
                       <?php endforeach; ?>
@@ -560,7 +560,7 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">Source</td>
                   <td width="78%" class="vtable">
-<input name="srcnot" type="checkbox" id="srcnot" value="yes" <?php if ($pconfig['srcnot']) echo "checked"; ?>>
+<input name="srcnot" type="checkbox" id="srcnot" value="yes" <?php if (!empty($pconfig['srcnot'])) echo "checked"; ?>>
                     <strong>not</strong><br>
                     Use this option to invert the sense of the match.<br>
                     <br>
@@ -572,7 +572,7 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
 							<?php $sel = is_specialnet($pconfig['src']); ?>
                             <option value="any" <?php if ($pconfig['src'] == "any") { echo "selected"; } ?>>
                             any</option>
-                            <option value="single" <?php if (($pconfig['srcmask'] == $maxnetmask) && !$sel) { echo "selected"; $sel = 1; } ?>>
+                            <option value="single" <?php if ((($pconfig['srcmask'] ?? null) == $maxnetmask) && !$sel) { echo "selected"; $sel = 1; } ?>>
                             Single host or alias</option>
                             <option value="network" <?php if (!$sel) echo "selected"; ?>>
                             Network</option>
@@ -597,7 +597,7 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
                         /
 						<select name="srcmask" class="formfld" id="srcmask">
 						<?php for ($i = ($maxnetmask - 1); $i > 0; $i--): ?>
-						<option value="<?=$i;?>" <?php if ($i == $pconfig['srcmask']) echo "selected"; ?>><?=$i;?></option>
+						<option value="<?=$i;?>" <?php if ($i == ($pconfig['srcmask'] ?? null)) echo "selected"; ?>><?=$i;?></option>
 						<?php endfor; ?>
 						</select>
 						</td>
@@ -613,31 +613,31 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
                         <td>from:&nbsp;&nbsp;</td>
                         <td><select name="srcbeginport" class="formfld" onchange="src_rep_change();ext_change()">
                             <option value="">(other)</option>
-                            <option value="any" <?php $bfound = 0; if ($pconfig['srcbeginport'] == "any") { echo "selected"; $bfound = 1; } ?>>any</option>
+                            <option value="any" <?php $bfound = 0; if (($pconfig['srcbeginport'] ?? null) == "any") { echo "selected"; $bfound = 1; } ?>>any</option>
                             <?php foreach ($wkports as $wkport => $wkportdesc): ?>
-                            <option value="<?=$wkport;?>" <?php if ($wkport == $pconfig['srcbeginport']) {
+                            <option value="<?=$wkport;?>" <?php if ($wkport == ($pconfig['srcbeginport'] ?? null)) {
 																echo "selected";
 																$bfound = 1;
 															}?>>
                             <?=htmlspecialchars($wkportdesc);?>
                             </option>
                             <?php endforeach; ?>
-                          </select> <input name="srcbeginport_cust" type="text" size="5" value="<?php if (!$bfound && $pconfig['srcbeginport']) echo htmlspecialchars($pconfig['srcbeginport']); ?>"></td>
+                          </select> <input name="srcbeginport_cust" type="text" size="5" value="<?php if (!$bfound && !empty($pconfig['srcbeginport'])) echo htmlspecialchars($pconfig['srcbeginport']); ?>"></td>
                       </tr>
                       <tr> 
                         <td>to:</td>
                         <td><select name="srcendport" class="formfld" onchange="ext_change()">
                             <option value="">(other)</option>
-                            <option value="any" <?php $bfound = 0; if ($pconfig['srcendport'] == "any") { echo "selected"; $bfound = 1; } ?>>any</option>
+                            <option value="any" <?php $bfound = 0; if (($pconfig['srcendport'] ?? null) == "any") { echo "selected"; $bfound = 1; } ?>>any</option>
                             <?php foreach ($wkports as $wkport => $wkportdesc): ?>
-                            <option value="<?=$wkport;?>" <?php if ($wkport == $pconfig['srcendport']) {
+                            <option value="<?=$wkport;?>" <?php if ($wkport == ($pconfig['srcendport'] ?? null)) {
 																echo "selected";
 																$bfound = 1;
 															}?>>
                             <?=htmlspecialchars($wkportdesc);?>
                             </option>
                             <?php endforeach; ?>
-                          </select> <input name="srcendport_cust" type="text" size="5" value="<?php if (!$bfound && $pconfig['srcendport']) echo htmlspecialchars($pconfig['srcendport']); ?>"></td>
+                          </select> <input name="srcendport_cust" type="text" size="5" value="<?php if (!$bfound && !empty($pconfig['srcendport'])) echo htmlspecialchars($pconfig['srcendport']); ?>"></td>
                       </tr>
                     </table>
                     <br> 
@@ -648,7 +648,7 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">Destination</td>
                   <td width="78%" class="vtable"> 
-                    <input name="dstnot" type="checkbox" id="dstnot" value="yes" <?php if ($pconfig['dstnot']) echo "checked"; ?>> 
+                    <input name="dstnot" type="checkbox" id="dstnot" value="yes" <?php if (!empty($pconfig['dstnot'])) echo "checked"; ?>> 
                     <strong>not</strong><br>
                     Use this option to invert the sense of the match.<br>
                     <br>
@@ -660,7 +660,7 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
                             <?php $sel = is_specialnet($pconfig['dst']); ?>
                             <option value="any" <?php if ($pconfig['dst'] == "any") { echo "selected"; } ?>>
                             any</option>
-                            <option value="single" <?php if (($pconfig['dstmask'] == $maxnetmask) && !$sel) { echo "selected"; $sel = 1; } ?>>
+                            <option value="single" <?php if ((($pconfig['dstmask'] ?? null) == $maxnetmask) && !$sel) { echo "selected"; $sel = 1; } ?>>
                             Single host or alias</option>
                             <option value="network" <?php if (!$sel) echo "selected"; ?>>
                             Network</option>
@@ -685,7 +685,7 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
                           / 
                           <select name="dstmask" class="formfld" id="dstmask">
 						<?php for ($i = ($maxnetmask - 1); $i > 0; $i--): ?>
-						<option value="<?=$i;?>" <?php if ($i == $pconfig['dstmask']) echo "selected"; ?>><?=$i;?></option>
+						<option value="<?=$i;?>" <?php if ($i == ($pconfig['dstmask'] ?? null)) echo "selected"; ?>><?=$i;?></option>
 						<?php endfor; ?>
 						</select></td>
                       </tr>
@@ -700,31 +700,31 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
                         <td>from:&nbsp;&nbsp;</td>
                         <td><select name="dstbeginport" class="formfld" onchange="dst_rep_change();ext_change()">
                             <option value="">(other)</option>
-                            <option value="any" <?php $bfound = 0; if ($pconfig['dstbeginport'] == "any") { echo "selected"; $bfound = 1; } ?>>any</option>
+                            <option value="any" <?php $bfound = 0; if (($pconfig['dstbeginport'] ?? null) == "any") { echo "selected"; $bfound = 1; } ?>>any</option>
                             <?php foreach ($wkports as $wkport => $wkportdesc): ?>
-                            <option value="<?=$wkport;?>" <?php if ($wkport == $pconfig['dstbeginport']) {
+                            <option value="<?=$wkport;?>" <?php if ($wkport == ($pconfig['dstbeginport'] ?? null)) {
 																echo "selected";
 																$bfound = 1;
 															}?>>
                             <?=htmlspecialchars($wkportdesc);?>
                             </option>
                             <?php endforeach; ?>
-                          </select> <input name="dstbeginport_cust" type="text" size="5" value="<?php if (!$bfound && $pconfig['dstbeginport']) echo htmlspecialchars($pconfig['dstbeginport']); ?>"></td>
+                          </select> <input name="dstbeginport_cust" type="text" size="5" value="<?php if (!$bfound && !empty($pconfig['dstbeginport'])) echo htmlspecialchars($pconfig['dstbeginport']); ?>"></td>
                       </tr>
                       <tr> 
                         <td>to:</td>
                         <td><select name="dstendport" class="formfld" onchange="ext_change()">
                             <option value="">(other)</option>
-                            <option value="any" <?php $bfound = 0; if ($pconfig['dstendport'] == "any") { echo "selected"; $bfound = 1; } ?>>any</option>
+                            <option value="any" <?php $bfound = 0; if (($pconfig['dstendport'] ?? null) == "any") { echo "selected"; $bfound = 1; } ?>>any</option>
                             <?php foreach ($wkports as $wkport => $wkportdesc): ?>
-                            <option value="<?=$wkport;?>" <?php if ($wkport == $pconfig['dstendport']) {
+                            <option value="<?=$wkport;?>" <?php if ($wkport == ($pconfig['dstendport'] ?? null)) {
 																echo "selected";
 																$bfound = 1;
 															}?>>
                             <?=htmlspecialchars($wkportdesc);?>
                             </option>
                             <?php endforeach; ?>
-                          </select> <input name="dstendport_cust" type="text" size="5" value="<?php if (!$bfound && $pconfig['dstendport']) echo htmlspecialchars($pconfig['dstendport']); ?>"></td>
+                          </select> <input name="dstendport_cust" type="text" size="5" value="<?php if (!$bfound && !empty($pconfig['dstendport'])) echo htmlspecialchars($pconfig['dstendport']); ?>"></td>
                       </tr>
                     </table>
                     <br> <span class="vexpl">Specify the port or port range for 
@@ -735,7 +735,7 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">Fragments</td>
                   <td width="78%" class="vtable"> 
-                    <input name="frags" type="checkbox" id="frags" value="yes" <?php if ($pconfig['frags']) echo "checked"; ?>>
+                    <input name="frags" type="checkbox" id="frags" value="yes" <?php if (!empty($pconfig['frags'])) echo "checked"; ?>>
                     <strong>Allow fragmented packets</strong><br>
                     <span class="vexpl">Hint: this option puts additional load 
                     on the firewall and may make it vulnerable to DoS attacks. 
@@ -745,7 +745,7 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">Log</td>
                   <td width="78%" class="vtable"> 
-                    <input name="log" type="checkbox" id="log" value="yes" <?php if ($pconfig['log']) echo "checked"; ?>>
+                    <input name="log" type="checkbox" id="log" value="yes" <?php if (!empty($pconfig['log'])) echo "checked"; ?>>
                     <strong>Log packets that are handled by this rule</strong><br>
                     <span class="vexpl">Hint: the firewall has limited local log 
                     space. Don't turn on logging for everything. If you want to 
@@ -756,7 +756,7 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
                 <tr> 
                   <td width="22%" valign="top" class="vncell">Description</td>
                   <td width="78%" class="vtable"> 
-                    <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr']);?>"> 
+                    <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr'] ?? '');?>"> 
                     <br> <span class="vexpl">You may enter a description here 
                     for your reference (not parsed).</span></td>
                 </tr>
@@ -764,10 +764,10 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
                   <td width="22%" valign="top">&nbsp;</td>
                   <td width="78%"> 
                     <input name="Submit" type="submit" class="formbtn" value="Save"> 
-                    <?php if (isset($id) && $a_filter[$id]): ?>
+                    <?php if (isset($id) && !empty($a_filter[$id])): ?>
                     <input name="id" type="hidden" value="<?=htmlspecialchars($id);?>"> 
                     <?php endif; ?>
-                    <input name="after" type="hidden" value="<?=htmlspecialchars($after);?>"> 
+                    <input name="after" type="hidden" value="<?=htmlspecialchars($after ?? '');?>"> 
                   </td>
                 </tr>
               </table>

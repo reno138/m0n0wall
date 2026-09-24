@@ -39,10 +39,10 @@ $pconfig['strictorder'] = isset($config['dnsmasq']['strictorder']);
 $pconfig['stoprebind'] = isset($config['dnsmasq']['stoprebind']);
 $pconfig['log'] = isset($config['dnsmasq']['log']);
 
-if (!is_array($config['dnsmasq']['hosts'])) {
+if (!is_array($config['dnsmasq']['hosts'] ?? null)) {
 	$config['dnsmasq']['hosts'] = array();
 }
-if (!is_array($config['dnsmasq']['domainoverrides'])) {
+if (!is_array($config['dnsmasq']['domainoverrides'] ?? null)) {
 	$config['dnsmasq']['domainoverrides'] = array();
 }
 hosts_sort();
@@ -56,7 +56,7 @@ if ($_POST) {
 		if (preg_match("/^del_(.+)_x$/", $pn, $matches)) {
 			list($type,$id) = explode(":", $matches[1]);
 			if ($type == 'host') {
-				if ($a_hosts[$id]) {
+				if (!empty($a_hosts[$id])) {
 					unset($a_hosts[$id]);
 					write_config();
 					touch($d_dnsmasqdirty_path);
@@ -65,7 +65,7 @@ if ($_POST) {
 				}
 			}
 			elseif ($type == 'doverride') {
-				if ($a_domainOverrides[$id]) {
+				if (!empty($a_domainOverrides[$id])) {
 					unset($a_domainOverrides[$id]);
 					write_config();
 					touch($d_dnsmasqdirty_path);
@@ -78,12 +78,12 @@ if ($_POST) {
 
 	$pconfig = $_POST;
 
-	$config['dnsmasq']['enable'] = ($_POST['enable']) ? true : false;
-	$config['dnsmasq']['regdhcp'] = ($_POST['regdhcp']) ? true : false;
-	$config['dnsmasq']['allservers'] = ($_POST['allservers']) ? true : false;
-	$config['dnsmasq']['strictorder'] = ($_POST['strictorder']) ? true : false;
-	$config['dnsmasq']['stoprebind'] = ($_POST['stoprebind']) ? true : false;
-	$config['dnsmasq']['log'] = ($_POST['log']) ? true : false;
+	$config['dnsmasq']['enable'] = (!empty($_POST['enable'])) ? true : false;
+	$config['dnsmasq']['regdhcp'] = (!empty($_POST['regdhcp'])) ? true : false;
+	$config['dnsmasq']['allservers'] = (!empty($_POST['allservers'])) ? true : false;
+	$config['dnsmasq']['strictorder'] = (!empty($_POST['strictorder'])) ? true : false;
+	$config['dnsmasq']['stoprebind'] = (!empty($_POST['stoprebind'])) ? true : false;
+	$config['dnsmasq']['log'] = (!empty($_POST['log'])) ? true : false;
 
 	write_config();
 	
@@ -104,7 +104,7 @@ if ($_POST) {
 ?>
 <?php include("fbegin.inc"); ?>
 <form action="services_dnsmasq.php" method="post">
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
 <?php if (file_exists($d_dnsmasqdirty_path)): ?><p>
 <?php print_info_box_np("The DNS forwarder configuration has been changed.<br>You must apply the changes in order for them to take effect.");?><br>
 <input name="apply" type="submit" class="formbtn" id="apply" value="Apply changes"></p>
@@ -112,11 +112,11 @@ if ($_POST) {
 			  <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="content pane">
                 <tr> 
                   <td class="vtable">
-                      <input name="enable" type="checkbox" id="enable" value="yes" <?php if ($pconfig['enable']) echo "checked";?>>
+                      <input name="enable" type="checkbox" id="enable" value="yes" <?php if (!empty($pconfig['enable'])) echo "checked";?>>
                       <strong>Enable DNS forwarder</strong></td>
                 </tr>
 				  <td class="vtable">
-                      <input name="allservers" type="checkbox" id="allservers" value="yes" <?php if ($pconfig['allservers']) echo "checked";?>>
+                      <input name="allservers" type="checkbox" id="allservers" value="yes" <?php if (!empty($pconfig['allservers'])) echo "checked";?>>
                       <strong>Enable All Servers</strong><br>
 					  By default, when more than one upstream server is available, 
 					  it will send queries to just one server. Setting this flag forces all
@@ -124,14 +124,14 @@ if ($_POST) {
 					  which answers first will be returned to the original requestor. </td>
                 </tr>
 				<td class="vtable">
-                      <input name="strictorder" type="checkbox" id="strictorder" value="yes" <?php if ($pconfig['strictorder']) echo "checked";?>>
+                      <input name="strictorder" type="checkbox" id="strictorder" value="yes" <?php if (!empty($pconfig['strictorder'])) echo "checked";?>>
                       <strong>Strict Order</strong><br>
 					  By default, the DNS forwarder will send queries to any of the upstream servers it
 					  knows about and tries to favour servers that are known to be up. Setting
 					  this flag forces it to try each query with each server strictly in order.</td>
                 </tr>
 				<td class="vtable">
-                      <input name="stoprebind" type="checkbox" id="stoprebind" value="yes" <?php if ($pconfig['stoprebind']) echo "checked";?>>
+                      <input name="stoprebind" type="checkbox" id="stoprebind" value="yes" <?php if (!empty($pconfig['stoprebind'])) echo "checked";?>>
                       <strong>Block DNS Rebind attacks</strong><br>
 					  If this option is set, the DNS forwarder will reject (and log) addresses from upstream nameservers 
 					  which are in the private IP ranges. 
@@ -140,7 +140,7 @@ if ($_POST) {
                 </tr>
                 <tr> 
                   <td class="vtable">
-                      <input name="regdhcp" type="checkbox" id="regdhcp" value="yes" <?php if ($pconfig['regdhcp']) echo "checked";?>>
+                      <input name="regdhcp" type="checkbox" id="regdhcp" value="yes" <?php if (!empty($pconfig['regdhcp'])) echo "checked";?>>
                       <strong>Register DHCP leases in DNS forwarder<br>
                       </strong>If this option is set, then machines that specify 
                       their hostname when requesting a DHCP lease will be registered 
@@ -151,7 +151,7 @@ if ($_POST) {
                 </tr>
                 <tr> 
                   <td class="vtable">
-                      <input name="log" type="checkbox" id="log" value="yes" <?php if ($pconfig['log']) echo "checked";?>>
+                      <input name="log" type="checkbox" id="log" value="yes" <?php if (!empty($pconfig['log'])) echo "checked";?>>
                       <strong>Log DNS requests to system log<br>
                       </strong>If this option is set, then every request
 					  received by the DNS forwarder will be logged into the system log.
@@ -190,16 +190,16 @@ if ($_POST) {
 			  <?php $i = 0; foreach ($a_hosts as $hostent): ?>
                 <tr>
                   <td class="listlr">
-                    <?=strtolower($hostent['host']);?>&nbsp;
+                    <?=strtolower($hostent['host'] ?? '');?>&nbsp;
                   </td>
                   <td class="listr">
-                    <?=strtolower($hostent['domain']);?>&nbsp;
+                    <?=strtolower($hostent['domain'] ?? '');?>&nbsp;
                   </td>
                   <td class="listr">
-                    <?=$hostent['ip'];?>&nbsp;
+                    <?=$hostent['ip'] ?? '';?>&nbsp;
                   </td>
                   <td class="listbg">
-                    <?=htmlspecialchars($hostent['descr']);?>&nbsp;
+                    <?=htmlspecialchars($hostent['descr'] ?? '');?>&nbsp;
                   </td>
                   <td valign="middle" nowrap class="list"> <a href="services_dnsmasq_edit.php?id=<?=$i;?>"><img src="e.gif" title="edit host" width="17" height="17" border="0" alt="edit host"></a>
                      &nbsp;<input name="del_host:<?=$i;?>" type="image" src="x.gif" width="17" height="17" title="delete host" alt="delete host" onclick="return confirm('Do you really want to delete this host?')"></td>
@@ -226,13 +226,13 @@ if ($_POST) {
 			  <?php $i = 0; foreach ($a_domainOverrides as $doment): ?>
                 <tr>
                   <td class="listlr">
-                    <?=strtolower($doment['domain']);?>&nbsp;
+                    <?=strtolower($doment['domain'] ?? '');?>&nbsp;
                   </td>
                   <td class="listr">
-                    <?=$doment['ip'];?>&nbsp;
+                    <?=$doment['ip'] ?? '';?>&nbsp;
                   </td>
                   <td class="listbg">
-                    <?=htmlspecialchars($doment['descr']);?>&nbsp;
+                    <?=htmlspecialchars($doment['descr'] ?? '');?>&nbsp;
                   </td>
                   <td valign="middle" nowrap class="list"> <a href="services_dnsmasq_domainoverride_edit.php?id=<?=$i;?>"><img src="e.gif" width="17" height="17" border="0" alt=""></a>
                      &nbsp;<input name="del_doverride:<?=$i;?>" type="image" src="x.gif" width="17" height="17" title="delete domain override" alt="delete domain override" onclick="return confirm('Do you really want to delete this domain override?')"></td>

@@ -32,19 +32,19 @@
 $pgtitle = array("VPN", "IPsec/L2TP", "Edit user");
 require("guiconfig.inc");
 
-if (!is_array($config['l2tp']['user'])) {
+if (!is_array($config['l2tp']['user'] ?? null)) {
 	$config['l2tp']['user'] = array();
 }
 l2tp_users_sort();
 $a_secret = &$config['l2tp']['user'];
 
-$id = $_GET['id'];
+$id = $_GET['id'] ?? null;
 if (isset($_POST['id']))
 	$id = $_POST['id'];
 
-if (isset($id) && $a_secret[$id]) {
-	$pconfig['username'] = $a_secret[$id]['name'];
-	$pconfig['ip'] = $a_secret[$id]['ip'];
+if (isset($id) && !empty($a_secret[$id])) {
+	$pconfig['username'] = $a_secret[$id]['name'] ?? null;
+	$pconfig['ip'] = $a_secret[$id]['ip'] ?? null;
 }
 
 if ($_POST) {
@@ -53,7 +53,7 @@ if ($_POST) {
 	$pconfig = $_POST;
 
 	/* input validation */
-	if (isset($id) && ($a_secret[$id])) {
+	if (isset($id) && (!empty($a_secret[$id]))) {
 		$reqdfields = explode(" ", "username");
 		$reqdfieldsn = explode(",", "Username");
 	} else {
@@ -63,20 +63,20 @@ if ($_POST) {
 	
 	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
-	if (preg_match("/[^a-zA-Z0-9\.\-_]/", $_POST['username']))
+	if (preg_match("/[^a-zA-Z0-9\.\-_]/", $_POST['username'] ?? ''))
 		$input_errors[] = "The username contains invalid characters.";
 		
-	if (preg_match("/[^a-zA-Z0-9\.\-_]/", $_POST['password']))
+	if (preg_match("/[^a-zA-Z0-9\.\-_]/", $_POST['password'] ?? ''))
 		$input_errors[] = "The password contains invalid characters.";
 	
-	if (($_POST['password']) && ($_POST['password'] != $_POST['password2'])) {
+	if ((!empty($_POST['password'])) && ($_POST['password'] != ($_POST['password2'] ?? null))) {
 		$input_errors[] = "The passwords do not match.";
 	}
-	if (($_POST['ip'] && !is_ipaddr($_POST['ip']))) {
+	if ((!empty($_POST['ip']) && !is_ipaddr($_POST['ip']))) {
 		$input_errors[] = "The IP address entered is not valid.";
 	}
 	
-	if (!$input_errors && !(isset($id) && $a_secret[$id])) {
+	if (empty($input_errors) && !(isset($id) && !empty($a_secret[$id]))) {
 		/* make sure there are no dupes */
 		foreach ($a_secret as $secretent) {
 			if ($secretent['name'] == $_POST['username']) {
@@ -86,18 +86,18 @@ if ($_POST) {
 		}
 	}
 
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 	
-		if (isset($id) && $a_secret[$id])
+		if (isset($id) && !empty($a_secret[$id]))
 			$secretent = $a_secret[$id];
 	
 		$secretent['name'] = $_POST['username'];
-		$secretent['ip'] = $_POST['ip'];
+		$secretent['ip'] = $_POST['ip'] ?? null;
 		
-		if ($_POST['password'])
+		if (!empty($_POST['password']))
 			$secretent['password'] = $_POST['password'];
 		
-		if (isset($id) && $a_secret[$id])
+		if (isset($id) && !empty($a_secret[$id]))
 			$a_secret[$id] = $secretent;
 		else
 			$a_secret[] = $secretent;
@@ -111,34 +111,34 @@ if ($_POST) {
 }
 ?>
 <?php include("fbegin.inc"); ?>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
             <form action="vpn_l2tp_users_edit.php" method="post" name="iform" id="iform">
               <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="content pane">
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">Username</td>
                   <td width="78%" class="vtable">
-					<?=$mandfldhtml;?><input name="username" type="text" class="formfld" id="username" size="20" value="<?=htmlspecialchars($pconfig['username']);?>"> 
+					<?=$mandfldhtml;?><input name="username" type="text" class="formfld" id="username" size="20" value="<?=htmlspecialchars($pconfig['username'] ?? '');?>"> 
                   </td>
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">Password</td>
                   <td width="78%" class="vtable"> 
                     <?=$mandfldhtml;?><input name="password" type="password" class="formfld" id="password" size="20"> 
                     <br><?=$mandfldhtml;?><input name="password2" type="password" class="formfld" id="password2" size="20"> 
-                    &nbsp;(confirmation)<?php if (isset($id) && $a_secret[$id]): ?><br>
+                    &nbsp;(confirmation)<?php if (isset($id) && !empty($a_secret[$id])): ?><br>
                     <span class="vexpl">If you want to change the users' password, 
                     enter it here twice.</span><?php endif; ?></td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncell">IP address</td>
                   <td width="78%" class="vtable"> 
-                    <input name="ip" type="text" class="formfld" id="ip" size="20" value="<?=htmlspecialchars($pconfig['ip']);?>"> 
+                    <input name="ip" type="text" class="formfld" id="ip" size="20" value="<?=htmlspecialchars($pconfig['ip'] ?? '');?>"> 
                     <br><span class="vexpl">If you want the user to be assigned a specific IP address, enter it here.</span></td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top">&nbsp;</td>
                   <td width="78%"> 
                     <input name="Submit" type="submit" class="formbtn" value="Save"> 
-                    <?php if (isset($id) && $a_secret[$id]): ?>
+                    <?php if (isset($id) && !empty($a_secret[$id])): ?>
                     <input name="id" type="hidden" value="<?=htmlspecialchars($id);?>">
                     <?php endif; ?>
                   </td>

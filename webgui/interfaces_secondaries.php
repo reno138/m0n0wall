@@ -29,10 +29,10 @@
 	POSSIBILITY OF SUCH DAMAGE.
 */
 
-$pgtitle = array("Interfaces", htmlspecialchars($_GET['ifname']), "Add secondary IP address");
+$pgtitle = array("Interfaces", htmlspecialchars($_GET['ifname'] ?? ''), "Add secondary IP address");
 require("guiconfig.inc");
 
-if (!is_array($config['secondaries']['secondary']))
+if (!is_array($config['secondaries']['secondary'] ?? null))
 	$config['secondaries']['secondary'] = array();
 
 $a_secondaries = &$config['secondaries']['secondary'] ;
@@ -44,7 +44,7 @@ if ($_POST) {
 			unset($a_secondaries[$id]);
 			write_config();
 			touch($d_sysrebootreqd_path);
-			header("Location: interfaces_secondaries.php?if=" . urlencode($_GET['if']) ."&ifname=" . urlencode($_GET['ifname']));
+			header("Location: interfaces_secondaries.php?if=" . urlencode($_GET['if'] ?? '') ."&ifname=" . urlencode($_GET['ifname'] ?? ''));
 			exit;
 		}
 	}
@@ -52,16 +52,16 @@ if ($_POST) {
 
 ?>
 <?php include("fbegin.inc"); ?>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
 <?php if (file_exists($d_sysrebootreqd_path)) print_info_box(get_std_save_message(0)); ?>
-<form action="interfaces_secondaries.php?if=<?=urlencode($_GET['if'])?>&amp;ifname=<?=urlencode($_GET['ifname'])?>" method="post" name="iform" id="iform">
+<form action="interfaces_secondaries.php?if=<?=urlencode($_GET['if'] ?? '')?>&amp;ifname=<?=urlencode($_GET['ifname'] ?? '')?>" method="post" name="iform" id="iform">
 <table width="100%" border="0" cellpadding="0" cellspacing="0" summary="tab pane">
   <tr><td class="tabnavtbl">
   <ul id="tabnav">
     <li class="tabinact1"><a href="<?php
-		if ($_GET['if'] == "lan")
+		if (($_GET['if'] ?? null) == "lan")
 			echo "interfaces_lan.php";
-		else if (preg_match("/^opt(\d)$/", $_GET['if'], $matches))
+		else if (preg_match("/^opt(\d)$/", $_GET['if'] ?? '', $matches))
 			echo "interfaces_opt.php?index=" . $matches[1];
 	?>">Primary configuration</a></li>
     <li class="tabact">Secondary IPs</li>
@@ -76,22 +76,22 @@ if ($_POST) {
                   <td width="10%" class="list"></td>
 				</tr>
 			  <?php $i = 0; foreach ($a_secondaries as $secondary):
-			 	if ($_GET['if'] == $secondary['if']) {?>
+			 	if (($_GET['if'] ?? null) == ($secondary['if'] ?? null)) {?>
                 <tr>
                   <td class="listlr">
-					<?=htmlspecialchars($secondary['ipaddr']);?>/<?=htmlspecialchars($secondary['prefix']);?>
+					<?=htmlspecialchars($secondary['ipaddr'] ?? '');?>/<?=htmlspecialchars($secondary['prefix'] ?? '');?>
                   </td>
                   <td class="listbg">
-                    <?=htmlspecialchars($secondary['descr']);?>&nbsp;
+                    <?=htmlspecialchars($secondary['descr'] ?? '');?>&nbsp;
                   </td>
-                  <td valign="middle" nowrap class="list"> <a href="interfaces_secondaries_edit.php?id=<?=$i;?>&amp;if=<?=urlencode($_GET['if'])?>&amp;ifname=<?=urlencode($_GET['ifname'])?>"><img src="e.gif" title="edit IP Address" width="17" height="17" border="0" alt="edit IP Address"></a>
+                  <td valign="middle" nowrap class="list"> <a href="interfaces_secondaries_edit.php?id=<?=$i;?>&amp;if=<?=urlencode($_GET['if'] ?? '')?>&amp;ifname=<?=urlencode($_GET['ifname'] ?? '')?>"><img src="e.gif" title="edit IP Address" width="17" height="17" border="0" alt="edit IP Address"></a>
                      &nbsp;<input name="del_<?=$i;?>" type="image" src="x.gif" width="17" height="17" title="delete address" alt="delete address" onclick="return confirm('Do you really want to delete this IP address?')"></td>
 				</tr>
 				
 			  <?php } ; $i++; endforeach; ?>
                 <tr> 
                   <td class="list" colspan="2">&nbsp;</td>
-                  <td class="list"> <a href="interfaces_secondaries_edit.php?if=<?=urlencode($_GET['if'])?>&amp;ifname=<?=urlencode($_GET['ifname'])?>"><img src="plus.gif" title="add IP Address" width="17" height="17" border="0" alt="add IP Address"></a></td>
+                  <td class="list"> <a href="interfaces_secondaries_edit.php?if=<?=urlencode($_GET['if'] ?? '')?>&amp;ifname=<?=urlencode($_GET['ifname'] ?? '')?>"><img src="plus.gif" title="add IP Address" width="17" height="17" border="0" alt="add IP Address"></a></td>
 				</tr>
 				<tr>
 				<td colspan="2" class="list"><span class="vexpl"><span class="red"><strong>

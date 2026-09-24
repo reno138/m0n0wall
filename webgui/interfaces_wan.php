@@ -35,22 +35,22 @@ require("guiconfig.inc");
 $wancfg = &$config['interfaces']['wan'];
 $optcfg = &$config['interfaces']['wan'];
 
-$pconfig['username'] = $config['pppoe']['username'];
-$pconfig['password'] = $config['pppoe']['password'];
-$pconfig['provider'] = $config['pppoe']['provider'];
-$pconfig['pppoemtu'] = $config['pppoe']['mtu'];
+$pconfig['username'] = $config['pppoe']['username'] ?? null;
+$pconfig['password'] = $config['pppoe']['password'] ?? null;
+$pconfig['provider'] = $config['pppoe']['provider'] ?? null;
+$pconfig['pppoemtu'] = $config['pppoe']['mtu'] ?? null;
 
-$pconfig['pptp_username'] = $config['pptp']['username'];
-$pconfig['pptp_password'] = $config['pptp']['password'];
-$pconfig['pptp_local'] = $config['pptp']['local'];
-$pconfig['pptp_subnet'] = $config['pptp']['subnet'];
-$pconfig['pptp_remote'] = $config['pptp']['remote'];
+$pconfig['pptp_username'] = $config['pptp']['username'] ?? null;
+$pconfig['pptp_password'] = $config['pptp']['password'] ?? null;
+$pconfig['pptp_local'] = $config['pptp']['local'] ?? null;
+$pconfig['pptp_subnet'] = $config['pptp']['subnet'] ?? null;
+$pconfig['pptp_remote'] = $config['pptp']['remote'] ?? null;
 
-$pconfig['modem_username'] = $config['modem']['username'];
-$pconfig['modem_password'] = $config['modem']['password'];
-$pconfig['modem_apn'] = $config['modem']['apn'];
+$pconfig['modem_username'] = $config['modem']['username'] ?? null;
+$pconfig['modem_password'] = $config['modem']['password'] ?? null;
+$pconfig['modem_apn'] = $config['modem']['apn'] ?? null;
 
-$pconfig['dhcphostname'] = $wancfg['dhcphostname'];
+$pconfig['dhcphostname'] = $wancfg['dhcphostname'] ?? null;
 
 if ($wancfg['ipaddr'] == "dhcp") {
 	$pconfig['type'] = "DHCP";
@@ -62,40 +62,40 @@ if ($wancfg['ipaddr'] == "dhcp") {
 	$pconfig['type'] = "Modem";
 } else {
 	$pconfig['type'] = "Static";
-	$pconfig['ipaddr'] = $wancfg['ipaddr'];
-	$pconfig['subnet'] = $wancfg['subnet'];
-	$pconfig['gateway'] = $wancfg['gateway'];
-	$pconfig['pointtopoint'] = $wancfg['pointtopoint'];
+	$pconfig['ipaddr'] = $wancfg['ipaddr'] ?? null;
+	$pconfig['subnet'] = $wancfg['subnet'] ?? null;
+	$pconfig['gateway'] = $wancfg['gateway'] ?? null;
+	$pconfig['pointtopoint'] = $wancfg['pointtopoint'] ?? null;
 }
 
 $pconfig['blockpriv'] = isset($wancfg['blockpriv']);
-$pconfig['spoofmac'] = $wancfg['spoofmac'];
+$pconfig['spoofmac'] = $wancfg['spoofmac'] ?? null;
 
 if (ipv6enabled()) {
 
 		
-	if ($wancfg['ipaddr6'] == "6to4" || $wancfg['ipaddr6'] == "ppp" || $wancfg['ipaddr6'] == "aiccu" || $wancfg['ipaddr6'] == "DHCP") {
-		$pconfig['ipv6mode'] = $wancfg['ipaddr6'];
+	if (($wancfg['ipaddr6'] ?? null) == "6to4" || ($wancfg['ipaddr6'] ?? null) == "ppp" || ($wancfg['ipaddr6'] ?? null) == "aiccu" || ($wancfg['ipaddr6'] ?? null) == "DHCP") {
+		$pconfig['ipv6mode'] = $wancfg['ipaddr6'] ?? null;
 		
-		if ($wancfg['ipaddr6'] == "aiccu") {
-			$pconfig['aiccu_username'] = $wancfg['aiccu']['username'];
-			$pconfig['aiccu_password'] = $wancfg['aiccu']['password'];
-			$pconfig['aiccu_tunnelid'] = $wancfg['aiccu']['tunnelid'];
+		if (($wancfg['ipaddr6'] ?? null) == "aiccu") {
+			$pconfig['aiccu_username'] = $wancfg['aiccu']['username'] ?? null;
+			$pconfig['aiccu_password'] = $wancfg['aiccu']['password'] ?? null;
+			$pconfig['aiccu_tunnelid'] = $wancfg['aiccu']['tunnelid'] ?? null;
 			$pconfig['aiccu_ayiya'] = isset($wancfg['aiccu']['ayiya']);
 		}
-		if ($wancfg['ipaddr6'] == "DHCP") {
-			$pconfig['v6duid'] = $wancfg['v6duid'];
+		if (($wancfg['ipaddr6'] ?? null) == "DHCP") {
+			$pconfig['v6duid'] = $wancfg['v6duid'] ?? null;
 		}
-	} else if ($wancfg['ipaddr6']) {
-		$pconfig['ipaddr6'] = $wancfg['ipaddr6'];
-		$pconfig['subnet6'] = $wancfg['subnet6'];
+	} else if (!empty($wancfg['ipaddr6'])) {
+		$pconfig['ipaddr6'] = $wancfg['ipaddr6'] ?? null;
+		$pconfig['subnet6'] = $wancfg['subnet6'] ?? null;
 		
-		if ($wancfg['tunnel6']) {
+		if (!empty($wancfg['tunnel6'])) {
 			$pconfig['ipv6mode'] = "tunnel";
-			$pconfig['tunnel6'] = $wancfg['tunnel6'];
+			$pconfig['tunnel6'] = $wancfg['tunnel6'] ?? null;
 		} else {
 			$pconfig['ipv6mode'] = "static";
-			$pconfig['gateway6'] = $wancfg['gateway6'];
+			$pconfig['gateway6'] = $wancfg['gateway6'] ?? null;
 		}
 	} else {
 		$pconfig['ipv6mode'] = "disabled";
@@ -108,82 +108,82 @@ if ($_POST) {
 	$pconfig = $_POST;
 
 	/* input validation */
-	if ($_POST['type'] == "Static") {
+	if (($_POST['type'] ?? null) == "Static") {
 		$reqdfields = explode(" ", "ipaddr subnet gateway");
 		$reqdfieldsn = explode(",", "IP address,Subnet bit count,Gateway");
 		do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
-	} else if ($_POST['type'] == "PPPoE") {
+	} else if (($_POST['type'] ?? null) == "PPPoE") {
 		$reqdfields = explode(" ", "username password");
 		$reqdfieldsn = explode(",", "PPPoE username,PPPoE password");
 		do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
-	} else if ($_POST['type'] == "PPTP") {
+	} else if (($_POST['type'] ?? null) == "PPTP") {
 		$reqdfields = explode(" ", "pptp_username pptp_password pptp_local pptp_subnet pptp_remote");
 		$reqdfieldsn = explode(",", "PPTP username,PPTP password,PPTP local IP address,PPTP subnet,PPTP remote IP address");
 		do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
-	} else if ($_POST['type'] == "Modem") {
+	} else if (($_POST['type'] ?? null) == "Modem") {
 		$reqdfields = explode(" ", "modem_username modem_password modem_apn");
 		$reqdfieldsn = explode(",", "Modem username,Modem password,Modem APN");
 		do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	}
 	
-	$_POST['spoofmac'] = str_replace("-", ":", $_POST['spoofmac']);
+	$_POST['spoofmac'] = str_replace("-", ":", $_POST['spoofmac'] ?? '');
 	
-	if (($_POST['ipaddr'] && !is_ipaddr($_POST['ipaddr']))) {
+	if ((!empty($_POST['ipaddr']) && !is_ipaddr($_POST['ipaddr'] ?? ''))) {
 		$input_errors[] = "A valid IP address must be specified.";
 	}
-	if (($_POST['subnet'] && !is_numeric($_POST['subnet']))) {
+	if ((!empty($_POST['subnet']) && !is_numeric($_POST['subnet']))) {
 		$input_errors[] = "A valid subnet bit count must be specified.";
 	}
-	if (($_POST['gateway'] && !is_ipaddr($_POST['gateway']))) {
+	if ((!empty($_POST['gateway']) && !is_ipaddr($_POST['gateway'] ?? ''))) {
 		$input_errors[] = "A valid gateway must be specified.";
 	}
-	if (($_POST['pointtopoint'] && !is_ipaddr($_POST['pointtopoint']))) {
+	if ((!empty($_POST['pointtopoint']) && !is_ipaddr($_POST['pointtopoint'] ?? ''))) {
 		$input_errors[] = "A valid point-to-point IP address must be specified.";
 	}
-	if (($_POST['provider'] && !is_domain($_POST['provider']))) {
+	if ((!empty($_POST['provider']) && !is_domain($_POST['provider']))) {
 		$input_errors[] = "The service name contains invalid characters.";
 	}
-	if (($_POST['pptp_local'] && !is_ipaddr($_POST['pptp_local']))) {
+	if ((!empty($_POST['pptp_local']) && !is_ipaddr($_POST['pptp_local'] ?? ''))) {
 		$input_errors[] = "A valid PPTP local IP address must be specified.";
 	}
-	if (($_POST['pptp_subnet'] && !is_numeric($_POST['pptp_subnet']))) {
+	if ((!empty($_POST['pptp_subnet']) && !is_numeric($_POST['pptp_subnet']))) {
 		$input_errors[] = "A valid PPTP subnet bit count must be specified.";
 	}
-	if (($_POST['pptp_remote'] && !is_ipaddr($_POST['pptp_remote']))) {
+	if ((!empty($_POST['pptp_remote']) && !is_ipaddr($_POST['pptp_remote'] ?? ''))) {
 		$input_errors[] = "A valid PPTP remote IP address must be specified.";
 	}
-	if (($_POST['spoofmac'] && !is_macaddr($_POST['spoofmac']))) {
+	if ((!empty($_POST['spoofmac']) && !is_macaddr($_POST['spoofmac']))) {
 		$input_errors[] = "A valid MAC address must be specified.";
 	}
-	if (($_POST['pppoemtu'] && !(is_numeric($_POST['pppoemtu']) && $_POST['pppoemtu'] >= 512 && $_POST['pppoemtu'] <= 1492))) {
+	if ((!empty($_POST['pppoemtu']) && !(is_numeric($_POST['pppoemtu']) && ($_POST['pppoemtu'] ?? null) >= 512 && ($_POST['pppoemtu'] ?? null) <= 1492))) {
 		$input_errors[] = "The PPPoE MTU must be between 512 and 1492 bytes.";
 	}
 
 	if (ipv6enabled()) {
-		if (($_POST['ipv6mode'] == "static" || $_POST['ipv6mode'] == "tunnel") && !is_ipaddr6($_POST['ipaddr6'])) {
+		if ((($_POST['ipv6mode'] ?? null) == "static" || ($_POST['ipv6mode'] ?? null) == "tunnel") && !is_ipaddr6($_POST['ipaddr6'] ?? '')) {
 			$input_errors[] = "A valid IPv6 address must be specified.";
 		}
-		if ($_POST['ipv6mode'] == "static" && !is_ipaddr6($_POST['gateway6'])) {
+		if (($_POST['ipv6mode'] ?? null) == "static" && !is_ipaddr6($_POST['gateway6'] ?? '')) {
 			$input_errors[] = 'A valid IPv6 gateway must be specified.';
 		}
-		if ($_POST['ipv6mode'] == "ppp" && $_POST['type'] != "PPPoE" && $_POST['type'] != "PPTP" && $_POST['type'] != "Modem") {
+		if (($_POST['ipv6mode'] ?? null) == "ppp" && ($_POST['type'] ?? null) != "PPPoE" && ($_POST['type'] ?? null) != "PPTP" && ($_POST['type'] ?? null) != "Modem") {
 			$input_errors[] = 'IPv6 PPP mode can only be used in conjunction with PPPoE, PPTP or Modem.';
 		}
-		if ($_POST['ipv6mode'] == "tunnel" && !is_ipaddr($_POST['tunnel6'])) {
+		if (($_POST['ipv6mode'] ?? null) == "tunnel" && !is_ipaddr($_POST['tunnel6'] ?? '')) {
 			$input_errors[] = 'An IPv6 tunnel endpoint address must be specified.';
 		}
-		if ($_POST['ipv6mode'] == "aiccu" && (!$_POST['aiccu_username'] || !$_POST['aiccu_password'] || !$_POST['aiccu_tunnelid'])) {
+		if (($_POST['ipv6mode'] ?? null) == "aiccu" && (empty($_POST['aiccu_username']) || empty($_POST['aiccu_password']) || empty($_POST['aiccu_tunnelid']))) {
 			$input_errors[] = 'Username, password and tunnel ID must be specified for AICCU.';
 		}
-		if ($_POST['ipv6mode'] == "DHCP" && $_POST['type'] != "Static" && $_POST['type'] != "DHCP") {
+		if (($_POST['ipv6mode'] ?? null) == "DHCP" && ($_POST['type'] ?? null) != "Static" && ($_POST['type'] ?? null) != "DHCP") {
 			$input_errors[] = 'IPv6 DHCP mode can only be used in conjunction with static or DHCP.';
 		}
-		if (($_POST['v6duid']  && !is_duid($_POST['v6duid']))) {
+		if ((!empty($_POST['v6duid']) && !is_duid($_POST['v6duid'] ?? ''))) {
 			$input_errors[] = 'A valid DUID must be specified.';
 		}
 	}
 
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 	
 		unset($wancfg['ipaddr']);
 		unset($wancfg['subnet']);
@@ -211,59 +211,59 @@ if ($_POST) {
 		unset($config['modem']['password']);
 		unset($config['modem']['apn']);
 		
-		if ($_POST['type'] == "Static") {
-			$wancfg['ipaddr'] = $_POST['ipaddr'];
-			$wancfg['subnet'] = $_POST['subnet'];
-			$wancfg['gateway'] = $_POST['gateway'];
+		if (($_POST['type'] ?? null) == "Static") {
+			$wancfg['ipaddr'] = $_POST['ipaddr'] ?? null;
+			$wancfg['subnet'] = $_POST['subnet'] ?? null;
+			$wancfg['gateway'] = $_POST['gateway'] ?? null;
 			if (isset($wancfg['ispointtopoint']))
-				$wancfg['pointtopoint'] = $_POST['pointtopoint'];
-		} else if ($_POST['type'] == "DHCP") {
+				$wancfg['pointtopoint'] = $_POST['pointtopoint'] ?? null;
+		} else if (($_POST['type'] ?? null) == "DHCP") {
 			$wancfg['ipaddr'] = "dhcp";
-			$wancfg['dhcphostname'] = $_POST['dhcphostname'];
-		} else if ($_POST['type'] == "PPPoE") {
+			$wancfg['dhcphostname'] = $_POST['dhcphostname'] ?? null;
+		} else if (($_POST['type'] ?? null) == "PPPoE") {
 			$wancfg['ipaddr'] = "pppoe";
-			$config['pppoe']['username'] = $_POST['username'];
-			$config['pppoe']['password'] = $_POST['password'];
-			$config['pppoe']['provider'] = $_POST['provider'];
-			$config['pppoe']['mtu'] = $_POST['pppoemtu'];
-		} else if ($_POST['type'] == "PPTP") {
+			$config['pppoe']['username'] = $_POST['username'] ?? null;
+			$config['pppoe']['password'] = $_POST['password'] ?? null;
+			$config['pppoe']['provider'] = $_POST['provider'] ?? null;
+			$config['pppoe']['mtu'] = $_POST['pppoemtu'] ?? null;
+		} else if (($_POST['type'] ?? null) == "PPTP") {
 			$wancfg['ipaddr'] = "pptp";
-			$config['pptp']['username'] = $_POST['pptp_username'];
-			$config['pptp']['password'] = $_POST['pptp_password'];
-			$config['pptp']['local'] = $_POST['pptp_local'];
-			$config['pptp']['subnet'] = $_POST['pptp_subnet'];
-			$config['pptp']['remote'] = $_POST['pptp_remote'];
-		} else if ($_POST['type'] == "Modem") {
+			$config['pptp']['username'] = $_POST['pptp_username'] ?? null;
+			$config['pptp']['password'] = $_POST['pptp_password'] ?? null;
+			$config['pptp']['local'] = $_POST['pptp_local'] ?? null;
+			$config['pptp']['subnet'] = $_POST['pptp_subnet'] ?? null;
+			$config['pptp']['remote'] = $_POST['pptp_remote'] ?? null;
+		} else if (($_POST['type'] ?? null) == "Modem") {
 			$wancfg['ipaddr'] = "modem";
-			$config['modem']['username'] = $_POST['modem_username'];
-			$config['modem']['password'] = $_POST['modem_password'];
-			$config['modem']['apn'] = $_POST['modem_apn'];
+			$config['modem']['username'] = $_POST['modem_username'] ?? null;
+			$config['modem']['password'] = $_POST['modem_password'] ?? null;
+			$config['modem']['apn'] = $_POST['modem_apn'] ?? null;
 		}
 		
-		$wancfg['blockpriv'] = $_POST['blockpriv'] ? true : false;
-		$wancfg['spoofmac'] = $_POST['spoofmac'];
+		$wancfg['blockpriv'] = !empty($_POST['blockpriv']) ? true : false;
+		$wancfg['spoofmac'] = $_POST['spoofmac'] ?? null;
 		
 		if (ipv6enabled()) {
 
-			if ($_POST['ipv6mode'] == "6to4" || $_POST['ipv6mode'] == "ppp") {
-				$wancfg['ipaddr6'] = $_POST['ipv6mode'];
-			} else if ($_POST['ipv6mode'] == "DHCP"){
-				$wancfg['ipaddr6'] = $_POST['ipv6mode'];
-				$wancfg['v6duid'] = $_POST['v6duid'];
-			} else if ($_POST['ipv6mode'] == "static") {
-				$wancfg['ipaddr6'] = $_POST['ipaddr6'];
-				$wancfg['subnet6'] = $_POST['subnet6'];
-				$wancfg['gateway6'] = $_POST['gateway6'];
-			} else if ($_POST['ipv6mode'] == "tunnel") {
-				$wancfg['ipaddr6'] = $_POST['ipaddr6'];
-				$wancfg['subnet6'] = $_POST['subnet6'];
-				$wancfg['tunnel6'] = $_POST['tunnel6'];
-			} else if ($_POST['ipv6mode'] == "aiccu") {
+			if (($_POST['ipv6mode'] ?? null) == "6to4" || ($_POST['ipv6mode'] ?? null) == "ppp") {
+				$wancfg['ipaddr6'] = $_POST['ipv6mode'] ?? null;
+			} else if (($_POST['ipv6mode'] ?? null) == "DHCP"){
+				$wancfg['ipaddr6'] = $_POST['ipv6mode'] ?? null;
+				$wancfg['v6duid'] = $_POST['v6duid'] ?? null;
+			} else if (($_POST['ipv6mode'] ?? null) == "static") {
+				$wancfg['ipaddr6'] = $_POST['ipaddr6'] ?? null;
+				$wancfg['subnet6'] = $_POST['subnet6'] ?? null;
+				$wancfg['gateway6'] = $_POST['gateway6'] ?? null;
+			} else if (($_POST['ipv6mode'] ?? null) == "tunnel") {
+				$wancfg['ipaddr6'] = $_POST['ipaddr6'] ?? null;
+				$wancfg['subnet6'] = $_POST['subnet6'] ?? null;
+				$wancfg['tunnel6'] = $_POST['tunnel6'] ?? null;
+			} else if (($_POST['ipv6mode'] ?? null) == "aiccu") {
 				$wancfg['ipaddr6'] = "aiccu";
-				$wancfg['aiccu']['username'] = $_POST['aiccu_username'];
-				$wancfg['aiccu']['password'] = $_POST['aiccu_password'];
-				$wancfg['aiccu']['tunnelid'] = $_POST['aiccu_tunnelid'];
-				$wancfg['aiccu']['ayiya']  = $_POST['aiccu_ayiya'] ? true : false;
+				$wancfg['aiccu']['username'] = $_POST['aiccu_username'] ?? null;
+				$wancfg['aiccu']['password'] = $_POST['aiccu_password'] ?? null;
+				$wancfg['aiccu']['tunnelid'] = $_POST['aiccu_tunnelid'] ?? null;
+				$wancfg['aiccu']['ayiya']  = !empty($_POST['aiccu_ayiya']) ? true : false;
 			}
 		}
 			
@@ -395,8 +395,8 @@ function type_change() {
 }
 //-->
 </script>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
             <form action="interfaces_wan.php" method="post" name="iform" id="iform">
               <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="content pane">
                 <tr> 
@@ -418,7 +418,7 @@ function type_change() {
                 </tr>
                 <tr> 
                   <td valign="top" class="vncell">MAC address</td>
-                  <td class="vtable"> <input name="spoofmac" type="text" class="formfld" id="spoofmac" size="30" value="<?=htmlspecialchars($pconfig['spoofmac']);?>"> 
+                  <td class="vtable"> <input name="spoofmac" type="text" class="formfld" id="spoofmac" size="30" value="<?=htmlspecialchars($pconfig['spoofmac'] ?? '');?>"> 
                     <br>
                     This field can be used to modify (&quot;spoof&quot;) the MAC 
                     address of the WAN interface<br>
@@ -434,7 +434,7 @@ function type_change() {
                 </tr>
                 <tr> 
                   <td width="100" valign="top" class="vncellreq">IP address</td>
-                  <td class="vtable"><?=$mandfldhtml;?><input name="ipaddr" type="text" class="formfld" id="ipaddr" size="20" value="<?=htmlspecialchars($pconfig['ipaddr']);?>">
+                  <td class="vtable"><?=$mandfldhtml;?><input name="ipaddr" type="text" class="formfld" id="ipaddr" size="20" value="<?=htmlspecialchars($pconfig['ipaddr'] ?? '');?>">
                     / 
                     <select name="subnet" class="formfld" id="subnet">
                     <?php
@@ -443,7 +443,7 @@ function type_change() {
                       else
                       	$snmax = 31;
                       for ($i = $snmax; $i > 0; $i--): ?>
-                      <option value="<?=$i;?>" <?php if ($i == $pconfig['subnet']) echo "selected"; ?>> 
+                      <option value="<?=$i;?>" <?php if ($i == ($pconfig['subnet'] ?? null)) echo "selected"; ?>> 
                       <?=$i;?>
                       </option>
                       <?php endfor; ?>
@@ -452,12 +452,12 @@ function type_change() {
                 <tr>
                   <td valign="top" class="vncellreq">Point-to-point IP address </td>
                   <td class="vtable">
-                    <?=$mandfldhtml;?><input name="pointtopoint" type="text" class="formfld" id="pointtopoint" size="20" value="<?=htmlspecialchars($pconfig['pointtopoint']);?>">
+                    <?=$mandfldhtml;?><input name="pointtopoint" type="text" class="formfld" id="pointtopoint" size="20" value="<?=htmlspecialchars($pconfig['pointtopoint'] ?? '');?>">
                   </td>
                 </tr><?php endif; ?>
                 <tr> 
                   <td valign="top" class="vncellreq">Gateway</td>
-                  <td class="vtable"><?=$mandfldhtml;?><input name="gateway" type="text" class="formfld" id="gateway" size="20" value="<?=htmlspecialchars($pconfig['gateway']);?>"> 
+                  <td class="vtable"><?=$mandfldhtml;?><input name="gateway" type="text" class="formfld" id="gateway" size="20" value="<?=htmlspecialchars($pconfig['gateway'] ?? '');?>"> 
                   </td>
                 </tr>
                 <tr> 
@@ -468,7 +468,7 @@ function type_change() {
                 </tr>
                 <tr> 
                   <td valign="top" class="vncell">Hostname</td>
-                  <td class="vtable"> <input name="dhcphostname" type="text" class="formfld" id="dhcphostname" size="40" value="<?=htmlspecialchars($pconfig['dhcphostname']);?>">
+                  <td class="vtable"> <input name="dhcphostname" type="text" class="formfld" id="dhcphostname" size="40" value="<?=htmlspecialchars($pconfig['dhcphostname'] ?? '');?>">
                     <br>
                     The value in this field is sent as the DHCP client identifier 
                     and hostname when requesting a DHCP lease. Some ISPs may require 
@@ -488,7 +488,7 @@ function type_change() {
                       <?php $opts = array('disabled' => 'disabled', 'static' => 'static', '6to4' => '6to4', 'tunnel' => 'Tunnel', 'ppp' => 'PPP', 'aiccu' => 'AICCU', 'DHCP' => 'DHCP');
 						foreach ($opts as $optn => $optd) {
 							echo "<option value=\"$optn\"";
-							if ($optn == $pconfig['ipv6mode']) echo "selected";
+							if ($optn == ($pconfig['ipv6mode'] ?? null)) echo "selected";
 							echo ">$optd</option>\n";
 						}
 						?>
@@ -503,18 +503,18 @@ function type_change() {
                 <tr> 
                   <td valign="top" class="vncellreq">DHCPv6 DUID</td>
                   <td class="vtable"> 
-                    <input name="v6duid" type="text" class="formfld" id="v6duid" size="30" value="<?=htmlspecialchars($pconfig['v6duid']);?>">
+                    <input name="v6duid" type="text" class="formfld" id="v6duid" size="30" value="<?=htmlspecialchars($pconfig['v6duid'] ?? '');?>">
                     </td>
                 </tr>
 				<tr> 
                   <td valign="top" class="vncellreq">IPv6 address</td>
                   <td class="vtable"> 
-                    <input name="ipaddr6" type="text" class="formfld" id="ipaddr6" size="30" value="<?=htmlspecialchars($pconfig['ipaddr6']);?>">
+                    <input name="ipaddr6" type="text" class="formfld" id="ipaddr6" size="30" value="<?=htmlspecialchars($pconfig['ipaddr6'] ?? '');?>">
                     / 
                     <select name="subnet6" class="formfld" id="subnet6">
                       <?php for ($i = 127; $i > 0; --$i): ?>
                       <option value="<?=$i;?>" <?php
-                        if ($i == $pconfig['subnet6'] || (!isset($pconfig['subnet6']) && $i == 64)) echo "selected";
+                        if ($i == ($pconfig['subnet6'] ?? null) || (!isset($pconfig['subnet6']) && $i == 64)) echo "selected";
                       ?>>
                       <?=$i;?>
                       </option>
@@ -524,13 +524,13 @@ function type_change() {
                 <tr> 
                   <td valign="top" class="vncellreq">IPv6 gateway</td>
                   <td class="vtable"> 
-                    <input name="gateway6" type="text" class="formfld" id="gateway6" size="30" value="<?=htmlspecialchars($pconfig['gateway6']);?>">
+                    <input name="gateway6" type="text" class="formfld" id="gateway6" size="30" value="<?=htmlspecialchars($pconfig['gateway6'] ?? '');?>">
                    </td>
                 </tr>
                 <tr> 
                   <td valign="top" class="vncellreq">IPv6 tunnel endpoint</td>
                   <td class="vtable"> 
-                    <input name="tunnel6" type="text" class="formfld" id="tunnel6" size="30" value="<?=htmlspecialchars($pconfig['tunnel6']);?>"><br>
+                    <input name="tunnel6" type="text" class="formfld" id="tunnel6" size="30" value="<?=htmlspecialchars($pconfig['tunnel6'] ?? '');?>"><br>
 					The IPv4 address of the remote tunnel endpoint (only when using tunnel mode).
                    </td>
                 </tr>
@@ -540,19 +540,19 @@ function type_change() {
                     <table border="0" cellspacing="0" cellpadding="0">
                       <tr> 
                         <td>Username:&nbsp;&nbsp;</td>
-                        <td><input name="aiccu_username" type="text" class="formfld" id="aiccu_username" size="20" value="<?=htmlspecialchars($pconfig['aiccu_username']);?>"></td>
+                        <td><input name="aiccu_username" type="text" class="formfld" id="aiccu_username" size="20" value="<?=htmlspecialchars($pconfig['aiccu_username'] ?? '');?>"></td>
                       </tr>
                       <tr> 
                         <td>Password:&nbsp;&nbsp;</td>
-                        <td><input name="aiccu_password" type="password" class="formfld" id="aiccu_password" size="20" value="<?=htmlspecialchars($pconfig['aiccu_password']);?>"></td>
+                        <td><input name="aiccu_password" type="password" class="formfld" id="aiccu_password" size="20" value="<?=htmlspecialchars($pconfig['aiccu_password'] ?? '');?>"></td>
 					  </tr>
 					  <tr> 
                         <td>Tunnel ID:&nbsp;&nbsp;</td>
-                        <td><input name="aiccu_tunnelid" type="text" class="formfld" id="aiccu_tunnelid" size="10" value="<?=htmlspecialchars($pconfig['aiccu_tunnelid']);?>"></td>
+                        <td><input name="aiccu_tunnelid" type="text" class="formfld" id="aiccu_tunnelid" size="10" value="<?=htmlspecialchars($pconfig['aiccu_tunnelid'] ?? '');?>"></td>
 					  </tr>
                       <tr> 
 	                    <td>AYIYA:&nbsp;&nbsp;</td>
-	                    <td><input type="checkbox" name="aiccu_ayiya" id="aiccu_ayiya" value="1" <?php if ($pconfig['aiccu_ayiya']) echo "checked";?>></td>
+	                    <td><input type="checkbox" name="aiccu_ayiya" id="aiccu_ayiya" value="1" <?php if (!empty($pconfig['aiccu_ayiya'])) echo "checked";?>></td>
 					  </tr>
                     </table><br>
 					Enter your SixXS account information here (only when using AICCU).
@@ -567,23 +567,23 @@ function type_change() {
                 </tr>
                 <tr> 
                   <td valign="top" class="vncellreq">Username</td>
-                  <td class="vtable"><?=$mandfldhtml;?><input name="username" type="text" class="formfld" id="username" size="20" value="<?=htmlspecialchars($pconfig['username']);?>"> 
+                  <td class="vtable"><?=$mandfldhtml;?><input name="username" type="text" class="formfld" id="username" size="20" value="<?=htmlspecialchars($pconfig['username'] ?? '');?>"> 
                   </td>
                 </tr>
                 <tr> 
                   <td valign="top" class="vncellreq">Password</td>
-                  <td class="vtable"><?=$mandfldhtml;?><input name="password" type="password" class="formfld" id="password" size="20" value="<?=htmlspecialchars($pconfig['password']);?>"> 
+                  <td class="vtable"><?=$mandfldhtml;?><input name="password" type="password" class="formfld" id="password" size="20" value="<?=htmlspecialchars($pconfig['password'] ?? '');?>"> 
                   </td>
                 </tr>
                 <tr> 
                   <td valign="top" class="vncell">Service name</td>
-                  <td class="vtable"><input name="provider" type="text" class="formfld" id="provider" size="20" value="<?=htmlspecialchars($pconfig['provider']);?>"> 
+                  <td class="vtable"><input name="provider" type="text" class="formfld" id="provider" size="20" value="<?=htmlspecialchars($pconfig['provider'] ?? '');?>"> 
                     <br> <span class="vexpl">Hint: this field can usually be left 
                     empty</span></td>
                 </tr>
                 <tr> 
                   <td valign="top" class="vncell">MTU</td>
-                  <td class="vtable"><input name="pppoemtu" type="text" class="formfld" id="pppoemtu" size="6" value="<?=htmlspecialchars($pconfig['pppoemtu']);?>"> bytes 
+                  <td class="vtable"><input name="pppoemtu" type="text" class="formfld" id="pppoemtu" size="6" value="<?=htmlspecialchars($pconfig['pppoemtu'] ?? '');?>"> bytes 
                     <br><span class="vexpl">Usually, the maximum MTU value of 1492 bytes (which is used by default) works fine, but if you
 						have problems with some sites not loading properly, you can try a smaller value (e.g. 1400) here.</span></td>
                 </tr>
@@ -595,21 +595,21 @@ function type_change() {
                 </tr>
                 <tr> 
                   <td valign="top" class="vncellreq">Username</td>
-                  <td class="vtable"><?=$mandfldhtml;?><input name="pptp_username" type="text" class="formfld" id="pptp_username" size="20" value="<?=htmlspecialchars($pconfig['pptp_username']);?>"> 
+                  <td class="vtable"><?=$mandfldhtml;?><input name="pptp_username" type="text" class="formfld" id="pptp_username" size="20" value="<?=htmlspecialchars($pconfig['pptp_username'] ?? '');?>"> 
                   </td>
                 </tr>
                 <tr> 
                   <td valign="top" class="vncellreq">Password</td>
-                  <td class="vtable"><?=$mandfldhtml;?><input name="pptp_password" type="password" class="formfld" id="pptp_password" size="20" value="<?=htmlspecialchars($pconfig['pptp_password']);?>"> 
+                  <td class="vtable"><?=$mandfldhtml;?><input name="pptp_password" type="password" class="formfld" id="pptp_password" size="20" value="<?=htmlspecialchars($pconfig['pptp_password'] ?? '');?>"> 
                   </td>
                 </tr>
                 <tr> 
                   <td width="100" valign="top" class="vncellreq">Local IP address</td>
-                  <td class="vtable"><?=$mandfldhtml;?><input name="pptp_local" type="text" class="formfld" id="pptp_local" size="20" value="<?=htmlspecialchars($pconfig['pptp_local']);?>">
+                  <td class="vtable"><?=$mandfldhtml;?><input name="pptp_local" type="text" class="formfld" id="pptp_local" size="20" value="<?=htmlspecialchars($pconfig['pptp_local'] ?? '');?>">
                     / 
                     <select name="pptp_subnet" class="formfld" id="pptp_subnet">
                       <?php for ($i = 31; $i > 0; $i--): ?>
-                      <option value="<?=$i;?>" <?php if ($i == $pconfig['pptp_subnet']) echo "selected"; ?>> 
+                      <option value="<?=$i;?>" <?php if ($i == ($pconfig['pptp_subnet'] ?? null)) echo "selected"; ?>> 
                       <?=$i;?>
                       </option>
                       <?php endfor; ?>
@@ -617,7 +617,7 @@ function type_change() {
                 </tr>
                 <tr> 
                   <td width="100" valign="top" class="vncellreq">Remote IP address</td>
-                  <td class="vtable"><?=$mandfldhtml;?><input name="pptp_remote" type="text" class="formfld" id="pptp_remote" size="20" value="<?=htmlspecialchars($pconfig['pptp_remote']);?>"> 
+                  <td class="vtable"><?=$mandfldhtml;?><input name="pptp_remote" type="text" class="formfld" id="pptp_remote" size="20" value="<?=htmlspecialchars($pconfig['pptp_remote'] ?? '');?>"> 
                   </td>
                 </tr>
                                <tr> 
@@ -628,17 +628,17 @@ function type_change() {
                 </tr>
                 <tr> 
                   <td valign="top" class="vncellreq">Username</td>
-                  <td class="vtable"><?=$mandfldhtml;?><input name="modem_username" type="text" class="formfld" id="modem_username" size="20" value="<?=htmlspecialchars($pconfig['modem_username']);?>"> 
+                  <td class="vtable"><?=$mandfldhtml;?><input name="modem_username" type="text" class="formfld" id="modem_username" size="20" value="<?=htmlspecialchars($pconfig['modem_username'] ?? '');?>"> 
                   </td>
                 </tr>
                 <tr> 
                   <td valign="top" class="vncellreq">Password</td>
-                  <td class="vtable"><?=$mandfldhtml;?><input name="modem_password" type="password" class="formfld" id="modem_password" size="20" value="<?=htmlspecialchars($pconfig['modem_password']);?>"> 
+                  <td class="vtable"><?=$mandfldhtml;?><input name="modem_password" type="password" class="formfld" id="modem_password" size="20" value="<?=htmlspecialchars($pconfig['modem_password'] ?? '');?>"> 
                   </td>
                 </tr>
                 <tr> 
                   <td valign="top" class="vncell">APN</td>
-                  <td class="vtable"><input name="modem_apn" type="text" class="formfld" id="modem_apn" size="20" value="<?=htmlspecialchars($pconfig['modem_apn']);?>"> 
+                  <td class="vtable"><input name="modem_apn" type="text" class="formfld" id="modem_apn" size="20" value="<?=htmlspecialchars($pconfig['modem_apn'] ?? '');?>"> 
                     </td>
                 </tr>
                 <tr> 

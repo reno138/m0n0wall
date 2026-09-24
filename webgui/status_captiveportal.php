@@ -48,7 +48,7 @@ flush();
 
 function clientcmp($a, $b) {
     global $order;
-    return strcmp($a[$order], $b[$order]);
+    return strcmp($a[$order] ?? '', $b[$order] ?? '');
 }
 
 $cpdb = array();
@@ -63,7 +63,7 @@ if ($fp) {
             $volume = getVolume($cpent[1]);
             $cpent[7] = $volume['output_bytes'];
             $cpent[8] = $volume['input_bytes'];
-            if ($_GET['showact'])
+            if (!empty($_GET['showact']))
                 $cpent[9] = captiveportal_get_last_activity($cpent[1]);
             $cpdb[] = $cpent;
         }
@@ -71,7 +71,7 @@ if ($fp) {
 
     fclose($fp);
 
-    if ($_GET['order']) {
+    if (!empty($_GET['order'])) {
         if ($_GET['order'] == "ip")
             $order = 2;
         else if ($_GET['order'] == "mac")
@@ -113,15 +113,15 @@ $tabs = array('Users' => 'status_captiveportal.php',
 
 <table width="100%" border="0" cellpadding="0" cellspacing="0" summary="content pane">
   <tr>
-    <td class="listhdrr"><a href="?order=ip&amp;showact=<?=htmlspecialchars($_GET['showact']);?>">IP address</a></td>
-    <td class="listhdrr"><a href="?order=mac&amp;showact=<?=htmlspecialchars($_GET['showact']);?>">MAC address</a></td>
-    <td class="listhdrr"><a href="?order=start&amp;showact=<?=htmlspecialchars($_GET['showact']);?>">Session start</a></td>
-    <td class="listhdrr"><a href="?order=download&amp;showact=<?=htmlspecialchars($_GET['showact']);?>">Download</a></td>
-    <td class="listhdrr"><a href="?order=upload&amp;showact=<?=htmlspecialchars($_GET['showact']);?>">Upload</a></td>
-    <?php if ($_GET['showact']): ?>
-    <td class="listhdrr"><a href="?order=lastact&amp;showact=<?=htmlspecialchars($_GET['showact']);?>">Last activity</a></td>
+    <td class="listhdrr"><a href="?order=ip&amp;showact=<?=htmlspecialchars($_GET['showact'] ?? '');?>">IP address</a></td>
+    <td class="listhdrr"><a href="?order=mac&amp;showact=<?=htmlspecialchars($_GET['showact'] ?? '');?>">MAC address</a></td>
+    <td class="listhdrr"><a href="?order=start&amp;showact=<?=htmlspecialchars($_GET['showact'] ?? '');?>">Session start</a></td>
+    <td class="listhdrr"><a href="?order=download&amp;showact=<?=htmlspecialchars($_GET['showact'] ?? '');?>">Download</a></td>
+    <td class="listhdrr"><a href="?order=upload&amp;showact=<?=htmlspecialchars($_GET['showact'] ?? '');?>">Upload</a></td>
+    <?php if (!empty($_GET['showact'])): ?>
+    <td class="listhdrr"><a href="?order=lastact&amp;showact=<?=htmlspecialchars($_GET['showact'] ?? '');?>">Last activity</a></td>
     <?php endif; ?>
-    <td class="listhdr"><a href="?order=user&amp;showact=<?=htmlspecialchars($_GET['showact']);?>">Username</a></td>
+    <td class="listhdr"><a href="?order=user&amp;showact=<?=htmlspecialchars($_GET['showact'] ?? '');?>">Username</a></td>
     <td class="list"></td>
   </tr>
 <?php foreach ($cpdb as $cpent): ?>
@@ -131,7 +131,7 @@ $tabs = array('Users' => 'status_captiveportal.php',
     <td class="listr"><?=htmlspecialchars(date("m/d/Y H:i:s", $cpent[0]));?></td>
     <td class="listr"><?=format_bytes($cpent[7]);?></td>
     <td class="listr"><?=format_bytes($cpent[8]);?></td>
-    <?php if ($_GET['showact']): ?>
+    <?php if (!empty($_GET['showact'])): ?>
     <td class="listr"><?php if ($cpent[9]) echo htmlspecialchars(date("m/d/Y H:i:s", $cpent[9]));?></td>
     <?php endif; ?>
     <td class="listr"><?=$cpent[4];?>&nbsp;</td>
@@ -150,8 +150,8 @@ $tabs = array('Users' => 'status_captiveportal.php',
 
 <p><!-- TODO: paragraph is not valid here -->
 <form action="status_captiveportal.php" method="GET">
-<input type="hidden" name="order" value="<?=htmlspecialchars($_GET['order']);?>">
-<?php if ($_GET['showact']): ?>
+<input type="hidden" name="order" value="<?=htmlspecialchars($_GET['order'] ?? '');?>">
+<?php if (!empty($_GET['showact'])): ?>
 <input type="hidden" name="showact" value="0">
 <input type="submit" class="formbtn" value="Don't show last activity">
 <?php else: ?>

@@ -32,13 +32,13 @@
 $pgtitle = array("Firewall", "NAT", "Edit outbound mapping");
 require("guiconfig.inc");
 
-if (!is_array($config['nat']['advancedoutbound']['rule']))
+if (!is_array($config['nat']['advancedoutbound']['rule'] ?? null))
     $config['nat']['advancedoutbound']['rule'] = array();
     
 $a_out = &$config['nat']['advancedoutbound']['rule'];
 nat_out_rules_sort();
 
-$id = $_GET['id'];
+$id = $_GET['id'] ?? null;
 if (isset($_POST['id']))
     $id = $_POST['id'];
 
@@ -46,8 +46,11 @@ function network_to_pconfig($adr, &$padr, &$pmask, &$pnot) {
 
     if (isset($adr['any']))
         $padr = "any";
-    else if ($adr['network']) {
-        list($padr, $pmask) = explode("/", $adr['network']);
+    else if (!empty($adr['network'])) {
+        /* a single host has no /bits part -> explode() returns one element */
+        $netparts = explode("/", $adr['network']);
+        $padr = $netparts[0];
+        $pmask = $netparts[1] ?? null;
         if (!$pmask)
             $pmask = 32;
     }
@@ -58,15 +61,18 @@ function network_to_pconfig($adr, &$padr, &$pmask, &$pnot) {
         $pnot = 0;
 }
 
-if (isset($id) && $a_out[$id]) {
-    list($pconfig['source'],$pconfig['source_subnet']) = explode('/', $a_out[$id]['source']['network']);
+if (isset($id) && !empty($a_out[$id])) {
+    /* a single host has no /bits part -> explode() returns one element */
+    $srcparts = explode('/', $a_out[$id]['source']['network'] ?? '');
+    $pconfig['source'] = $srcparts[0] ?? null;
+    $pconfig['source_subnet'] = $srcparts[1] ?? null;
     network_to_pconfig($a_out[$id]['destination'], $pconfig['destination'],
 	   $pconfig['destination_subnet'], $pconfig['destination_not']);
-    $pconfig['target'] = $a_out[$id]['target'];
-    $pconfig['interface'] = $a_out[$id]['interface'];
+    $pconfig['target'] = $a_out[$id]['target'] ?? null;
+    $pconfig['interface'] = $a_out[$id]['interface'] ?? null;
 	if (!$pconfig['interface'])
 		$pconfig['interface'] = "wan";
-    $pconfig['descr'] = $a_out[$id]['descr'];
+    $pconfig['descr'] = $a_out[$id]['descr'] ?? null;
     $pconfig['noportmap'] = isset($a_out[$id]['noportmap']);
 } else {
     $pconfig['source_subnet'] = 24;
@@ -78,7 +84,7 @@ if (isset($id) && $a_out[$id]) {
 
 if ($_POST) {
     
-    if ($_POST['destination_type'] == "any") {
+    if (($_POST['destination_type'] ?? null) == "any") {
         $_POST['destination'] = "any";
         $_POST['destination_subnet'] = 24;
     }
@@ -92,37 +98,37 @@ if ($_POST) {
     
     do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 
-    if ($_POST['source'] && !is_ipaddr($_POST['source'])) {
+    if (!empty($_POST['source']) && !is_ipaddr($_POST['source'])) {
         $input_errors[] = "A valid source must be specified.";
     }
-    if ($_POST['source_subnet'] && !is_numericint($_POST['source_subnet'])) {
+    if (!empty($_POST['source_subnet']) && !is_numericint($_POST['source_subnet'])) {
         $input_errors[] = "A valid source bit count must be specified.";
     }
-    if ($_POST['destination_type'] != "any") {
-        if ($_POST['destination'] && !is_ipaddr($_POST['destination'])) {
+    if (($_POST['destination_type'] ?? null) != "any") {
+        if (!empty($_POST['destination']) && !is_ipaddr($_POST['destination'])) {
             $input_errors[] = "A valid destination must be specified.";
         }
-        if ($_POST['destination_subnet'] && !is_numericint($_POST['destination_subnet'])) {
+        if (!empty($_POST['destination_subnet']) && !is_numericint($_POST['destination_subnet'])) {
             $input_errors[] = "A valid destination bit count must be specified.";
         }
     }
-    if ($_POST['target'] && !is_ipaddr($_POST['target'])) {
+    if (!empty($_POST['target']) && !is_ipaddr($_POST['target'])) {
         $input_errors[] = "A valid target IP address must be specified.";
     }
     
     /* check for existing entries */
-    $osn = gen_subnet($_POST['source'], $_POST['source_subnet']) . "/" . $_POST['source_subnet'];
-    if ($_POST['destination_type'] == "any")
+    $osn = gen_subnet($_POST['source'] ?? '', $_POST['source_subnet'] ?? '') . "/" . ($_POST['source_subnet'] ?? '');
+    if (($_POST['destination_type'] ?? null) == "any")
         $ext = "any";
     else
-        $ext = gen_subnet($_POST['destination'], $_POST['destination_subnet']) . "/"
-            . $_POST['destination_subnet'];
+        $ext = gen_subnet($_POST['destination'] ?? '', $_POST['destination_subnet'] ?? '') . "/"
+            . ($_POST['destination_subnet'] ?? '');
 			
-	if ($_POST['target']) {
+	if (!empty($_POST['target'])) {
 		/* check for clashes with 1:1 NAT (Server NAT is OK) */
 		if (is_array($config['nat']['onetoone'])) {
 			foreach ($config['nat']['onetoone'] as $natent) {
-				if (check_subnets_overlap($_POST['target'], 32, $natent['external'], $natent['subnet'])) {
+				if (check_subnets_overlap($_POST['target'], 32, $natent['external'] ?? '', $natent['subnet'] ?? '')) {
 					$input_errors[] = "A 1:1 NAT mapping overlaps with the specified target IP address.";
 					break;
 				}
@@ -131,16 +137,16 @@ if ($_POST) {
 	}
     
     foreach ($a_out as $natent) {
-        if (isset($id) && ($a_out[$id]) && ($a_out[$id] === $natent))
+        if (isset($id) && (!empty($a_out[$id])) && ($a_out[$id] === $natent))
             continue;
         
-		if (!$natent['interface'])
+		if (empty($natent['interface']))
 			$natent['interface'] == "wan";
 		
-		if (($natent['interface'] == $_POST['interface']) && ($natent['source']['network'] == $osn)) {
+		if ((($natent['interface'] ?? null) == ($_POST['interface'] ?? null)) && (($natent['source']['network'] ?? null) == $osn)) {
 			if (isset($natent['destination']['not']) == isset($_POST['destination_not'])) {
 				if ((isset($natent['destination']['any']) && ($ext == "any")) ||
-						($natent['destination']['network'] == $ext)) {
+						(($natent['destination']['network'] ?? null) == $ext)) {
 					$input_errors[] = "There is already an outbound NAT rule with the specified settings.";
 					break;
 				}
@@ -148,13 +154,13 @@ if ($_POST) {
 		}
     }
 
-    if (!$input_errors) {
+    if (empty($input_errors)) {
         $natent = array();
         $natent['source']['network'] = $osn;
-        $natent['descr'] = $_POST['descr'];
-        $natent['target'] = $_POST['target'];
-        $natent['interface'] = $_POST['interface'];
-        $natent['noportmap'] = $_POST['noportmap'] ? true : false;
+        $natent['descr'] = $_POST['descr'] ?? null;
+        $natent['target'] = $_POST['target'] ?? null;
+        $natent['interface'] = $_POST['interface'] ?? null;
+        $natent['noportmap'] = !empty($_POST['noportmap']) ? true : false;
         
         if ($ext == "any")
             $natent['destination']['any'] = true;
@@ -164,7 +170,7 @@ if ($_POST) {
         if (isset($_POST['destination_not']) && $ext != "any")
             $natent['destination']['not'] = true;
         
-        if (isset($id) && $a_out[$id])
+        if (isset($id) && !empty($a_out[$id]))
             $a_out[$id] = $natent;
         else
             $a_out[] = $natent;
@@ -197,7 +203,7 @@ function typesel_change() {
 }
 //-->
 </script>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
             <form action="firewall_nat_out_edit.php" method="post" name="iform" id="iform">
               <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="content pane">
 			      <tr>
@@ -207,10 +213,10 @@ function typesel_change() {
 						<?php
 						$interfaces = array('wan' => 'WAN');
 						for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-							$interfaces['opt' . $i] = $config['interfaces']['opt' . $i]['descr'];
+							$interfaces['opt' . $i] = $config['interfaces']['opt' . $i]['descr'] ?? '';
 						}
 						foreach ($interfaces as $iface => $ifacename): ?>
-						<option value="<?=$iface;?>" <?php if ($iface == $pconfig['interface']) echo "selected"; ?>> 
+						<option value="<?=$iface;?>" <?php if ($iface == ($pconfig['interface'] ?? null)) echo "selected"; ?>> 
 						<?=htmlspecialchars($ifacename);?>
 						</option>
 						<?php endforeach; ?>
@@ -221,12 +227,12 @@ function typesel_change() {
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">Source</td>
                   <td width="78%" class="vtable">
-					<?=$mandfldhtml;?><input name="source" type="text" class="formfld" id="source" size="20" value="<?=htmlspecialchars($pconfig['source']);?>">
+					<?=$mandfldhtml;?><input name="source" type="text" class="formfld" id="source" size="20" value="<?=htmlspecialchars($pconfig['source'] ?? '');?>">
                      
                   / 
                     <select name="source_subnet" class="formfld" id="source_subnet">
                       <?php for ($i = 32; $i >= 0; $i--): ?>
-                      <option value="<?=$i;?>" <?php if ($i == $pconfig['source_subnet']) echo "selected"; ?>>
+                      <option value="<?=$i;?>" <?php if ($i == ($pconfig['source_subnet'] ?? null)) echo "selected"; ?>>
                       <?=$i;?>
                       </option>
                       <?php endfor; ?>
@@ -237,7 +243,7 @@ function typesel_change() {
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">Destination</td>
                   <td width="78%" class="vtable">
-				<input name="destination_not" type="checkbox" id="destination_not" value="yes" <?php if ($pconfig['destination_not']) echo "checked"; ?>>
+				<input name="destination_not" type="checkbox" id="destination_not" value="yes" <?php if (!empty($pconfig['destination_not'])) echo "checked"; ?>>
                     <strong>not</strong><br>
                     Use this option to invert the sense of the match.<br>
                     <br>
@@ -246,20 +252,20 @@ function typesel_change() {
                         <td>Type:&nbsp;&nbsp;</td>
 						<td></td>
                         <td><select name="destination_type" class="formfld" onChange="typesel_change()">
-                            <option value="any" <?php if ($pconfig['destination'] == "any") echo "selected"; ?>> 
+                            <option value="any" <?php if (($pconfig['destination'] ?? null) == "any") echo "selected"; ?>> 
                             any</option>
-                            <option value="network" <?php if ($pconfig['destination'] != "any") echo "selected"; ?>> 
+                            <option value="network" <?php if (($pconfig['destination'] ?? null) != "any") echo "selected"; ?>> 
                             Network</option>
                           </select></td>
                       </tr>
                       <tr> 
                         <td>Address:&nbsp;&nbsp;</td>
 						<td><?=$mandfldhtmlspc;?></td>
-                        <td><input name="destination" type="text" class="formfld" id="destination" size="20" value="<?=htmlspecialchars($pconfig['destination']);?>">
+                        <td><input name="destination" type="text" class="formfld" id="destination" size="20" value="<?=htmlspecialchars($pconfig['destination'] ?? '');?>">
                           / 
                           <select name="destination_subnet" class="formfld" id="destination_subnet">
                             <?php for ($i = 32; $i >= 0; $i--): ?>
-                            <option value="<?=$i;?>" <?php if ($i == $pconfig['destination_subnet']) echo "selected"; ?>> 
+                            <option value="<?=$i;?>" <?php if ($i == ($pconfig['destination_subnet'] ?? null)) echo "selected"; ?>> 
                             <?=$i;?>
                             </option>
                             <?php endfor; ?>
@@ -276,14 +282,14 @@ function typesel_change() {
                 <tr> 
                   <td valign="top" class="vncell">Target</td>
                   <td class="vtable">
-<input name="target" type="text" class="formfld" id="target" size="20" value="<?=htmlspecialchars($pconfig['target']);?>">
+<input name="target" type="text" class="formfld" id="target" size="20" value="<?=htmlspecialchars($pconfig['target'] ?? '');?>">
                     <br>
                      <span class="vexpl">Packets matching this rule will be mapped to the IP address given here. Leave blank to use the selected interface's IP address.</span></td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncell">Portmap</td>
                   <td width="78%" class="vtable">
-					<input name="noportmap" type="checkbox" id="noportmap" value="1" <?php if ($pconfig['noportmap']) echo "checked"; ?>> <strong>Avoid port mapping</strong>
+					<input name="noportmap" type="checkbox" id="noportmap" value="1" <?php if (!empty($pconfig['noportmap'])) echo "checked"; ?>> <strong>Avoid port mapping</strong>
                     <br>
                      <span class="vexpl">This option avoids remapping of the source port number for outbound packets whenever possible
 						(i.e. when there is no other mapping for the same port). This may help with software
@@ -293,7 +299,7 @@ function typesel_change() {
                 <tr> 
                   <td width="22%" valign="top" class="vncell">Description</td>
                   <td width="78%" class="vtable"> 
-                    <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr']);?>"> 
+                    <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr'] ?? '');?>"> 
                     <br> <span class="vexpl">You may enter a description here 
                     for your reference (not parsed).</span></td>
                 </tr>
@@ -301,7 +307,7 @@ function typesel_change() {
                   <td width="22%" valign="top">&nbsp;</td>
                   <td width="78%"> 
                     <input name="Submit" type="submit" class="formbtn" value="Save"> 
-                    <?php if (isset($id) && $a_out[$id]): ?>
+                    <?php if (isset($id) && !empty($a_out[$id])): ?>
                     <input name="id" type="hidden" value="<?=htmlspecialchars($id);?>"> 
                     <?php endif; ?>
                   </td>

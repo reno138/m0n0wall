@@ -32,7 +32,7 @@
 $pgtitle = array("Firewall", "NAT", "Outbound");
 require("guiconfig.inc");
 
-if (!is_array($config['nat']['advancedoutbound']['rule']))
+if (!is_array($config['nat']['advancedoutbound']['rule'] ?? null))
     $config['nat']['advancedoutbound']['rule'] = array();
     
 $a_out = &$config['nat']['advancedoutbound']['rule'];
@@ -42,11 +42,11 @@ if ($_POST) {
 
     $pconfig = $_POST;
 
-    $config['nat']['advancedoutbound']['enable'] = ($_POST['enable']) ? true : false;
+    $config['nat']['advancedoutbound']['enable'] = (!empty($_POST['enable'])) ? true : false;
 
-	if (isset($_POST['del_x']) && is_array($_POST['entries'])) {
+	if (isset($_POST['del_x']) && is_array($_POST['entries'] ?? null)) {
 		foreach ($_POST['entries'] as $entry) {
-			if ($a_out[$entry])
+			if (!empty($a_out[$entry]))
 				unset($a_out[$entry]);
 		}
 	}
@@ -73,7 +73,7 @@ if ($_POST) {
 ?>
 <?php include("fbegin.inc"); ?>
 <form action="firewall_nat_out.php" method="post">
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
 <?php if (file_exists($d_natconfdirty_path)): ?><p>
 <?php print_info_box_np("The NAT configuration has been changed.<br>You must apply the changes in order for them to take effect.");?><br>
 <input name="apply" type="submit" class="formbtn" id="apply" value="Apply changes"></p>
@@ -132,14 +132,14 @@ if ($_POST) {
 				  <td class="listt"><input type="checkbox" name="entries[]" value="<?=$i;?>" style="margin: 0 5px 0 0; padding: 0; width: 15px; height: 15px;"></td>
                   <td class="listlr">
                     <?php
-					if (!$natent['interface'] || ($natent['interface'] == "wan"))
+					if (empty($natent['interface']) || ($natent['interface'] == "wan"))
 					  	echo "WAN";
 					else
-						echo htmlspecialchars($config['interfaces'][$natent['interface']]['descr']);
+						echo htmlspecialchars($config['interfaces'][$natent['interface']]['descr'] ?? '');
 					?>
                   </td>
                   <td class="listr"> 
-                    <?=$natent['source']['network'];?>
+                    <?=$natent['source']['network'] ?? '';?>
                   </td>
                   <td class="listr"> 
                     <?php
@@ -148,13 +148,13 @@ if ($_POST) {
                       else {
                           if (isset($natent['destination']['not']))
                               echo "!&nbsp;";
-                          echo $natent['destination']['network'];
+                          echo $natent['destination']['network'] ?? '';
                       }
                     ?>
                   </td>
                   <td class="listr"> 
                     <?php
-                      if (!$natent['target'])
+                      if (empty($natent['target']))
                           echo "*";
                       else
                           echo $natent['target'];
@@ -164,7 +164,7 @@ if ($_POST) {
                     ?>
                   </td>
                   <td class="listbg"> 
-                    <?=htmlspecialchars($natent['descr']);?>&nbsp;
+                    <?=htmlspecialchars($natent['descr'] ?? '');?>&nbsp;
                   </td>
                   <td class="list" nowrap> <a href="firewall_nat_out_edit.php?id=<?=$i;?>"><img src="e.gif" title="edit mapping" width="17" height="17" border="0" alt="edit mapping"></a></td>
                 </tr>

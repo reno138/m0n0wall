@@ -32,13 +32,13 @@
 $pgtitle = array("Firewall", "Traffic shaper", "Rules");
 require("guiconfig.inc");
 
-if (!is_array($config['shaper']['rule'])) {
+if (!is_array($config['shaper']['rule'] ?? null)) {
 	$config['shaper']['rule'] = array();
 }
-if (!is_array($config['shaper']['pipe'])) {
+if (!is_array($config['shaper']['pipe'] ?? null)) {
 	$config['shaper']['pipe'] = array();
 }
-if (!is_array($config['shaper']['queue'])) {
+if (!is_array($config['shaper']['queue'] ?? null)) {
 	$config['shaper']['queue'] = array();
 }
 $a_shaper = &$config['shaper']['rule'];
@@ -49,13 +49,13 @@ $pconfig['enable'] = isset($config['shaper']['enable']);
 
 if ($_POST) {
 
-	if ($_POST['submit']) {
+	if (!empty($_POST['submit'])) {
 		$pconfig = $_POST;
-		$config['shaper']['enable'] = $_POST['enable'] ? true : false;
+		$config['shaper']['enable'] = !empty($_POST['enable']) ? true : false;
 		write_config();
 	}
 	
-	if ($_POST['apply'] || $_POST['submit']) {
+	if (!empty($_POST['apply']) || !empty($_POST['submit'])) {
 		$retval = 0;
 		if (!file_exists($d_sysrebootreqd_path)) {
 			config_lock();
@@ -71,10 +71,10 @@ if ($_POST) {
 	
 	if (isset($_POST['del_x'])) {
 		/* delete selected rules */
-		if (is_array($_POST['rule']) && count($_POST['rule'])) {
+		if (is_array($_POST['rule'] ?? null) && count($_POST['rule'])) {
 			foreach ($_POST['rule'] as $rulei) {
 				// Scheduler: delete matching jobs
-				croen_update_job(Array('shaper-enable_rule', 'shaper-disable_rule'), $a_shaper[$rulei]['descr']);
+				croen_update_job(Array('shaper-enable_rule', 'shaper-disable_rule'), $a_shaper[$rulei]['descr'] ?? null);
 				unset($a_shaper[$rulei]);
 			}
 			write_config();
@@ -97,7 +97,7 @@ if ($_POST) {
 			}
 		}
 		/* move selected rules before this rule */
-		if (isset($movebtn) && is_array($_POST['rule']) && count($_POST['rule'])) {
+		if (isset($movebtn) && is_array($_POST['rule'] ?? null) && count($_POST['rule'])) {
 			$a_shaper_new = array();
 
 			/* copy all rules < $movebtn and not selected */
@@ -132,7 +132,7 @@ if ($_POST) {
 		}
 
 		if (isset($togglebtn)) {
-			if ($a_shaper[$togglebtn]) {
+			if (!empty($a_shaper[$togglebtn])) {
 				$a_shaper[$togglebtn]['disabled'] = !isset($a_shaper[$togglebtn]['disabled']);
 				write_config();
 				touch($d_shaperconfdirty_path);
@@ -197,7 +197,7 @@ function fr_insline(id, on) {
 // -->
 </script>
 <form action="firewall_shaper.php" method="post">
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
 <?php if (file_exists($d_shaperconfdirty_path)): ?><p>
 <?php print_info_box_np("The traffic shaper configuration has been changed.<br>You must apply the changes in order for them to take effect.");?><br>
 <input name="apply" type="submit" class="formbtn" id="apply" value="Apply changes"></p>
@@ -255,9 +255,9 @@ function fr_insline(id, on) {
 				  $iflabels = array('lan' => 'LAN', 'wan' => 'WAN', 'pptp' => 'PPTP');
 				  for ($j = 1; isset($config['interfaces']['opt' . $j]); $j++)
 				  	$iflabels['opt' . $j] = $config['interfaces']['opt' . $j]['descr'];
-				  echo $textss . htmlspecialchars($iflabels[$shaperent['interface']]);
+				  echo $textss . htmlspecialchars($iflabels[$shaperent['interface'] ?? ''] ?? '');
 				  echo "<br>";
-				  if ($shaperent['direction'] != "in")
+				  if (($shaperent['direction'] ?? null) != "in")
 					$iconfn = "out{$dis}.gif";
 				  else
 				    $iconfn = "in{$dis}.gif";
@@ -269,25 +269,25 @@ function fr_insline(id, on) {
                           <?=$textss;?><?php if (isset($shaperent['protocol'])) echo strtoupper($shaperent['protocol']); else echo "*"; ?><?=$textse;?>
                         </td>
                         <td class="listr" onClick="fr_toggle(<?=$i;?>)"><?=$textss;?><?php echo htmlspecialchars(pprint_address($shaperent['source'])); ?>
-						<?php if ($shaperent['source']['port']): ?><br>
+						<?php if (!empty($shaperent['source']['port'])): ?><br>
 						Port: <?=htmlspecialchars(pprint_port($shaperent['source']['port'])); ?> 
 						<?php endif; ?><?=$textse;?>
                         </td>
                         <td class="listr" onClick="fr_toggle(<?=$i;?>)"><?=$textss;?><?php echo htmlspecialchars(pprint_address($shaperent['destination'])); ?>
-						<?php if ($shaperent['destination']['port']): ?><br>
+						<?php if (!empty($shaperent['destination']['port'])): ?><br>
 						Port: <?=htmlspecialchars(pprint_port($shaperent['destination']['port'])); ?>
 						<?php endif; ?><?=$textse;?>
                         </td>
                         <td class="listr" onClick="fr_toggle(<?=$i;?>)"><?=$textss;?>
                           <?php 
 							if (isset($shaperent['targetpipe'])) {
-								if ($a_pipe[$shaperent['targetpipe']]['descr'])
+								if (!empty($a_pipe[$shaperent['targetpipe']]['descr']))
 									$desc = htmlspecialchars($a_pipe[$shaperent['targetpipe']]['descr']);
 								else 
 									$desc = "Pipe " . ($shaperent['targetpipe']+1);
 								echo "<a href=\"firewall_shaper_pipes_edit.php?id={$shaperent['targetpipe']}\">{$desc}</a>";
 							} else if (isset($shaperent['targetqueue'])) {
-								if ($a_queue[$shaperent['targetqueue']]['descr'])
+								if (!empty($a_queue[$shaperent['targetqueue']]['descr']))
 									$desc = htmlspecialchars($a_queue[$shaperent['targetqueue']]['descr']);
 								else 
 									$desc = "Queue " . ($shaperent['targetqueue']+1);
@@ -296,7 +296,7 @@ function fr_insline(id, on) {
 						  ?><?=$textse;?>
                         </td>
                         <td class="listbg" onClick="fr_toggle(<?=$i;?>)"> 
-                          <?=$textss;?><?=htmlspecialchars($shaperent['descr']);?><?=$textse;?>
+                          <?=$textss;?><?=htmlspecialchars($shaperent['descr'] ?? '');?><?=$textse;?>
                           &nbsp; </td>
                         <td valign="middle" nowrap class="list">
 						    <table border="0" cellspacing="0" cellpadding="1" summary="button pane">

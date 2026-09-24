@@ -14,7 +14,7 @@
 $pgtitle = array("VPN", "WireGuard", "Tunnels");
 require("guiconfig.inc");
 
-if (!is_array($config['wireguard']['tunnel'])) {
+if (!is_array($config['wireguard']['tunnel'] ?? null)) {
 	$config['wireguard']['tunnel'] = array();
 }
 $a_tunnel = &$config['wireguard']['tunnel'];
@@ -23,7 +23,7 @@ $pconfig['enable'] = isset($config['wireguard']['enable']);
 
 if ($_POST) {
 
-	if ($_POST['apply']) {
+	if (!empty($_POST['apply'])) {
 		$retval = 0;
 		if (!file_exists($d_sysrebootreqd_path))
 			$retval = wg_configure();
@@ -32,9 +32,9 @@ if ($_POST) {
 			if (file_exists($d_wireguardconfdirty_path))
 				unlink($d_wireguardconfdirty_path);
 		}
-	} else if ($_POST['submit']) {
+	} else if (!empty($_POST['submit'])) {
 		$pconfig = $_POST;
-		$config['wireguard']['enable'] = $_POST['enable'] ? true : false;
+		$config['wireguard']['enable'] = !empty($_POST['enable']) ? true : false;
 		write_config();
 		touch($d_wireguardconfdirty_path);
 	} else {
@@ -42,7 +42,7 @@ if ($_POST) {
 		foreach ($_POST as $pn => $pv) {
 			if (preg_match("/del_(\d+)_x/", $pn, $matches)) {
 				$id = $matches[1];
-				if ($a_tunnel[$id]) {
+				if (!empty($a_tunnel[$id])) {
 					unset($a_tunnel[$id]);
 					write_config();
 					touch($d_wireguardconfdirty_path);
@@ -56,7 +56,7 @@ if ($_POST) {
 ?>
 <?php include("fbegin.inc"); ?>
 <form action="vpn_wireguard.php" method="post">
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
 <?php if (file_exists($d_wireguardconfdirty_path)): ?><p>
 <?php print_info_box_np("The WireGuard configuration has been changed.<br>You must apply the changes in order for them to take effect.");?><br>
 <input name="apply" type="submit" class="formbtn" id="apply" value="Apply changes"></p>
@@ -68,7 +68,7 @@ if ($_POST) {
 	$tabs = array('Tunnels' => 'vpn_wireguard.php');
 	$i = 0;
 	foreach ($a_tunnel as $t) {
-		$label = $t['descr'] ? $t['descr'] : $t['if'];
+		$label = !empty($t['descr']) ? $t['descr'] : ($t['if'] ?? '');
 		$tabs["Peers: " . htmlspecialchars($label)] = "vpn_wireguard_peers.php?tunnel=" . $i;
 		$i++;
 	}
@@ -81,7 +81,7 @@ if ($_POST) {
 		        <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="checkbox pane">
                 <tr>
                   <td class="vtable">
-                      <input name="enable" type="checkbox" id="enable" value="yes" <?php if ($pconfig['enable']) echo "checked";?>>
+                      <input name="enable" type="checkbox" id="enable" value="yes" <?php if (!empty($pconfig['enable'])) echo "checked";?>>
                       <strong>Enable WireGuard</strong></td>
                 </tr>
                 <tr>
@@ -107,15 +107,15 @@ if ($_POST) {
 					} else {
 						$spans = $spane = "";
 					}
-					$npeers = is_array($tunnel['peer']) ? count($tunnel['peer']) : 0;
+					$npeers = is_array($tunnel['peer'] ?? null) ? count($tunnel['peer']) : 0;
 				?>
                 <tr valign="top">
-                  <td nowrap class="listlr"><?=$spans;?><?=htmlspecialchars($tunnel['if']);?><?=$spane;?></td>
-                  <td class="listr"><?=$spans;?><?=htmlspecialchars($tunnel['address']);?>/<?=htmlspecialchars($tunnel['subnet']);?><?=$spane;?></td>
-                  <td class="listr"><?=$spans;?><?=htmlspecialchars($tunnel['listenport']);?><?=$spane;?></td>
+                  <td nowrap class="listlr"><?=$spans;?><?=htmlspecialchars($tunnel['if'] ?? '');?><?=$spane;?></td>
+                  <td class="listr"><?=$spans;?><?=htmlspecialchars($tunnel['address'] ?? '');?>/<?=htmlspecialchars($tunnel['subnet'] ?? '');?><?=$spane;?></td>
+                  <td class="listr"><?=$spans;?><?=htmlspecialchars($tunnel['listenport'] ?? '');?><?=$spane;?></td>
                   <td class="listr"><?=$spans;?><a href="vpn_wireguard_peers.php?tunnel=<?=$i;?>"><?=$npeers;?></a><?=$spane;?></td>
                   <td class="listr"><?=$spans;?><?=wg_pool_free_count($tunnel);?><?=$spane;?></td>
-                  <td class="listbg"><?=$spans;?><?=htmlspecialchars($tunnel['descr']);?>&nbsp;<?=$spane;?></td>
+                  <td class="listbg"><?=$spans;?><?=htmlspecialchars($tunnel['descr'] ?? '');?>&nbsp;<?=$spane;?></td>
                   <td valign="middle" nowrap class="list"> <a href="vpn_wireguard_edit.php?id=<?=$i;?>"><img src="e.gif" title="edit tunnel" width="17" height="17" border="0" alt="edit tunnel"></a>
                     &nbsp;<input name="del_<?=$i;?>" type="image" src="x.gif" width="17" height="17" title="delete tunnel" alt="delete tunnel" onclick="return confirm('Do you really want to delete this tunnel?')"></td>
 				</tr>

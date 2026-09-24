@@ -49,11 +49,11 @@ require("guiconfig.inc");
 <?php
 
 /* delete any SAs? */
-if (isset($_POST['del_x']) && is_array($_POST['entries'])) {
+if (isset($_POST['del_x']) && is_array($_POST['entries'] ?? null)) {
 	$fd = @popen("/usr/local/sbin/setkey -c > /dev/null 2>&1", "w");
 	if ($fd) {
 		foreach ($_POST['entries'] as $entry) {
-			list ($src,$dst,$proto,$spi) = explode(";", $entry);
+			list ($src,$dst,$proto,$spi) = array_pad(explode(";", $entry), 4, null);
 			fwrite($fd, "delete $src $dst $proto $spi ;\n");
 		}
 		pclose($fd);
@@ -72,29 +72,29 @@ if ($fd) {
 		if ($line == "No SAD entries.")
 			break;
 		if ($line[0] != "\t") {
-			if (is_array($cursa))
+			if (is_array($cursa ?? null))
 				$sad[] = $cursa;
 			$cursa = array();
-			list($cursa['src'],$cursa['dst']) = explode(" ", $line);
+			list($cursa['src'],$cursa['dst']) = array_pad(explode(" ", $line), 2, null);
 			$i = 0;
 		} else {
 			$linea = explode(" ", trim($line));
 			if ($i == 1) {
-				$cursa['proto'] = $linea[0];
-				$cursa['spi'] = substr($linea[2], strpos($linea[2], "x")+1, -1);
-			} else if (substr($linea[0],0,2) == "E:") {
-				$cursa['ealgo'] = $linea[1];
-			} else if (substr($linea[0],0,2) == "A:") {
-				$cursa['aalgo'] = $linea[1];
-			} else if (substr($linea[0],0,3) == "NAT" && $i == 2) {
-				$cursa['natoai'] = $linea[1];
-			} else if (substr($linea[0],0,3) == "NAT" && $i == 3) {
-				$cursa['natoar'] = $linea[1];
+				$cursa['proto'] = $linea[0] ?? null;
+				$cursa['spi'] = substr($linea[2] ?? '', strpos($linea[2] ?? '', "x")+1, -1);
+			} else if (substr($linea[0] ?? '',0,2) == "E:") {
+				$cursa['ealgo'] = $linea[1] ?? null;
+			} else if (substr($linea[0] ?? '',0,2) == "A:") {
+				$cursa['aalgo'] = $linea[1] ?? null;
+			} else if (substr($linea[0] ?? '',0,3) == "NAT" && $i == 2) {
+				$cursa['natoai'] = $linea[1] ?? null;
+			} else if (substr($linea[0] ?? '',0,3) == "NAT" && $i == 3) {
+				$cursa['natoar'] = $linea[1] ?? null;
 			}
 		}
 		$i++;
 	}
-	if (is_array($cursa) && count($cursa))
+	if (is_array($cursa ?? null) && count($cursa))
 		$sad[] = $cursa;
 	pclose($fd);
 }
@@ -117,16 +117,16 @@ if (count($sad)):
 foreach ($sad as $sa): ?>
 	<tr>
 		<?php
-			$args = htmlspecialchars($sa['src'] . ";" . $sa['dst'] . ";" . $sa['proto'] . ";0x" . $sa['spi']);
+			$args = htmlspecialchars(($sa['src'] ?? '') . ";" . ($sa['dst'] ?? '') . ";" . ($sa['proto'] ?? '') . ";0x" . ($sa['spi'] ?? ''));
 		?>
 		<td class="listt"><input type="checkbox" name="entries[]" value="<?=$args;?>" style="margin: 0 5px 0 0; padding: 0; width: 15px; height: 15px;"></td>
-		<td class="listlr"><?=htmlspecialchars($sa['src']);?></td>
-		<td class="listr"><?=htmlspecialchars($sa['dst']);?></td>
-		<td class="listr"><?=htmlspecialchars(strtoupper($sa['proto']));?></td>
-		<td class="listr"><?=htmlspecialchars($sa['spi']);?></td>
-		<td class="listr"><?=htmlspecialchars($sa['ealgo']);?></td>
-		<td class="listr"><?=htmlspecialchars($sa['aalgo']);?></td>
-		<td class="listr"><?=htmlspecialchars($sa['natoai']);?> <?=htmlspecialchars($sa['natoar']);?></td>
+		<td class="listlr"><?=htmlspecialchars($sa['src'] ?? '');?></td>
+		<td class="listr"><?=htmlspecialchars($sa['dst'] ?? '');?></td>
+		<td class="listr"><?=htmlspecialchars(strtoupper($sa['proto'] ?? ''));?></td>
+		<td class="listr"><?=htmlspecialchars($sa['spi'] ?? '');?></td>
+		<td class="listr"><?=htmlspecialchars($sa['ealgo'] ?? '');?></td>
+		<td class="listr"><?=htmlspecialchars($sa['aalgo'] ?? '');?></td>
+		<td class="listr"><?=htmlspecialchars($sa['natoai'] ?? '');?> <?=htmlspecialchars($sa['natoar'] ?? '');?></td>
 	</tr>
 <?php endforeach; ?>
 	 <tr> 

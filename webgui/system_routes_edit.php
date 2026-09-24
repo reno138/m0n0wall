@@ -31,7 +31,7 @@
 
 require("guiconfig.inc");
 
-if ($ipv6routes = ($_GET['type'] == 'ipv6')) {
+if ($ipv6routes = (($_GET['type'] ?? null) == 'ipv6')) {
 	$configname = 'route6';
 	$typelink = '&type=ipv6';
 	$maxnetmask = 128;
@@ -43,17 +43,17 @@ if ($ipv6routes = ($_GET['type'] == 'ipv6')) {
 $pgtitle = array("System", "Static routes", "Edit");	/* make group manager happy */
 $pgtitle = array("System", ipv6enabled() ? ($ipv6routes ? 'IPv6 Static routes' : 'IPv4 Static routes') : 'Static routes', "Edit");
 
-if (!is_array($config['staticroutes'][$configname]))
+if (!is_array($config['staticroutes'][$configname] ?? null))
 	$config['staticroutes'][$configname] = array();
 
 staticroutes_sort();
 $a_routes = &$config['staticroutes'][$configname];
 
-$id = $_GET['id'];
+$id = $_GET['id'] ?? null;
 if (isset($_POST['id']))
 	$id = $_POST['id'];
 
-if (isset($id) && $a_routes[$id]) {
+if (isset($id) && !empty($a_routes[$id])) {
 	$pconfig['interface'] = $a_routes[$id]['interface'];
 	list($pconfig['network'],$pconfig['network_subnet']) = 
 		explode('/', $a_routes[$id]['network']);
@@ -89,7 +89,7 @@ if ($_POST) {
 	    $osn = gen_subnet($_POST['network'], $_POST['network_subnet']) . "/" . $_POST['network_subnet'];
 	
 	foreach ($a_routes as $route) {
-		if (isset($id) && ($a_routes[$id]) && ($a_routes[$id] === $route))
+		if (isset($id) && !empty($a_routes[$id]) && ($a_routes[$id] === $route))
 			continue;
 
 		if ($route['network'] == $osn) {
@@ -105,7 +105,7 @@ if ($_POST) {
 		$route['gateway'] = $_POST['gateway'];
 		$route['descr'] = $_POST['descr'];
 
-		if (isset($id) && $a_routes[$id])
+		if (isset($id) && !empty($a_routes[$id]))
 			$a_routes[$id] = $route;
 		else
 			$a_routes[] = $route;
@@ -120,7 +120,7 @@ if ($_POST) {
 }
 ?>
 <?php include("fbegin.inc"); ?>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
             <form action="system_routes_edit.php?<?=$typelink?>" method="post" name="iform" id="iform">
               <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="content pane">
                 <tr> 
@@ -134,7 +134,7 @@ if ($_POST) {
 					  	$interfaces['opt' . $i] = $config['interfaces']['opt' . $i]['descr'];
 					  }
 					  foreach ($interfaces as $iface => $ifacename): ?>
-                      <option value="<?=$iface;?>" <?php if ($iface == $pconfig['interface']) echo "selected"; ?>> 
+                      <option value="<?=$iface;?>" <?php if ($iface == ($pconfig['interface'] ?? null)) echo "selected"; ?>> 
                       <?=htmlspecialchars($ifacename);?>
                       </option>
                       <?php endforeach; ?>
@@ -144,11 +144,11 @@ if ($_POST) {
                 <tr>
                   <td width="22%" valign="top" class="vncellreq">Destination network</td>
                   <td width="78%" class="vtable"> 
-                    <?=$mandfldhtml;?><input name="network" type="text" class="formfld" id="network" size="20" value="<?=htmlspecialchars($pconfig['network']);?>"> 
+                    <?=$mandfldhtml;?><input name="network" type="text" class="formfld" id="network" size="20" value="<?=htmlspecialchars($pconfig['network'] ?? '');?>"> 
 				  / 
                     <select name="network_subnet" class="formfld" id="network_subnet">
                       <?php for ($i = $maxnetmask; $i >= 1; $i--): ?>
-                      <option value="<?=$i;?>" <?php if ($i == $pconfig['network_subnet']) echo "selected"; ?>>
+                      <option value="<?=$i;?>" <?php if ($i == ($pconfig['network_subnet'] ?? null)) echo "selected"; ?>>
                       <?=$i;?>
                       </option>
                       <?php endfor; ?>
@@ -158,13 +158,13 @@ if ($_POST) {
 				<tr>
                   <td width="22%" valign="top" class="vncellreq">Gateway</td>
                   <td width="78%" class="vtable"> 
-                    <?=$mandfldhtml;?><input name="gateway" type="text" class="formfld" id="gateway" size="40" value="<?=htmlspecialchars($pconfig['gateway']);?>">
+                    <?=$mandfldhtml;?><input name="gateway" type="text" class="formfld" id="gateway" size="40" value="<?=htmlspecialchars($pconfig['gateway'] ?? '');?>">
                     <br> <span class="vexpl">Gateway to be used to reach the destination network</span></td>
                 </tr>
 				<tr>
                   <td width="22%" valign="top" class="vncell">Description</td>
                   <td width="78%" class="vtable"> 
-                    <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr']);?>">
+                    <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr'] ?? '');?>">
                     <br> <span class="vexpl">You may enter a description here
                     for your reference (not parsed).</span></td>
                 </tr>
@@ -172,7 +172,7 @@ if ($_POST) {
                   <td width="22%" valign="top">&nbsp;</td>
                   <td width="78%"> 
                     <input name="Submit" type="submit" class="formbtn" value="Save">
-                    <?php if (isset($id) && $a_routes[$id]): ?>
+                    <?php if (isset($id) && !empty($a_routes[$id])): ?>
                     <input name="id" type="hidden" value="<?=htmlspecialchars($id);?>">
                     <?php endif; ?>
                   </td>

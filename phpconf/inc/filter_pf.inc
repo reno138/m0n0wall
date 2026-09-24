@@ -937,6 +937,112 @@ function pf_pflogd_start() {
 }
 
 /* ---------------------------------------------------------------------------
+ * Reading the filter log
+ *
+ * ipfilter's ipmon fed text lines to syslog, which landed in
+ * /var/log/filter.log and which diag_logs_filter.php parsed. pf has no ipmon:
+ * matching packets are copied to the pflog0 interface and pflogd writes them
+ * to /var/log/pflog.cap as a pcap. So the log is now binary, and the only
+ * thing in the image that can decode it is tcpdump.
+ *
+ * -q is deliberate: without it tcpdump describes TCP as "Flags [S], seq ..."
+ * and never names the protocol, which is the one field the log page filters
+ * on. With it every line ends in a protocol name and a length:
+ *
+ *   2026-09-24 14:02:33.123456 rule 5/0(match): block in on vtnet0: \
+ *       192.0.2.30.54321 > 192.0.2.240.65001: tcp 0
+ *
+ * -tttt gives the absolute date and time; the default prints time only, and
+ * -ttt prints a delta from the previous packet, which is useless in a log.
+ * ------------------------------------------------------------------------ */
+
+/* Split "192.0.2.30.54321" into address and port, or "2001:db8::1.443" for
+   IPv6. tcpdump separates the port with a dot in both families, so an IPv6
+   address has to be recognised by its colons rather than by counting dots. */
+function pf_log_split_endpoint($tok) {
+	$tok = rtrim($tok, ":");
+	$dot = strrpos($tok, ".");
+	if ($dot === false)
+		return array($tok, "");
+	$maybe_port = substr($tok, $dot + 1);
+	if ($maybe_port === "" || !ctype_digit($maybe_port))
+		return array($tok, "");
+	$addr = substr($tok, 0, $dot);
+	if (strpos($tok, ":") !== false)          /* IPv6 plus port */
+		return array($addr, $maybe_port);
+	if (substr_count($addr, ".") == 3)        /* IPv4 plus port */
+		return array($addr, $maybe_port);
+	return array($tok, "");                   /* bare IPv4, no port */
+}
+
+/* The last $nentries packets pf logged, newest last.
+ *
+ * Returns an array of entries with act, time, interface, src, srcport, dst,
+ * dstport, proto, rulenr -- the shape diag_logs_filter.php renders. Returns
+ * an empty array when there is nothing to read; the caller distinguishes "no
+ * packets" from "no log" by testing for the capture file itself. */
+function pf_filter_log_read($nentries = 50, $reverse = false) {
+	global $g;
+
+	$cap = "{$g['varlog_path']}/pflog.cap";
+	if (!file_exists($cap))
+		return array();
+
+	$out = array();
+	exec("/usr/sbin/tcpdump -n -e -q -tttt -r " . escapeshellarg($cap) .
+	     " 2>/dev/null | /usr/bin/tail -n " . ((int)$nentries), $out);
+
+	$entries = array();
+	foreach ($out as $line) {
+		if (!preg_match('/^(\S+ \S+) rule ([\d\-]+)\/\S*\((\w+)\): ' .
+		                '(pass|block|rdr|nat) (in|out) on (\S+): (.*)$/', $line, $m))
+			continue;
+
+		$e = array(
+			'time'      => $m[1],
+			'rulenr'    => $m[2],
+			'act'       => $m[4],
+			'interface' => $m[6],
+			'src' => '', 'srcport' => '', 'dst' => '', 'dstport' => '', 'proto' => '',
+		);
+
+		/* "192.0.2.30.54321 > 192.0.2.240.65001: tcp 0" */
+		$rest = $m[7];
+		if (preg_match('/^(\S+) > ([^:]+(?::\S+)*?):\s*(\S+)/', $rest, $r)) {
+			list($e['src'], $e['srcport']) = pf_log_split_endpoint($r[1]);
+			list($e['dst'], $e['dstport']) = pf_log_split_endpoint($r[2]);
+			$e['proto'] = strtoupper(rtrim($r[3], ','));
+		} else {
+			$e['proto'] = '';
+		}
+		$entries[] = $e;
+	}
+
+	if ($reverse)
+		$entries = array_reverse($entries);
+
+	return $entries;
+}
+
+/* Interface name to the label the GUI uses ("LAN", "WAN", a description). */
+function pf_log_interface_map() {
+	global $config;
+
+	$map = array();
+	if (!empty($config['interfaces']['lan']['if']))
+		$map[$config['interfaces']['lan']['if']] = "LAN";
+	$wanif = function_exists('get_real_wan_interface') ? get_real_wan_interface() : '';
+	if (!empty($wanif))
+		$map[$wanif] = "WAN";
+	for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
+		$oc = $config['interfaces']['opt' . $i];
+		if (!empty($oc['if']))
+			$map[$oc['if']] = !empty($oc['descr']) ? $oc['descr'] : ('OPT' . $i);
+	}
+	return $map;
+}
+
+/* ---------------------------------------------------------------------------
  * Captive portal
  *
  * The portal's web servers listen on 8000 and 8001 of the portal interface,

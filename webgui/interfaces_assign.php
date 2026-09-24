@@ -42,7 +42,7 @@ require("guiconfig.inc");
 $portlist = get_interface_list(true, false, true);
 
 /* add VLAN interfaces */
-if (is_array($config['vlans']['vlan']) && count($config['vlans']['vlan'])) {
+if (is_array($config['vlans']['vlan'] ?? null) && count($config['vlans']['vlan'])) {
 	$i = 0;
 	foreach ($config['vlans']['vlan'] as $vlan) {
 		$portlist['vlan' . $i] = $vlan;
@@ -52,7 +52,7 @@ if (is_array($config['vlans']['vlan']) && count($config['vlans']['vlan'])) {
 }
 
 /* add WLAN interfaces */
-if (is_array($config['wlans']['wlan']) && count($config['wlans']['wlan'])) {
+if (is_array($config['wlans']['wlan'] ?? null) && count($config['wlans']['wlan'])) {
 	$i = 0;
 	foreach ($config['wlans']['wlan'] as $wlan) {
 		$portlist['wlan' . $i] = $wlan;
@@ -94,7 +94,7 @@ if ($_POST) {
 	}
 
 
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 		/* No errors detected, so update the config */
 		foreach ($_POST as $ifname => $ifport) {
 		
@@ -106,7 +106,7 @@ if ($_POST) {
 					
 					/* check for wireless interfaces, set or clear ['wireless'] */
 					if (preg_match($g['wireless_regex'], $ifport)) {
-						if (!is_array($config['interfaces'][$ifname]['wireless']))
+						if (!is_array($config['interfaces'][$ifname]['wireless'] ?? null))
 							$config['interfaces'][$ifname]['wireless'] = array();
 					} else {
 						unset($config['interfaces'][$ifname]['wireless']);
@@ -127,11 +127,11 @@ if ($_POST) {
 				$i++;
 
 				/* look at the following OPTn ports */
-				while (is_array($config['interfaces']['opt' . $i])) {
+				while (is_array($config['interfaces']['opt' . $i] ?? null)) {
 					$config['interfaces']['opt' . ($i - 1)] =
 						$config['interfaces']['opt' . $i];
 
-					if ($config['interfaces']['opt' . ($i - 1)]['descr'] == "OPT" . $i)
+					if (($config['interfaces']['opt' . ($i - 1)]['descr'] ?? null) == "OPT" . $i)
 						$config['interfaces']['opt' . ($i - 1)]['descr'] = "OPT" . ($i - 1);
 
 					unset($config['interfaces']['opt' . $i]);
@@ -143,7 +143,7 @@ if ($_POST) {
 			} else if ($ifname == "add_x") {
 				/* find next free optional interface number */
 				$i = 1;
-				while (is_array($config['interfaces']['opt' . $i]))
+				while (is_array($config['interfaces']['opt' . $i] ?? null))
 					$i++;
 
 				$newifname = 'opt' . $i;
@@ -154,7 +154,7 @@ if ($_POST) {
 				foreach ($portlist as $portname => $portinfo) {
 					$portused = false;
 					foreach ($config['interfaces'] as $ifname => $ifdata) {
-						if ($ifdata['if'] == $portname) {
+						if (($ifdata['if'] ?? null) == $portname) {
 							$portused = true;
 							break;
 						}
@@ -176,7 +176,7 @@ if ($_POST) {
 
 ?>
 <?php include("fbegin.inc"); ?>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
 <?php if (file_exists($d_sysrebootreqd_path)) print_info_box(get_std_save_message(0)); ?>
 <form action="interfaces_assign.php" method="post" name="iform" id="iform">
 <table width="100%" border="0" cellpadding="0" cellspacing="0" summary="tab pane">
@@ -196,7 +196,7 @@ if ($_POST) {
 	<td class="list">&nbsp;</td>
   </tr>
   <?php foreach ($config['interfaces'] as $ifname => $iface):
-	if ($iface['descr'])
+	if (!empty($iface['descr']))
 		$ifdescr = $iface['descr'];
 	else
 		$ifdescr = strtoupper($ifname);
@@ -206,22 +206,22 @@ if ($_POST) {
 	  <td valign="middle" class="listr">
 		<select name="<?=$ifname;?>" class="formfld" id="<?=$ifname;?>">
 		  <?php foreach ($portlist as $portname => $portinfo): ?>
-		  <option value="<?=htmlspecialchars($portname);?>" <?php if ($portname == $iface['if']) echo "selected";?>> 
-		  <?php if ($portinfo['isvlan']) {
+		  <option value="<?=htmlspecialchars($portname);?>" <?php if ($portname == ($iface['if'] ?? null)) echo "selected";?>> 
+		  <?php if (!empty($portinfo['isvlan'])) {
 		  			$descr = "VLAN {$portinfo['tag']} on {$portinfo['if']}";
-					if ($portinfo['descr'])
+					if (!empty($portinfo['descr']))
 						$descr .= " (" . $portinfo['descr'] . ")";
 					echo htmlspecialchars($descr);
-				  } else if ($portinfo['iswlan']) {
+				  } else if (!empty($portinfo['iswlan'])) {
 		  			$descr = "WLAN \"{$portinfo['ssid']}\" on {$portinfo['if']}";
-					if ($portinfo['descr'])
+					if (!empty($portinfo['descr']))
 						$descr .= " (" . $portinfo['descr'] . ")";
 					echo htmlspecialchars($descr);
 				  } else {
-					if ($portinfo['drvname'])
-						echo htmlspecialchars($portname . " (" . $portinfo['drvname'] . ", " . $portinfo['mac'] . ")");
+					if (!empty($portinfo['drvname']))
+						echo htmlspecialchars($portname . " (" . $portinfo['drvname'] . ", " . ($portinfo['mac'] ?? '') . ")");
 					else
-						echo htmlspecialchars($portname . " (" . $portinfo['mac'] . ")");
+						echo htmlspecialchars($portname . " (" . ($portinfo['mac'] ?? '') . ")");
 				  }
 		  ?>
 		  </option>

@@ -32,24 +32,28 @@
 $pgtitle = array("Firewall", "NAT", "Edit");
 require("guiconfig.inc");
 
-if (!is_array($config['nat']['rule'])) {
+if (!is_array($config['nat']['rule'] ?? null)) {
 	$config['nat']['rule'] = array();
 }
 nat_rules_sort();
 $a_nat = &$config['nat']['rule'];
 
-$id = $_GET['id'];
+$id = $_GET['id'] ?? null;
 if (isset($_POST['id']))
 	$id = $_POST['id'];
 
-if (isset($id) && $a_nat[$id]) {
-	$pconfig['extaddr'] = $a_nat[$id]['external-address'];
-	$pconfig['proto'] = $a_nat[$id]['protocol'];
-	list($pconfig['beginport'],$pconfig['endport']) = explode("-", $a_nat[$id]['external-port']);
-	$pconfig['localip'] = $a_nat[$id]['target'];
-	$pconfig['localbeginport'] = $a_nat[$id]['local-port'];
-	$pconfig['descr'] = $a_nat[$id]['descr'];
-	$pconfig['interface'] = $a_nat[$id]['interface'];
+$pconfig = array();
+
+if (isset($id) && !empty($a_nat[$id])) {
+	$pconfig['extaddr'] = $a_nat[$id]['external-address'] ?? null;
+	$pconfig['proto'] = $a_nat[$id]['protocol'] ?? null;
+	$extports = explode("-", $a_nat[$id]['external-port'] ?? '');
+	$pconfig['beginport'] = $extports[0] ?? null;
+	$pconfig['endport'] = $extports[1] ?? null;
+	$pconfig['localip'] = $a_nat[$id]['target'] ?? null;
+	$pconfig['localbeginport'] = $a_nat[$id]['local-port'] ?? null;
+	$pconfig['descr'] = $a_nat[$id]['descr'] ?? null;
+	$pconfig['interface'] = $a_nat[$id]['interface'] ?? null;
 	if (!$pconfig['interface'])
 		$pconfig['interface'] = "wan";
 } else {
@@ -58,15 +62,15 @@ if (isset($id) && $a_nat[$id]) {
 
 if ($_POST) {
 
-	if ($_POST['beginport_cust'] && !$_POST['beginport'])
+	if (!empty($_POST['beginport_cust']) && empty($_POST['beginport']))
 		$_POST['beginport'] = $_POST['beginport_cust'];
-	if ($_POST['endport_cust'] && !$_POST['endport'])
+	if (!empty($_POST['endport_cust']) && empty($_POST['endport']))
 		$_POST['endport'] = $_POST['endport_cust'];
-	if ($_POST['localbeginport_cust'] && !$_POST['localbeginport'])
+	if (!empty($_POST['localbeginport_cust']) && empty($_POST['localbeginport']))
 		$_POST['localbeginport'] = $_POST['localbeginport_cust'];
 		
-	if (!$_POST['endport'])
-		$_POST['endport'] = $_POST['beginport'];
+	if (empty($_POST['endport']))
+		$_POST['endport'] = $_POST['beginport'] ?? null;
 	
 	unset($input_errors);
 	$pconfig = $_POST;
@@ -77,98 +81,100 @@ if ($_POST) {
 	
 	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
-	if ($_POST['extaddr'] == 'wan' && $_POST['interface'] == 'wan') {
+	if (($_POST['extaddr'] ?? null) == 'wan' && ($_POST['interface'] ?? null) == 'wan') {
 		$input_errors[] = "The interface must not be WAN if the External Address is set to WAN.";
 	}
 	
-	if (($_POST['beginport'] && !is_port($_POST['beginport']))) {
+	if ((!empty($_POST['beginport']) && !is_port($_POST['beginport']))) {
 		$input_errors[] = "The start port must be an integer between 1 and 65535.";
 	}
-	if (($_POST['endport'] && !is_port($_POST['endport']))) {
+	if ((!empty($_POST['endport']) && !is_port($_POST['endport']))) {
 		$input_errors[] = "The end port must be an integer between 1 and 65535.";
 	}
-	if (($_POST['localbeginport'] && !is_port($_POST['localbeginport']))) {
+	if ((!empty($_POST['localbeginport']) && !is_port($_POST['localbeginport']))) {
 		$input_errors[] = "The local port must be an integer between 1 and 65535.";
 	}
-	if (($_POST['localip'] && !is_ipaddroralias($_POST['localip']))) {
+	if ((!empty($_POST['localip']) && !is_ipaddroralias($_POST['localip']))) {
 		$input_errors[] = "A valid NAT IP address or host alias must be specified.";
 	}
 	
-	if ($_POST['beginport'] > $_POST['endport']) {
+	if (($_POST['beginport'] ?? null) > ($_POST['endport'] ?? null)) {
 		/* swap */
-		$tmp = $_POST['endport'];
+		$tmp = $_POST['endport'] ?? null;
 		$_POST['endport'] = $_POST['beginport'];
 		$_POST['beginport'] = $tmp;
 	}
 	
-	if (!$input_errors) {
-		if (($_POST['endport'] - $_POST['beginport'] + $_POST['localbeginport']) > 65535)
+	if (empty($input_errors)) {
+		if ((($_POST['endport'] ?? null) - ($_POST['beginport'] ?? null) + ($_POST['localbeginport'] ?? null)) > 65535)
 			$input_errors[] = "The target port range must lie between 1 and 65535.";
 	}
 	
 	/* check for overlaps */
 	foreach ($a_nat as $natent) {
-		if (isset($id) && ($a_nat[$id]) && ($a_nat[$id] === $natent))
+		if (isset($id) && (!empty($a_nat[$id])) && ($a_nat[$id] === $natent))
 			continue;
-		if ($natent['interface'] != $_POST['interface'])
+		if (($natent['interface'] ?? null) != ($_POST['interface'] ?? null))
 			continue;
-		if ($natent['external-address'] != $_POST['extaddr'])
+		if (($natent['external-address'] ?? null) != ($_POST['extaddr'] ?? null))
 			continue;
-		if (($natent['protocol'] != $_POST['proto']) && ($natent['protocol'] != "tcp/udp") && ($_POST['proto'] != "tcp/udp"))
+		if ((($natent['protocol'] ?? null) != ($_POST['proto'] ?? null)) && (($natent['protocol'] ?? null) != "tcp/udp") && (($_POST['proto'] ?? null) != "tcp/udp"))
 			continue;
 		
-		list($begp,$endp) = explode("-", $natent['external-port']);
+		$natports = explode("-", $natent['external-port'] ?? '');
+		$begp = $natports[0] ?? null;
+		$endp = $natports[1] ?? null;
 		if (!$endp)
 			$endp = $begp;
 		
-		if (!(   (($_POST['beginport'] < $begp) && ($_POST['endport'] < $begp))
-		      || (($_POST['beginport'] > $endp) && ($_POST['endport'] > $endp)))) {
+		if (!(   ((($_POST['beginport'] ?? null) < $begp) && (($_POST['endport'] ?? null) < $begp))
+		      || ((($_POST['beginport'] ?? null) > $endp) && (($_POST['endport'] ?? null) > $endp)))) {
 			
 			$input_errors[] = "The external port range overlaps with an existing entry.";
 			break;
 		}
 	}
 
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 		$natent = array();
-		if ($_POST['extaddr'])
+		if (!empty($_POST['extaddr']))
 			$natent['external-address'] = $_POST['extaddr'];
-		$natent['protocol'] = $_POST['proto'];
+		$natent['protocol'] = $_POST['proto'] ?? null;
 		
-		if ($_POST['beginport'] == $_POST['endport'])
-			$natent['external-port'] = $_POST['beginport'];
+		if (($_POST['beginport'] ?? null) == ($_POST['endport'] ?? null))
+			$natent['external-port'] = $_POST['beginport'] ?? null;
 		else
-			$natent['external-port'] = $_POST['beginport'] . "-" . $_POST['endport'];
+			$natent['external-port'] = ($_POST['beginport'] ?? '') . "-" . ($_POST['endport'] ?? '');
 		
-		$natent['target'] = $_POST['localip'];
-		$natent['local-port'] = $_POST['localbeginport'];
-		$natent['interface'] = $_POST['interface'];
-		$natent['descr'] = $_POST['descr'];
+		$natent['target'] = $_POST['localip'] ?? null;
+		$natent['local-port'] = $_POST['localbeginport'] ?? null;
+		$natent['interface'] = $_POST['interface'] ?? null;
+		$natent['descr'] = $_POST['descr'] ?? null;
 		
-		if (isset($id) && $a_nat[$id])
+		if (isset($id) && !empty($a_nat[$id]))
 			$a_nat[$id] = $natent;
 		else
 			$a_nat[] = $natent;
 		
 		touch($d_natconfdirty_path);
 		
-		if ($_POST['autoadd'] && ($_POST['extaddr'] != 'wan')) {
+		if (!empty($_POST['autoadd']) && (($_POST['extaddr'] ?? null) != 'wan')) {
 			/* auto-generate a matching firewall rule */
 			$filterent = array();		
-			$filterent['interface'] = $_POST['interface'];
-			$filterent['protocol'] = $_POST['proto'];
+			$filterent['interface'] = $_POST['interface'] ?? null;
+			$filterent['protocol'] = $_POST['proto'] ?? null;
 			$filterent['source']['any'] = "";
-			$filterent['destination']['address'] = $_POST['localip'];
+			$filterent['destination']['address'] = $_POST['localip'] ?? null;
 			
-			$dstpfrom = $_POST['localbeginport'];
-			$dstpto = $dstpfrom + $_POST['endport'] - $_POST['beginport'];
+			$dstpfrom = $_POST['localbeginport'] ?? null;
+			$dstpto = $dstpfrom + ($_POST['endport'] ?? null) - ($_POST['beginport'] ?? null);
 			
 			if ($dstpfrom == $dstpto)
 				$filterent['destination']['port'] = $dstpfrom;
 			else
 				$filterent['destination']['port'] = $dstpfrom . "-" . $dstpto;
 			
-			$filterent['descr'] = "NAT " . $_POST['descr'];
+			$filterent['descr'] = "NAT " . ($_POST['descr'] ?? '');
 			
 			$config['filter']['rule'][] = $filterent;
 			
@@ -211,7 +217,7 @@ function ext_rep_change() {
 }
 //-->
 </script>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
             <form action="firewall_nat_edit.php" method="post" name="iform" id="iform">
               <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="content pane">
 			  	<tr>
@@ -221,10 +227,10 @@ function ext_rep_change() {
 						<?php
 						$interfaces = array('wan' => 'WAN', 'lan' => 'LAN');
 						for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-							$interfaces['opt' . $i] = $config['interfaces']['opt' . $i]['descr'];
+							$interfaces['opt' . $i] = $config['interfaces']['opt' . $i]['descr'] ?? null;
 						}
 						foreach ($interfaces as $iface => $ifacename): ?>
-						<option value="<?=$iface;?>" <?php if ($iface == $pconfig['interface']) echo "selected"; ?>>
+						<option value="<?=$iface;?>" <?php if ($iface == ($pconfig['interface'] ?? null)) echo "selected"; ?>>
 						<?=htmlspecialchars($ifacename);?>
 						</option>
 						<?php endforeach; ?>
@@ -236,12 +242,14 @@ function ext_rep_change() {
                   <td width="22%" valign="top" class="vncellreq">External address</td>
                   <td width="78%" class="vtable"> 
                     <select name="extaddr" class="formfld">
-					  <option value="" <?php if (!$pconfig['extaddr']) echo "selected"; ?>>Interface address</option>
-					  <option value="wan" <?php if ($pconfig['extaddr'] == 'wan' ) echo "selected"; ?>>WAN address</option>		
+					  <option value="" <?php if (empty($pconfig['extaddr'])) echo "selected"; ?>>Interface address</option>
+					  <option value="wan" <?php if (($pconfig['extaddr'] ?? null) == 'wan' ) echo "selected"; ?>>WAN address</option>		
                       <?php
-					  if (is_array($config['nat']['servernat'])):
-						  foreach ($config['nat']['servernat'] as $sn): ?>
-                      <option value="<?=$sn['ipaddr'];?>" <?php if ($sn['ipaddr'] == $pconfig['extaddr']) echo "selected"; ?>><?=htmlspecialchars("{$sn['ipaddr']} ({$sn['descr']})");?></option>
+					  if (is_array($config['nat']['servernat'] ?? null)):
+						  foreach ($config['nat']['servernat'] as $sn):
+							  $sn_ipaddr = $sn['ipaddr'] ?? '';
+							  $sn_descr = $sn['descr'] ?? ''; ?>
+                      <option value="<?=$sn_ipaddr;?>" <?php if ($sn_ipaddr == ($pconfig['extaddr'] ?? null)) echo "selected"; ?>><?=htmlspecialchars("{$sn_ipaddr} ({$sn_descr})");?></option>
                       <?php endforeach; endif; ?>
                     </select><br>
                     <span class="vexpl">
@@ -254,7 +262,7 @@ function ext_rep_change() {
                   <td width="78%" class="vtable"> 
                     <select name="proto" class="formfld">
                       <?php $protocols = explode(" ", "TCP UDP TCP/UDP"); foreach ($protocols as $proto): ?>
-                      <option value="<?=strtolower($proto);?>" <?php if (strtolower($proto) == $pconfig['proto']) echo "selected"; ?>><?=htmlspecialchars($proto);?></option>
+                      <option value="<?=strtolower($proto);?>" <?php if (strtolower($proto) == ($pconfig['proto'] ?? null)) echo "selected"; ?>><?=htmlspecialchars($proto);?></option>
                       <?php endforeach; ?>
                     </select> <br> <span class="vexpl">Choose which IP protocol 
                     this rule should match.<br>
@@ -270,28 +278,28 @@ function ext_rep_change() {
                         <td><select name="beginport" class="formfld" onChange="ext_rep_change();ext_change()">
                             <option value="">(other)</option>
                             <?php $bfound = 0; foreach ($wkports as $wkport => $wkportdesc): ?>
-                            <option value="<?=$wkport;?>" <?php if ($wkport == $pconfig['beginport']) {
+                            <option value="<?=$wkport;?>" <?php if ($wkport == ($pconfig['beginport'] ?? null)) {
 																echo "selected";
 																$bfound = 1;
 															}?>>
 							<?=htmlspecialchars($wkportdesc);?>
 							</option>
                             <?php endforeach; ?>
-                          </select> <input name="beginport_cust" type="text" size="5" value="<?php if (!$bfound) echo htmlspecialchars($pconfig['beginport']); ?>"></td>
+                          </select> <input name="beginport_cust" type="text" size="5" value="<?php if (!$bfound) echo htmlspecialchars($pconfig['beginport'] ?? ''); ?>"></td>
                       </tr>
                       <tr> 
                         <td>to:</td>
                         <td><select name="endport" class="formfld" onChange="ext_change()">
                             <option value="">(other)</option>
                             <?php $bfound = 0; foreach ($wkports as $wkport => $wkportdesc): ?>
-                            <option value="<?=$wkport;?>" <?php if ($wkport == $pconfig['endport']) {
+                            <option value="<?=$wkport;?>" <?php if ($wkport == ($pconfig['endport'] ?? null)) {
 																echo "selected";
 																$bfound = 1;
 															}?>>
 							<?=htmlspecialchars($wkportdesc);?>
 							</option>
 							<?php endforeach; ?>
-                          </select> <input name="endport_cust" type="text" size="5" value="<?php if (!$bfound) echo htmlspecialchars($pconfig['endport']); ?>"></td>
+                          </select> <input name="endport_cust" type="text" size="5" value="<?php if (!$bfound) echo htmlspecialchars($pconfig['endport'] ?? ''); ?>"></td>
                       </tr>
                     </table>
                     <br> <span class="vexpl">Specify the port or port range on 
@@ -302,7 +310,7 @@ function ext_rep_change() {
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">NAT IP</td>
                   <td width="78%" class="vtable"> 
-                    <?=$mandfldhtml;?><input name="localip" type="text" class="formfldalias" id="localip" size="20" value="<?=htmlspecialchars($pconfig['localip']);?>"> 
+                    <?=$mandfldhtml;?><input name="localip" type="text" class="formfldalias" id="localip" size="20" value="<?=htmlspecialchars($pconfig['localip'] ?? '');?>"> 
                     <br> <span class="vexpl">Enter the internal IP address of 
                     the server on which you want to map the ports.<br>
                     e.g. <em>192.168.1.12</em></span></td>
@@ -313,14 +321,14 @@ function ext_rep_change() {
                     <select name="localbeginport" class="formfld" onChange="ext_change()">
                       <option value="">(other)</option>
                       <?php $bfound = 0; foreach ($wkports as $wkport => $wkportdesc): ?>
-                      <option value="<?=$wkport;?>" <?php if ($wkport == $pconfig['localbeginport']) {
+                      <option value="<?=$wkport;?>" <?php if ($wkport == ($pconfig['localbeginport'] ?? null)) {
 																echo "selected";
 																$bfound = 1;
 															}?>>
 					  <?=htmlspecialchars($wkportdesc);?>
 					  </option>
                       <?php endforeach; ?>
-                    </select> <input name="localbeginport_cust" type="text" size="5" value="<?php if (!$bfound) echo htmlspecialchars($pconfig['localbeginport']); ?>"> 
+                    </select> <input name="localbeginport_cust" type="text" size="5" value="<?php if (!$bfound) echo htmlspecialchars($pconfig['localbeginport'] ?? ''); ?>"> 
                     <br>
                     <span class="vexpl">Specify the port on the machine with the 
                     IP address entered above. In case of a port range, specify 
@@ -331,10 +339,10 @@ function ext_rep_change() {
                 <tr> 
                   <td width="22%" valign="top" class="vncell">Description</td>
                   <td width="78%" class="vtable"> 
-                    <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr']);?>"> 
+                    <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr'] ?? '');?>"> 
                     <br> <span class="vexpl">You may enter a description here 
                     for your reference (not parsed).</span></td>
-                </tr><?php if (!(isset($id) && $a_nat[$id])): ?>
+                </tr><?php if (!(isset($id) && !empty($a_nat[$id]))): ?>
                 <tr> 
                   <td width="22%" valign="top">&nbsp;</td>
                   <td width="78%"> 
@@ -346,7 +354,7 @@ function ext_rep_change() {
                   <td width="22%" valign="top">&nbsp;</td>
                   <td width="78%"> 
                     <input name="Submit" type="submit" class="formbtn" value="Save"> 
-                    <?php if (isset($id) && $a_nat[$id]): ?>
+                    <?php if (isset($id) && !empty($a_nat[$id])): ?>
                     <input name="id" type="hidden" value="<?=htmlspecialchars($id);?>"> 
                     <?php endif; ?>
                   </td>

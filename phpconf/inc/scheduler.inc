@@ -33,7 +33,7 @@
 		global $config;
 
 		// Superficial corruption check
-		if (is_array($config['croen']) && is_array($config['croen']['jobset'])) {
+		if (is_array($config['croen'] ?? null) && is_array($config['croen']['jobset'] ?? null)) {
 			$config_changed = FALSE;
 			
 			// Note: "<jobset/>" will be parsed to array([0] => '')
@@ -61,10 +61,10 @@
 		}
 
 		// Prepare scheduler arrays
-		if (!is_array($config['croen'])) {
+		if (!is_array($config['croen'] ?? null)) {
 			$config['croen'] = array();
 		}
-		if (!is_array($config['croen']['jobset'])) {
+		if (!is_array($config['croen']['jobset'] ?? null)) {
 			$config['croen']['jobset'] = array();
 		}
 	}
@@ -427,7 +427,7 @@
 		foreach ($config['croen']['jobset'] AS $jobset_id => $jobset) {
 			if (isset($jobset['job']) && is_array($jobset['job'])) {
 				foreach ($jobset['job'] AS $job_id => $job) {
-					if ((!is_array($jobName) && $job['name'] == $jobName) || (is_array($jobName) && in_array($job['name'], $jobName))) {
+					if ((!is_array($jobName) && ($job['name'] ?? null) == $jobName) || (is_array($jobName) && in_array($job['name'] ?? null, $jobName))) {
 						if ($oldTarget !== FALSE && $newTarget !== FALSE && isset($job['target']) && $job['target'] == $oldTarget) {
 							// Set target to new target
 							$config['croen']['jobset'][$jobset_id]['job'][$job_id]['target'] = $newTarget;

@@ -33,9 +33,9 @@ $pgtitle = array("Diagnostics", "Logs");
 require("guiconfig.inc");
 
 $pconfig['reverse'] = isset($config['syslog']['reverse']);
-$pconfig['nentries'] = $config['syslog']['nentries'];
-$pconfig['remoteserver'] = $config['syslog']['remoteserver'];
-$pconfig['remoteport'] = $config['syslog']['remoteport'];
+$pconfig['nentries'] = $config['syslog']['nentries'] ?? null;
+$pconfig['remoteserver'] = $config['syslog']['remoteserver'] ?? null;
+$pconfig['remoteport'] = $config['syslog']['remoteport'] ?? null;
 $pconfig['filter'] = isset($config['syslog']['filter']);
 $pconfig['dhcp'] = isset($config['syslog']['dhcp']);
 $pconfig['portalauth'] = isset($config['syslog']['portalauth']);
@@ -56,32 +56,32 @@ if ($_POST) {
 	$pconfig = $_POST;
 
 	/* input validation */
-	if ($_POST['enable'] && !is_ipaddr4or6($_POST['remoteserver'])) {
+	if (!empty($_POST['enable']) && !is_ipaddr4or6($_POST['remoteserver'] ?? null)) {
 		$input_errors[] = "A valid IP address must be specified.";
 	}
-	if ($_POST['remoteport'] && !is_port($_POST['remoteport'])) {
+	if (!empty($_POST['remoteport']) && !is_port($_POST['remoteport'])) {
 		$input_errors[] = "A valid port number must be specified.";
 	}
-	if (($_POST['nentries'] < 5) || ($_POST['nentries'] > 1000)) {
+	if ((($_POST['nentries'] ?? null) < 5) || (($_POST['nentries'] ?? null) > 1000)) {
 		$input_errors[] = "Number of log entries to show must be between 5 and 1000.";
 	}
 
 	if (!$input_errors) {
-		$config['syslog']['reverse'] = $_POST['reverse'] ? true : false;
+		$config['syslog']['reverse'] = !empty($_POST['reverse']) ? true : false;
 		$config['syslog']['nentries'] = (int)$_POST['nentries'];
-		$config['syslog']['remoteserver'] = $_POST['remoteserver'];
-		$config['syslog']['remoteport'] = $_POST['remoteport'];
-		$config['syslog']['filter'] = $_POST['filter'] ? true : false;
-		$config['syslog']['dhcp'] = $_POST['dhcp'] ? true : false;
-		$config['syslog']['portalauth'] = $_POST['portalauth'] ? true : false;
-		$config['syslog']['vpn'] = $_POST['vpn'] ? true : false;
-		$config['syslog']['system'] = $_POST['system'] ? true : false;
-		$config['syslog']['enable'] = $_POST['enable'] ? true : false;
+		$config['syslog']['remoteserver'] = $_POST['remoteserver'] ?? null;
+		$config['syslog']['remoteport'] = $_POST['remoteport'] ?? null;
+		$config['syslog']['filter'] = !empty($_POST['filter']) ? true : false;
+		$config['syslog']['dhcp'] = !empty($_POST['dhcp']) ? true : false;
+		$config['syslog']['portalauth'] = !empty($_POST['portalauth']) ? true : false;
+		$config['syslog']['vpn'] = !empty($_POST['vpn']) ? true : false;
+		$config['syslog']['system'] = !empty($_POST['system']) ? true : false;
+		$config['syslog']['enable'] = !empty($_POST['enable']) ? true : false;
 		$oldnologdefaultblock = isset($config['syslog']['nologdefaultblock']);
-		$config['syslog']['nologdefaultblock'] = $_POST['logdefaultblock'] ? false : true;
-		$config['syslog']['rawfilter'] = $_POST['rawfilter'] ? true : false;
-		$config['syslog']['resolve'] = $_POST['resolve'] ? true : false;
-		$config['syslog']['bindlan'] = $_POST['bindlan'] ? true : false;
+		$config['syslog']['nologdefaultblock'] = !empty($_POST['logdefaultblock']) ? false : true;
+		$config['syslog']['rawfilter'] = !empty($_POST['rawfilter']) ? true : false;
+		$config['syslog']['resolve'] = !empty($_POST['resolve']) ? true : false;
+		$config['syslog']['bindlan'] = !empty($_POST['bindlan']) ? true : false;
 		
 		write_config();
 		
@@ -125,8 +125,8 @@ function enable_change(enable_over) {
 // -->
 </script>
 <form action="diag_logs_settings.php" method="post" name="iform" id="iform">
-<?php if ($input_errors) print_input_errors($input_errors); ?>
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
 <table width="100%" border="0" cellpadding="0" cellspacing="0" summary="tab pane">
   <tr><td class="tabnavtbl">
   <ul id="tabnav">
@@ -146,7 +146,7 @@ function enable_change(enable_over) {
 	  <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="content pane">
                       <tr> 
                         <td width="22%" valign="top" class="vtable">&nbsp;</td>
-                        <td width="78%" class="vtable"> <input name="reverse" type="checkbox" id="reverse" value="yes" <?php if ($pconfig['reverse']) echo "checked"; ?>>
+                        <td width="78%" class="vtable"> <input name="reverse" type="checkbox" id="reverse" value="yes" <?php if (!empty($pconfig['reverse'])) echo "checked"; ?>>
                           <strong>Show log entries in reverse order (newest entries 
                           on top)</strong></td>
                       </tr>
@@ -158,7 +158,7 @@ function enable_change(enable_over) {
                       </tr>
                       <tr> 
                         <td valign="top" class="vtable">&nbsp;</td>
-                        <td class="vtable"> <input name="logdefaultblock" type="checkbox" id="logdefaultblock" value="yes" <?php if ($pconfig['logdefaultblock']) echo "checked"; ?>>
+                        <td class="vtable"> <input name="logdefaultblock" type="checkbox" id="logdefaultblock" value="yes" <?php if (!empty($pconfig['logdefaultblock'])) echo "checked"; ?>>
                           <strong>Log packets blocked by the default rule</strong><br>
                           Hint: packets that are blocked by the 
                           implicit default block rule will not be logged anymore 
@@ -166,20 +166,20 @@ function enable_change(enable_over) {
                       </tr>
                       <tr> 
                         <td valign="top" class="vtable">&nbsp;</td>
-                        <td class="vtable"> <input name="rawfilter" type="checkbox" id="rawfilter" value="yes" <?php if ($pconfig['rawfilter']) echo "checked"; ?>>
+                        <td class="vtable"> <input name="rawfilter" type="checkbox" id="rawfilter" value="yes" <?php if (!empty($pconfig['rawfilter'])) echo "checked"; ?>>
                           <strong>Show raw filter logs</strong><br>
                           Hint: If this is checked, filter logs are shown as generated by the packet filter, without any formatting. This will reveal more detailed information. </td>
                       </tr>
                       <tr> 
                         <td valign="top" class="vtable">&nbsp;</td>
-                        <td class="vtable"> <input name="resolve" type="checkbox" id="resolve" value="yes" <?php if ($pconfig['resolve']) echo "checked"; ?>>
+                        <td class="vtable"> <input name="resolve" type="checkbox" id="resolve" value="yes" <?php if (!empty($pconfig['resolve'])) echo "checked"; ?>>
                           <strong>Resolve IP addresses to hostnames</strong><br>
                           Hint: If this is checked, IP addresses in firewall logs are resolved to real hostnames where possible.<br>
                           Warning: This can cause a huge delay in loading the firewall log page!</td>
                       </tr>
                       <tr> 
                         <td width="22%" valign="top" class="vtable">&nbsp;</td>
-                        <td width="78%" class="vtable"> <input name="enable" type="checkbox" id="enable" value="yes" <?php if ($pconfig['enable']) echo "checked"; ?> onClick="enable_change(false)">
+                        <td width="78%" class="vtable"> <input name="enable" type="checkbox" id="enable" value="yes" <?php if (!empty($pconfig['enable'])) echo "checked"; ?> onClick="enable_change(false)">
                           <strong>Enable syslog'ing to remote syslog server</strong></td>
                       </tr>
                       <tr> 
@@ -189,24 +189,24 @@ function enable_change(enable_over) {
 						  <table border="0" cellspacing="0" cellpadding="0" summary="network widget">
 	                        <tr> 
 	                          <td>IP address:&nbsp;&nbsp;</td>
-	                          <td><input name="remoteserver" id="remoteserver" type="text" class="formfld" size="20" value="<?=htmlspecialchars($pconfig['remoteserver']);?>"></td>
+	                          <td><input name="remoteserver" id="remoteserver" type="text" class="formfld" size="20" value="<?=htmlspecialchars($pconfig['remoteserver'] ?? '');?>"></td>
 	                        </tr>
 	                        <tr> 
 	                          <td>Port:&nbsp;&nbsp;</td>
-	                          <td><input name="remoteport" id="remoteport" type="text" class="formfld" size="5" value="<?=htmlspecialchars($pconfig['remoteport']);?>"> (optional; default = 514)</td>
+	                          <td><input name="remoteport" id="remoteport" type="text" class="formfld" size="5" value="<?=htmlspecialchars($pconfig['remoteport'] ?? '');?>"> (optional; default = 514)</td>
 	                        </tr>
 	                        <tr> 
 	                          <td></td>
 	                          <td>
-								<input name="system" id="system" type="checkbox" value="yes" onclick="enable_change(false)" <?php if ($pconfig['system']) echo "checked"; ?>>
+								<input name="system" id="system" type="checkbox" value="yes" onclick="enable_change(false)" <?php if (!empty($pconfig['system'])) echo "checked"; ?>>
 		                          system events <br>
-								  <input name="filter" id="filter" type="checkbox" value="yes" <?php if ($pconfig['filter']) echo "checked"; ?>>
+								  <input name="filter" id="filter" type="checkbox" value="yes" <?php if (!empty($pconfig['filter'])) echo "checked"; ?>>
 		                          firewall events<br>
-								  <input name="dhcp" id="dhcp" type="checkbox" value="yes" <?php if ($pconfig['dhcp']) echo "checked"; ?>>
+								  <input name="dhcp" id="dhcp" type="checkbox" value="yes" <?php if (!empty($pconfig['dhcp'])) echo "checked"; ?>>
 		                          DHCP service events<br>
-								  <input name="portalauth" id="portalauth" type="checkbox" value="yes" <?php if ($pconfig['portalauth']) echo "checked"; ?>>
+								  <input name="portalauth" id="portalauth" type="checkbox" value="yes" <?php if (!empty($pconfig['portalauth'])) echo "checked"; ?>>
 		                          Captive portal<br> 
-								  <input name="vpn" id="vpn" type="checkbox" value="yes" <?php if ($pconfig['vpn']) echo "checked"; ?>>
+								  <input name="vpn" id="vpn" type="checkbox" value="yes" <?php if (!empty($pconfig['vpn'])) echo "checked"; ?>>
 		                          PPTP/L2TP VPN events
 							  </td>
 	                        </tr>
@@ -216,7 +216,7 @@ function enable_change(enable_over) {
 						<tr> 
 						<td width="22%" valign="top" class="vtable"></td>
 						<td width="78%" class="vtable"> 
-						  <input name="bindlan" type="checkbox" value="yes" <?php if ($pconfig['bindlan']) echo "checked"; ?>> <strong>Bind to LAN interface only</strong>
+						  <input name="bindlan" type="checkbox" value="yes" <?php if (!empty($pconfig['bindlan'])) echo "checked"; ?>> <strong>Bind to LAN interface only</strong>
 						  <br>
 						  This option can be useful when trying to send syslog data
 						  through a VPN tunnel terminated on the WAN interface.</td>

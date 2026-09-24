@@ -32,7 +32,7 @@
 $pgtitle = array("VPN", "IPsec", "CAs");
 require("guiconfig.inc");
 
-if (!is_array($config['ipsec']['cacert'])) {
+if (!is_array($config['ipsec']['cacert'] ?? null)) {
 	$config['ipsec']['cacert'] = array();
 }
 ipsec_ca_sort();
@@ -42,7 +42,7 @@ if ($_POST) {
 	foreach ($_POST as $pn => $pv) {
 		if (preg_match("/^del_(\d+)_x$/", $pn, $matches)) {
 			$id = $matches[1];
-			if ($a_cacert[$id]) {
+			if (!empty($a_cacert[$id])) {
 				unset($a_cacert[$id]);
 				write_config();
 				touch($d_ipsecconfdirty_path);
@@ -56,7 +56,7 @@ if ($_POST) {
 ?>
 <?php include("fbegin.inc"); ?>
 <form action="vpn_ipsec.php" method="post">
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
 <?php if (file_exists($d_ipsecconfdirty_path)): ?><p>
 <?php print_info_box_np("The IPsec tunnel configuration has been changed.<br>You must apply the changes in order for them to take effect.");?><br>
 <input name="apply" type="submit" class="formbtn" id="apply" value="Apply changes"></p>
@@ -85,7 +85,7 @@ if ($_POST) {
 			  <?php $i = 0; foreach ($a_cacert as $cacertent): ?>
                 <tr> 
                   <td class="listlr">
-                    <?=htmlspecialchars($cacertent['ident']);?>
+                    <?=htmlspecialchars($cacertent['ident'] ?? '');?>
                   </td>
                   <td class="list" nowrap> <a href="vpn_ipsec_ca_edit.php?id=<?=$i;?>"><img src="e.gif" title="edit certificate" width="17" height="17" border="0" alt="certificate"></a>
                      &nbsp;<input name="del_<?=$i;?>" type="image" src="x.gif" width="17" height="17" title="delete certificate" alt="delete certificate" onclick="return confirm('Do you really want to delete this certificate?')"></td>

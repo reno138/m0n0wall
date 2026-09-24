@@ -102,13 +102,13 @@ function getAdminPageList() {
 // Get a list of all admin pages & Descriptions
 $pages = getAdminPageList();
 
-if (!is_array($config['system']['group'])) {
+if (!is_array($config['system']['group'] ?? null)) {
 	$config['system']['group'] = array();
 }
 admin_groups_sort();
 $a_group = &$config['system']['group'];
 
-$id = $_GET['id'];
+$id = $_GET['id'] ?? null;
 if (isset($_POST['id']))
 	$id = $_POST['id'];
 	
@@ -119,11 +119,11 @@ if ($_POST) {
 	foreach ($_POST as $pn => $pv) {
 		if (preg_match("/^del_(\d+)_x$/", $pn, $matches)) {
 			$id = $matches[1];
-			if ($a_group[$id]) {
+			if (!empty($a_group[$id])) {
 			    $ok_to_delete = true;
 			    if (isset($config['system']['user'])) {
 		    	    foreach ($config['system']['user'] as $userent) {
-		    	    	if ($userent['groupname'] == $a_group[$id]['name']) {
+		    	    	if (($userent['groupname'] ?? null) == ($a_group[$id]['name'] ?? null)) {
 		    				$ok_to_delete = false;
 		    				$input_errors[] = "users still exist who are members of this group!";
 		    				break;	    
@@ -140,7 +140,7 @@ if ($_POST) {
 		}
 	}
 
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 		$pconfig = $_POST;
 
 		/* input validation */
@@ -149,35 +149,35 @@ if ($_POST) {
 	
 		do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
-		if (preg_match("/[^a-zA-Z0-9\.\-_ ]/", $_POST['groupname']))
+		if (preg_match("/[^a-zA-Z0-9\.\-_ ]/", $_POST['groupname'] ?? ''))
 			$input_errors[] = "The group name contains invalid characters.";
 		
-		if (!$input_errors && !(isset($id) && $a_group[$id])) {
+		if (empty($input_errors) && !(isset($id) && !empty($a_group[$id]))) {
 			/* make sure there are no dupes */
 			foreach ($a_group as $group) {
-				if ($group['name'] == $_POST['groupname']) {
+				if (($group['name'] ?? null) == ($_POST['groupname'] ?? null)) {
 					$input_errors[] = "Another entry with the same group name already exists.";
 					break;
 				}
 			}
 		}
 	
-		if (!$input_errors) {
+		if (empty($input_errors)) {
 	
-			if (isset($id) && $a_group[$id])
+			if (isset($id) && !empty($a_group[$id]))
 				$group = $a_group[$id];
 		
-			$group['name'] = $_POST['groupname'];
-			$group['description'] = $_POST['description'];
+			$group['name'] = $_POST['groupname'] ?? null;
+			$group['description'] = $_POST['description'] ?? null;
 			unset($group['pages']);
 			foreach ($pages as $fname => $title) {
 				$identifier = str_replace('.php','',$fname);
-				if ($_POST[$identifier] == 'yes') {
+				if (($_POST[$identifier] ?? null) == 'yes') {
 					$group['pages'][] = $fname;
 				}			
 			}		
 		
-			if (isset($id) && $a_group[$id])
+			if (isset($id) && !empty($a_group[$id]))
 				$a_group[$id] = $group;
 			else
 				$a_group[] = $group;
@@ -192,8 +192,8 @@ if ($_POST) {
 
 ?>
 <?php include("fbegin.inc"); ?>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
 <form action="system_groupmanager.php" method="post" name="iform" id="iform">
 <table width="100%" border="0" cellpadding="0" cellspacing="0" summary="tab pane">
   <tr><td class="tabnavtbl">
@@ -208,12 +208,12 @@ if ($_POST) {
 <tr>
   <td class="tabcont">
 <?php
-if($_GET['act']=="new" || $_GET['act']=="edit"){
-	if($_GET['act']=="edit"){
-		if (isset($id) && $a_group[$id]) {
-	       $pconfig['name'] = $a_group[$id]['name'];
-	       $pconfig['description'] = $a_group[$id]['description'];
-	       $pconfig['pages'] = $a_group[$id]['pages'];
+if(($_GET['act'] ?? null)=="new" || ($_GET['act'] ?? null)=="edit"){
+	if(($_GET['act'] ?? null)=="edit"){
+		if (isset($id) && !empty($a_group[$id])) {
+	       $pconfig['name'] = $a_group[$id]['name'] ?? null;
+	       $pconfig['description'] = $a_group[$id]['description'] ?? null;
+	       $pconfig['pages'] = $a_group[$id]['pages'] ?? null;
         }
 	}
 ?>
@@ -221,13 +221,13 @@ if($_GET['act']=="new" || $_GET['act']=="edit"){
             <tr> 
               <td width="22%" valign="top" class="vncellreq">Group name</td>
               <td width="78%" class="vtable"> 
-                <input name="groupname" type="text" class="formfld" id="groupname" size="20" value="<?=htmlspecialchars($pconfig['name']);?>"> 
+                <input name="groupname" type="text" class="formfld" id="groupname" size="20" value="<?=htmlspecialchars($pconfig['name'] ?? '');?>"> 
                 </td>
             </tr>
             <tr> 
               <td width="22%" valign="top" class="vncell">Description</td>
               <td width="78%" class="vtable"> 
-                <input name="description" type="text" class="formfld" id="description" size="20" value="<?=htmlspecialchars($pconfig['description']);?>">
+                <input name="description" type="text" class="formfld" id="description" size="20" value="<?=htmlspecialchars($pconfig['description'] ?? '');?>">
                 <br>
                 Group description, for your own information only</td>
             </tr>
@@ -250,7 +250,7 @@ if($_GET['act']=="new" || $_GET['act']=="edit"){
               	$identifier = str_replace('.php','',$fname);
               	?>
               	<tr><td class="listlr">
-              	<input name="<?=$identifier?>" type="checkbox" id="<?=$identifier?>" value="yes" <?php if (in_array($fname,$pconfig['pages'])) echo "checked"; ?>></td>
+              	<input name="<?=$identifier?>" type="checkbox" id="<?=$identifier?>" value="yes" <?php if (in_array($fname,$pconfig['pages'] ?? array())) echo "checked"; ?>></td>
               	<td class="listr"><?=$title?></td>
               	<td class="listr"><?=$fname?></td>
               	</tr>
@@ -263,7 +263,7 @@ if($_GET['act']=="new" || $_GET['act']=="edit"){
               <td width="22%" valign="top">&nbsp;</td>
               <td width="78%"> 
                 <input name="save" type="submit" class="formbtn" value="Save"> 
-		        <?php if (isset($id) && $a_group[$id]): ?>
+		        <?php if (isset($id) && !empty($a_group[$id])): ?>
 		        <input name="id" type="hidden" value="<?=htmlspecialchars($id);?>">
 		        <?php endif; ?>                
               </td>
@@ -282,13 +282,13 @@ if($_GET['act']=="new" || $_GET['act']=="edit"){
 	<?php $i = 0; foreach($a_group as $group): ?>
 		<tr>
                   <td class="listlr">
-                    <?=htmlspecialchars($group['name']); ?>&nbsp;
+                    <?=htmlspecialchars($group['name'] ?? ''); ?>&nbsp;
                   </td>
                   <td class="listr">
-                    <?=htmlspecialchars($group['description']);?>&nbsp;
+                    <?=htmlspecialchars($group['description'] ?? '');?>&nbsp;
                   </td>
                   <td class="listbg">
-                    <?=count($group['pages']);?>&nbsp;
+                    <?=count($group['pages'] ?? array());?>&nbsp;
                   </td>
                   <td valign="middle" nowrap class="list"> <a href="system_groupmanager.php?act=edit&amp;id=<?=$i; ?>"><img src="e.gif" title="edit group" width="17" height="17" border="0" alt="edit group"></a>
                      &nbsp;<input name="del_<?=$i;?>" type="image" src="x.gif" width="17" height="17" title="delete group" alt="delete group" onclick="return confirm('Do you really want to delete this group?')"></td>

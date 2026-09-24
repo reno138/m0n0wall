@@ -260,6 +260,10 @@ function is_hostname($hostname) {
 }
 
 /* returns true if $domain is a valid domain name */
+/* NOTE for the PHP 8 sweep: this is NOT null-equivalent. is_domain(null) is
+   false (the is_string guard), but is_domain("") is TRUE, because the regex
+   below matches the empty string. Callers guarding a possibly-missing value
+   must use "?? null", never "?? ''", or the validation silently passes. */
 function is_domain($domain) {
 	if (!is_string($domain))
 		return false;

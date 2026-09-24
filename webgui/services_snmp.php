@@ -32,14 +32,14 @@
 $pgtitle = array("Services", "SNMP");
 require("guiconfig.inc");
 
-if (!is_array($config['snmpd'])) {
+if (!is_array($config['snmpd'] ?? null)) {
 	$config['snmpd'] = array();
 	$config['snmpd']['rocommunity'] = "public";
 }
 
-$pconfig['syslocation'] = $config['snmpd']['syslocation'];
-$pconfig['syscontact'] = $config['snmpd']['syscontact'];
-$pconfig['rocommunity'] = $config['snmpd']['rocommunity'];
+$pconfig['syslocation'] = $config['snmpd']['syslocation'] ?? null;
+$pconfig['syscontact'] = $config['snmpd']['syscontact'] ?? null;
+$pconfig['rocommunity'] = $config['snmpd']['rocommunity'] ?? null;
 $pconfig['enable'] = isset($config['snmpd']['enable']);
 $pconfig['bindlan'] = isset($config['snmpd']['bindlan']);
 
@@ -49,19 +49,19 @@ if ($_POST) {
 	$pconfig = $_POST;
 
 	/* input validation */
-	if ($_POST['enable']) {
+	if (!empty($_POST['enable'])) {
 		$reqdfields = explode(" ", "rocommunity");
 		$reqdfieldsn = explode(",", "Community");
 		
 		do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	}
 
-	if (!$input_errors) {
-		$config['snmpd']['syslocation'] = $_POST['syslocation'];	
-		$config['snmpd']['syscontact'] = $_POST['syscontact'];
-		$config['snmpd']['rocommunity'] = $_POST['rocommunity'];
-		$config['snmpd']['enable'] = $_POST['enable'] ? true : false;
-		$config['snmpd']['bindlan'] = $_POST['bindlan'] ? true : false;
+	if (empty($input_errors)) {
+		$config['snmpd']['syslocation'] = $_POST['syslocation'] ?? null;	
+		$config['snmpd']['syscontact'] = $_POST['syscontact'] ?? null;
+		$config['snmpd']['rocommunity'] = $_POST['rocommunity'] ?? null;
+		$config['snmpd']['enable'] = !empty($_POST['enable']) ? true : false;
+		$config['snmpd']['bindlan'] = !empty($_POST['bindlan']) ? true : false;
 			
 		write_config();
 		
@@ -88,39 +88,39 @@ function enable_change(enable_change) {
 }
 //-->
 </script>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
             <form action="services_snmp.php" method="post" name="iform" id="iform">
               <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="content pane">
                 <tr> 
                   <td width="22%" valign="top" class="vtable">&nbsp;</td>
                   <td width="78%" class="vtable">
-<input name="enable" type="checkbox" value="yes" <?php if ($pconfig['enable']) echo "checked"; ?> onClick="enable_change(false)">
+<input name="enable" type="checkbox" value="yes" <?php if (!empty($pconfig['enable'])) echo "checked"; ?> onClick="enable_change(false)">
                     <strong>Enable SNMP agent</strong></td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncell">System location</td>
                   <td width="78%" class="vtable"> 
-                    <input name="syslocation" type="text" class="formfld" id="syslocation" size="40" value="<?=htmlspecialchars($pconfig['syslocation']);?>"> 
+                    <input name="syslocation" type="text" class="formfld" id="syslocation" size="40" value="<?=htmlspecialchars($pconfig['syslocation'] ?? '');?>"> 
                   </td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncell">System contact</td>
                   <td width="78%" class="vtable"> 
-                    <input name="syscontact" type="text" class="formfld" id="syscontact" size="40" value="<?=htmlspecialchars($pconfig['syscontact']);?>"> 
+                    <input name="syscontact" type="text" class="formfld" id="syscontact" size="40" value="<?=htmlspecialchars($pconfig['syscontact'] ?? '');?>"> 
                   </td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">Community</td>
                   <td width="78%" class="vtable"> 
-                    <?=$mandfldhtml;?><input name="rocommunity" type="text" class="formfld" id="rocommunity" size="40" value="<?=htmlspecialchars($pconfig['rocommunity']);?>"> 
+                    <?=$mandfldhtml;?><input name="rocommunity" type="text" class="formfld" id="rocommunity" size="40" value="<?=htmlspecialchars($pconfig['rocommunity'] ?? '');?>"> 
                     <br>
                     In most cases, &quot;public&quot; is used here</td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vtable"></td>
                   <td width="78%" class="vtable"> 
-                    <input name="bindlan" type="checkbox" value="yes" <?php if ($pconfig['bindlan']) echo "checked"; ?>> <strong>Bind to LAN interface only</strong>
+                    <input name="bindlan" type="checkbox" value="yes" <?php if (!empty($pconfig['bindlan'])) echo "checked"; ?>> <strong>Bind to LAN interface only</strong>
                     <br>
                     This option can be useful when trying to access the SNMP agent
                     by the LAN interface's IP address through a VPN tunnel terminated on the WAN interface.</td>

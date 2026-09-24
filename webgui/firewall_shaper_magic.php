@@ -41,7 +41,7 @@ function wipe_magic () {
   $types=array("pipe","queue","rule");
   foreach ($types as $type) {
     foreach (array_keys($config['shaper'][$type]) as $num) {
-    if (substr($config['shaper'][$type][$num]['descr'],0,2) == "m_") {
+    if (substr($config['shaper'][$type][$num]['descr'] ?? '',0,2) == "m_") {
 	  // Scheduler: delete matching jobs
 	  croen_update_job(($type == 'rule' ? Array('shaper-enable_rule', 'shaper-disable_rule') : ($type == 'pipe' ? 'shaper-set_pipe_bandwidth' : 'shaper-set_queue_weight')), $config['shaper'][$type][$num]['descr']);
       unset($config['shaper'][$type][$num]);
@@ -279,13 +279,13 @@ function create_magic ($maxup, $maxdown, $p2plow,$maskq) {
   $rulei++;
 }
 
-if (!is_array($config['shaper']['rule'])) {
+if (!is_array($config['shaper']['rule'] ?? null)) {
     $config['shaper']['rule'] = array();
 }
-if (!is_array($config['shaper']['pipe'])) {
+if (!is_array($config['shaper']['pipe'] ?? null)) {
     $config['shaper']['pipe'] = array();
 }
-if (!is_array($config['shaper']['queue'])) {
+if (!is_array($config['shaper']['queue'] ?? null)) {
     $config['shaper']['queue'] = array();
 }
 
@@ -295,45 +295,47 @@ $a_pipes = &$config['shaper']['pipe'];
 
 $pconfig['p2plow'] = isset($config['shaper']['magic']['p2plow']);
 $pconfig['maskq'] = isset($config['shaper']['magic']['maskq']);
-$pconfig['maxup'] = $config['shaper']['magic']['maxup'];
-$pconfig['maxdown'] = $config['shaper']['magic']['maxdown'];
+$pconfig['maxup'] = $config['shaper']['magic']['maxup'] ?? null;
+$pconfig['maxdown'] = $config['shaper']['magic']['maxdown'] ?? null;
+
+$note = '';
 
 if ($_POST) {
 
-    if ($_POST['install']) {
+    if (!empty($_POST['install'])) {
         unset($input_errors);
         $pconfig = $_POST;
         $reqdfields = explode(" ", "maxup maxdown");
         $reqdfieldsn = explode(",", "Max. Upload,Max.Download");
         do_input_validation($_POST,$reqdfields, $reqdfieldsn, $input_errors);
-        if (($_POST['maxup'] && !is_numericint($_POST['maxup']))) {
+        if ((!empty($_POST['maxup']) && !is_numericint($_POST['maxup']))) {
             $input_errors[] = "The max upload bandwidth must be an integer.";
         }
-        if (($_POST['maxdown'] && !is_numericint($_POST['maxdown']))) {
+        if ((!empty($_POST['maxdown']) && !is_numericint($_POST['maxdown']))) {
             $input_errors[] = "The max download bandwidth must be an integer.";
         }
-        if (!$input_errors) {
-          if ($_POST['install']) {
+        if (empty($input_errors)) {
+          if (!empty($_POST['install'])) {
 		     // Scheduler: delete matching jobs
 		     croen_update_job(Array('shaper-enable_rule', 'shaper-disable_rule', 'shaper-set_pipe_bandwidth', 'shaper-set_queue_weight'));
 	     	 unset ($config['shaper']);
-             create_magic($_POST['maxup'],$_POST['maxdown'],$_POST['p2plow']?TRUE:FALSE,$_POST['maskq']?TRUE:FALSE);
+             create_magic($_POST['maxup'] ?? null,$_POST['maxdown'] ?? null,!empty($_POST['p2plow'])?TRUE:FALSE,!empty($_POST['maskq'])?TRUE:FALSE);
              touch($d_shaperconfdirty_path);
           }
-          $config['shaper']['magic']['p2plow'] = $_POST['p2plow'] ? TRUE : FALSE;
-          $config['shaper']['magic']['maskq'] = $_POST['maskq'] ? TRUE : FALSE;
-          $config['shaper']['magic']['maxup'] = $_POST['maxup'];
-          $config['shaper']['magic']['maxdown'] = $_POST['maxdown'];
+          $config['shaper']['magic']['p2plow'] = !empty($_POST['p2plow']) ? TRUE : FALSE;
+          $config['shaper']['magic']['maskq'] = !empty($_POST['maskq']) ? TRUE : FALSE;
+          $config['shaper']['magic']['maxup'] = $_POST['maxup'] ?? null;
+          $config['shaper']['magic']['maxdown'] = $_POST['maxdown'] ?? null;
           write_config();
         }
     }
-    if ($_POST['remove']) {
+    if (!empty($_POST['remove'])) {
 		wipe_magic();
 		$note = '<p><span class="red"><strong>Note: The traffic shaper has been disabled.<br>All of your user-defined rules/pipes/queues are still intact.</strong></span><strong><br>';
 		touch($d_shaperconfdirty_path);
 		write_config();
     }
-    if ($_POST['apply']) {
+    if (!empty($_POST['apply'])) {
         $retval = 0;
         if (!file_exists($d_sysrebootreqd_path)) {
             config_lock();
@@ -350,9 +352,9 @@ if ($_POST) {
 
 ?>
 <?php include("fbegin.inc"); ?>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
 <form action="firewall_shaper_magic.php" method="post">
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
 <?php if (file_exists($d_shaperconfdirty_path)): ?><p>
 <?php print_info_box_np("The traffic shaper configuration has been changed.<br>You must apply the changes in order for them to take effect.$note");?><br>
 <input name="apply" type="submit" class="formbtn" id="apply" value="Apply changes"></p>
@@ -375,27 +377,27 @@ if ($_POST) {
 		<tr> 
 		  <td width="22%" valign="top" class="vtable">&nbsp;</td>
 		  <td width="78%" class="vtable">
-			  <input name="p2plow" type="checkbox" id="p2plow" value="yes" <?php if ($pconfig['p2plow']) echo "checked";?>>
+			  <input name="p2plow" type="checkbox" id="p2plow" value="yes" <?php if (!empty($pconfig['p2plow'])) echo "checked";?>>
 			  Set P2P traffic to lowest priority</td>
 		</tr>
 		<tr> 
 		  <td width="22%" valign="top" class="vtable">&nbsp;</td>
 		  <td width="78%" class="vtable">
-			  <input name="maskq" type="checkbox" id="maskq" value="yes" <?php if ($pconfig['maskq']) echo "checked";?>>
+			  <input name="maskq" type="checkbox" id="maskq" value="yes" <?php if (!empty($pconfig['maskq'])) echo "checked";?>>
 			  Share bandwidth evenly on LAN</td>
 		</tr>
         <tr valign="top">
           <td width="22%" class="vncellreq">Downstream<br>
             speed </td>
           <td width="78%" class="vtable">
-              <?=$mandfldhtml;?><input name="maxdown" type="text" size="10" value="<?php if ($pconfig['maxdown']) echo htmlspecialchars($pconfig['maxdown']); ?>"> 
+              <?=$mandfldhtml;?><input name="maxdown" type="text" size="10" value="<?php if (!empty($pconfig['maxdown'])) echo htmlspecialchars($pconfig['maxdown']); ?>"> 
               kbps<br>
               Enter the speed of your WAN downstream link here.</td>
 		</tr>
         <tr valign="top">
           <td width="22%" class="vncellreq">Upstream<br>
             speed</td>
-          <td width="78%" class="vtable"><?=$mandfldhtml;?><input name="maxup" type="text" size="10" value="<?php if ($pconfig['maxup']) echo htmlspecialchars($pconfig['maxup']); ?>">
+          <td width="78%" class="vtable"><?=$mandfldhtml;?><input name="maxup" type="text" size="10" value="<?php if (!empty($pconfig['maxup'])) echo htmlspecialchars($pconfig['maxup']); ?>">
               kbps<br>
               Enter the speed of your WAN upstream link here.</td>
 		</tr>

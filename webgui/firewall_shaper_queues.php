@@ -32,20 +32,20 @@
 $pgtitle = array("Firewall", "Traffic shaper", "Queues");
 require("guiconfig.inc");
 
-if (!is_array($config['shaper']['pipe'])) {
+if (!is_array($config['shaper']['pipe'] ?? null)) {
 	$config['shaper']['pipe'] = array();
 }
-if (!is_array($config['shaper']['queue'])) {
+if (!is_array($config['shaper']['queue'] ?? null)) {
 	$config['shaper']['queue'] = array();
 }
 $a_queues = &$config['shaper']['queue'];
 $a_pipe = &$config['shaper']['pipe'];
 
-if (isset($_POST['del_x']) && is_array($_POST['entries'])) {
+if (isset($_POST['del_x']) && is_array($_POST['entries'] ?? null)) {
 	foreach ($_POST['entries'] as $entry) {
-		if ($a_queues[$entry]) {
+		if (!empty($a_queues[$entry])) {
 			/* check that no rule references this queue */
-			if (is_array($config['shaper']['rule'])) {
+			if (is_array($config['shaper']['rule'] ?? null)) {
 				foreach ($config['shaper']['rule'] as $rule) {
 					if (isset($rule['targetqueue']) && ($rule['targetqueue'] == $entry)) {
 						$input_errors[] = "This queue cannot be deleted because it is still referenced by a rule.";
@@ -56,14 +56,14 @@ if (isset($_POST['del_x']) && is_array($_POST['entries'])) {
 		}
 	}
 	
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 		foreach ($_POST['entries'] as $entry) {
 			// Scheduler: delete matching jobs
-			croen_update_job('shaper-set_queue_weight', $a_queues[$entry]['descr']);
+			croen_update_job('shaper-set_queue_weight', $a_queues[$entry]['descr'] ?? null);
 			unset($a_queues[$entry]);
 	
 			/* renumber all rules */
-			if (is_array($config['shaper']['rule'])) {
+			if (is_array($config['shaper']['rule'] ?? null)) {
 				for ($i = 0; isset($config['shaper']['rule'][$i]); $i++) {
 					$currule = &$config['shaper']['rule'][$i];
 					if (isset($currule['targetqueue']) && ($currule['targetqueue'] > $entry))
@@ -81,8 +81,8 @@ if (isset($_POST['del_x']) && is_array($_POST['entries'])) {
 ?>
 <?php include("fbegin.inc"); ?>
 <form action="firewall_shaper.php" method="post">
-<?php if ($input_errors) print_input_errors($input_errors); ?>
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
 <?php if (file_exists($d_shaperconfdirty_path)): ?><p>
 <?php print_info_box_np("The traffic shaper configuration has been changed.<br>You must apply the changes in order for them to take effect.");?><br>
 <input name="apply" type="submit" class="formbtn" id="apply" value="Apply changes"></p>
@@ -120,21 +120,21 @@ if (isset($_POST['del_x']) && is_array($_POST['entries'])) {
                           <?=($i+1);?></td>
                         <td class="listr"> 
 							<?php
-							if ($a_pipe[$queue['targetpipe']]['descr'])
+							if (!empty($a_pipe[$queue['targetpipe']]['descr']))
 								$desc = htmlspecialchars($a_pipe[$queue['targetpipe']]['descr']);
 							else 
-								$desc = "Pipe " . ($queue['targetpipe']+1);
+								$desc = "Pipe " . (($queue['targetpipe'] ?? null)+1);
 							?>	
-                          <a href="firewall_shaper_pipes_edit.php?id=<?=$queue['targetpipe'];?>"><?=$desc;?></a></td>
+                          <a href="firewall_shaper_pipes_edit.php?id=<?=$queue['targetpipe'] ?? '';?>"><?=$desc;?></a></td>
                         <td class="listr"> 
-                          <?=$queue['weight'];?></td>
+                          <?=$queue['weight'] ?? '';?></td>
                         <td class="listr"> 
-                          <?php if ($queue['mask']): ?>
-                          <?=$queue['mask'];?>
+                          <?php if (!empty($queue['mask'])): ?>
+                          <?=$queue['mask'] ?? '';?>
                           <?php endif; ?>
                           &nbsp; </td>
                         <td class="listbg"> 
-                          <?=htmlspecialchars($queue['descr']);?>
+                          <?=htmlspecialchars($queue['descr'] ?? '');?>
                           &nbsp; </td>
                         <td valign="middle" nowrap class="list"> <a href="firewall_shaper_queues_edit.php?id=<?=$i;?>"><img src="e.gif" title="edit queue" width="17" height="17" border="0" alt="edit queue"></a></td>
                       </tr>

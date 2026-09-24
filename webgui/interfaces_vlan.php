@@ -32,7 +32,7 @@
 $pgtitle = array("Interfaces", "Assign network ports");
 require("guiconfig.inc");
 
-if (!is_array($config['vlans']['vlan']))
+if (!is_array($config['vlans']['vlan'] ?? null))
 	$config['vlans']['vlan'] = array();
 
 $a_vlans = &$config['vlans']['vlan'] ;
@@ -40,13 +40,13 @@ $a_vlans = &$config['vlans']['vlan'] ;
 function vlan_inuse($num) {
 	global $config, $g;
 
-	if ($config['interfaces']['lan']['if'] == "vlan{$num}")
+	if (($config['interfaces']['lan']['if'] ?? null) == "vlan{$num}")
 		return true;
-	if ($config['interfaces']['wan']['if'] == "vlan{$num}")
+	if (($config['interfaces']['wan']['if'] ?? null) == "vlan{$num}")
 		return true;
 	
 	for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-		if ($config['interfaces']['opt' . $i]['if'] == "vlan{$num}")
+		if (($config['interfaces']['opt' . $i]['if'] ?? null) == "vlan{$num}")
 			return true;
 	}
 	
@@ -75,10 +75,10 @@ if ($_POST) {
 				unset($a_vlans[$id]);
 
 				/* renumber all interfaces that use VLANs */
-				$config['interfaces']['lan']['if'] = renumber_vlan($config['interfaces']['lan']['if'], $id);
-				$config['interfaces']['wan']['if'] = renumber_vlan($config['interfaces']['wan']['if'], $id);
+				$config['interfaces']['lan']['if'] = renumber_vlan($config['interfaces']['lan']['if'] ?? '', $id);
+				$config['interfaces']['wan']['if'] = renumber_vlan($config['interfaces']['wan']['if'] ?? '', $id);
 				for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++)
-					$config['interfaces']['opt' . $i]['if'] = renumber_vlan($config['interfaces']['opt' . $i]['if'], $id);
+					$config['interfaces']['opt' . $i]['if'] = renumber_vlan($config['interfaces']['opt' . $i]['if'] ?? '', $id);
 
 				write_config();
 				touch($d_sysrebootreqd_path);
@@ -91,7 +91,7 @@ if ($_POST) {
 
 ?>
 <?php include("fbegin.inc"); ?>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
 <?php if (file_exists($d_sysrebootreqd_path)) print_info_box(get_std_save_message(0)); ?>
 <form action="interfaces_vlan.php" method="post" name="iform" id="iform">
 <table width="100%" border="0" cellpadding="0" cellspacing="0" summary="tab pane">
@@ -114,13 +114,13 @@ if ($_POST) {
 			  <?php $i = 0; foreach ($a_vlans as $vlan): ?>
                 <tr>
                   <td class="listlr">
-					<?=htmlspecialchars($vlan['if']);?>
+					<?=htmlspecialchars($vlan['if'] ?? '');?>
                   </td>
                   <td class="listr">
-					<?=htmlspecialchars($vlan['tag']);?>
+					<?=htmlspecialchars($vlan['tag'] ?? '');?>
                   </td>
                   <td class="listbg">
-                    <?=htmlspecialchars($vlan['descr']);?>&nbsp;
+                    <?=htmlspecialchars($vlan['descr'] ?? '');?>&nbsp;
                   </td>
                   <td valign="middle" nowrap class="list"> <a href="interfaces_vlan_edit.php?id=<?=$i;?>"><img src="e.gif" title="edit VLAN" width="17" height="17" border="0" alt="edit VLAN"></a>
                      &nbsp;<input name="del_<?=$i;?>" type="image" src="x.gif" width="17" height="17" title="delete VLAN" alt="delete VLAN" onclick="return confirm('Do you really want to delete this VLAN?')"></td>

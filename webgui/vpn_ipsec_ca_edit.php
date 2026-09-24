@@ -32,17 +32,17 @@
 $pgtitle = array("VPN", "IPsec", "Edit CA/CRL certificate");
 require("guiconfig.inc");
 
-if (!is_array($config['ipsec']['cacert'])) {
+if (!is_array($config['ipsec']['cacert'] ?? null)) {
 	$config['ipsec']['cacert'] = array();
 }
 ipsec_ca_sort();
 $a_secret = &$config['ipsec']['cacert'];
 
-$id = $_GET['id'];
+$id = $_GET['id'] ?? null;
 if (isset($_POST['id']))
 	$id = $_POST['id'];
 
-if (isset($id) && $a_secret[$id]) {
+if (isset($id) && !empty($a_secret[$id])) {
 	$pconfig['ident'] = $a_secret[$id]['ident'];
 	$pconfig['cert'] = base64_decode($a_secret[$id]['cert']);
 	if ((isset($a_secret[$id]['crl'])) and ($a_secret[$id]['crl']!=""))
@@ -71,7 +71,7 @@ if ($_POST) {
 	if (preg_match("/[^a-zA-Z0-9@\.\-]/", $_POST['ident']))
 		$input_errors[] = "The identifier contains invalid characters.";
 	
-	if (!$input_errors && !(isset($id) && $a_secret[$id])) {
+	if (!$input_errors && !(isset($id) && !empty($a_secret[$id]))) {
 		/* make sure there are no dupes */
 		foreach ($a_secret as $secretent) {
 			if ($secretent['ident'] == $_POST['ident']) {
@@ -83,7 +83,7 @@ if ($_POST) {
 
 	if (!$input_errors) {
 	
-		if (isset($id) && $a_secret[$id])
+		if (isset($id) && !empty($a_secret[$id]))
 			$secretent = $a_secret[$id];
 	
 		$secretent['ident'] = $_POST['ident'];
@@ -93,7 +93,7 @@ if ($_POST) {
 		else 
 			$secretent['crl'] = "";
 		
-		if (isset($id) && $a_secret[$id])
+		if (isset($id) && !empty($a_secret[$id]))
 			$a_secret[$id] = $secretent;
 		else
 			$a_secret[] = $secretent;
@@ -107,13 +107,13 @@ if ($_POST) {
 }
 ?>
 <?php include("fbegin.inc"); ?>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
             <form action="vpn_ipsec_ca_edit.php" method="post" name="iform" id="iform">
               <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="content pane">
                 <tr> 
                   <td valign="top" class="vncellreq">Identifier</td>
                   <td class="vtable">
- <input name="ident" type="text" class="formfld" id="ident" size="30" value="<?=htmlspecialchars($pconfig['ident']);?>">
+ <input name="ident" type="text" class="formfld" id="ident" size="30" value="<?=htmlspecialchars($pconfig['ident'] ?? '');?>">
                     <br>
 This can be any text to describe the certificate authority.       
                   </td>
@@ -121,14 +121,14 @@ This can be any text to describe the certificate authority.
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">Certificate</td>
                   <td width="78%" class="vtable"> 
-                    <textarea name="cert" cols="65" rows="7" id="cert" class="formpre"><?=htmlspecialchars($pconfig['cert']);?></textarea>
+                    <textarea name="cert" cols="65" rows="7" id="cert" class="formpre"><?=htmlspecialchars($pconfig['cert'] ?? '');?></textarea>
                     <br> 
                     Paste a CA certificate in X.509 PEM format here.</td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncell">Certificate Revocation List</td>
                   <td width="78%" class="vtable"> 
-                    <textarea name="crl" cols="65" rows="7" id="crl" class="formpre"><?=htmlspecialchars($pconfig['crl']);?></textarea>
+                    <textarea name="crl" cols="65" rows="7" id="crl" class="formpre"><?=htmlspecialchars($pconfig['crl'] ?? '');?></textarea>
                     <br> 
                     Paste a CRL in X.509 PEM format here.</td>
                 </tr>
@@ -136,7 +136,7 @@ This can be any text to describe the certificate authority.
                   <td width="22%" valign="top">&nbsp;</td>
                   <td width="78%"> 
                     <input name="Submit" type="submit" class="formbtn" value="Save"> 
-                    <?php if (isset($id) && $a_secret[$id]): ?>
+                    <?php if (isset($id) && !empty($a_secret[$id])): ?>
                     <input name="id" type="hidden" value="<?=htmlspecialchars($id);?>">
                     <?php endif; ?>
                   </td>

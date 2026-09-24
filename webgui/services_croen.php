@@ -50,14 +50,14 @@
 			do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 			
 			// 2: Input validation (field values)
-			if (!$input_errors) {
+			if (empty($input_errors)) {
 				if (!ctype_digit($_POST['interval']) || (int)$_POST['interval'] < 1 || (int)$_POST['interval'] > 60) {
 					$input_errors[] = "The loop interval has to be between 1 and 60";
 				}
 			}
 			
 			// 3: Set config variables & write config
-			if (!$input_errors) {
+			if (empty($input_errors)) {
 				// Config variables
 				$config['croen']['interval'] = (int)$_POST['interval'];
 				$config['croen']['enable'] = (isset($_POST['enable']) ? TRUE : FALSE);
@@ -68,7 +68,7 @@
 		}
 		
 		// Restart service & retrieve save message
-		if (!$input_errors) {
+		if (empty($input_errors)) {
 			$retval = 0;
 			if (!file_exists($d_sysrebootreqd_path)) {
 				config_lock();
@@ -134,11 +134,11 @@
 		</script>';
 
 	// Show errors (if any)
-	if ($input_errors) {
+	if (!empty($input_errors)) {
 		print_input_errors($input_errors);
 	}
 	// Show savemsg (if any)
-	if ($savemsg) {
+	if (!empty($savemsg)) {
 		print_info_box($savemsg);
 	}
 

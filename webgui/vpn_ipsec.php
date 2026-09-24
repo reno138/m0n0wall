@@ -32,7 +32,7 @@
 $pgtitle = array("VPN", "IPsec", "Tunnels");
 require("guiconfig.inc");
 
-if (!is_array($config['ipsec']['tunnel'])) {
+if (!is_array($config['ipsec']['tunnel'] ?? null)) {
 	$config['ipsec']['tunnel'] = array();
 }
 $a_ipsec = &$config['ipsec']['tunnel'];
@@ -42,7 +42,7 @@ $pconfig['enable'] = isset($config['ipsec']['enable']);
 
 if ($_POST) {
 
-	if ($_POST['apply']) {
+	if (!empty($_POST['apply'])) {
 		$retval = 0;
 		if (!file_exists($d_sysrebootreqd_path))
 			$retval = vpn_ipsec_configure();
@@ -51,10 +51,10 @@ if ($_POST) {
 			if (file_exists($d_ipsecconfdirty_path))
 				unlink($d_ipsecconfdirty_path);
 		}
-	} else if ($_POST['submit']) {
+	} else if (!empty($_POST['submit'])) {
 		$pconfig = $_POST;
 		
-		$config['ipsec']['enable'] = $_POST['enable'] ? true : false;
+		$config['ipsec']['enable'] = !empty($_POST['enable']) ? true : false;
 		
 		write_config();
 	
@@ -73,7 +73,7 @@ if ($_POST) {
 		foreach ($_POST as $pn => $pv) {
 			if (preg_match("/^del_(\d+)_x$/", $pn, $matches)) {
 				$id = $matches[1];
-				if ($a_ipsec[$id]) {
+				if (!empty($a_ipsec[$id])) {
 					unset($a_ipsec[$id]);
 					write_config();
 					touch($d_ipsecconfdirty_path);
@@ -88,7 +88,7 @@ if ($_POST) {
 ?>
 <?php include("fbegin.inc"); ?>
 <form action="vpn_ipsec.php" method="post">
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
 <?php if (file_exists($d_ipsecconfdirty_path)): ?><p>
 <?php print_info_box_np("The IPsec tunnel configuration has been changed.<br>You must apply the changes in order for them to take effect.");?><br>
 <input name="apply" type="submit" class="formbtn" id="apply" value="Apply changes"></p>
@@ -110,7 +110,7 @@ if ($_POST) {
 		        <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="checkbox pane">
                 <tr> 
                   <td class="vtable">
-                      <input name="enable" type="checkbox" id="enable" value="yes" <?php if ($pconfig['enable']) echo "checked";?>>
+                      <input name="enable" type="checkbox" id="enable" value="yes" <?php if (!empty($pconfig['enable'])) echo "checked";?>>
                       <strong>Enable IPsec</strong></td>
                 </tr>
                 <tr> 
@@ -140,37 +140,37 @@ if ($_POST) {
 				?>
                 <tr valign="top">
                   <td nowrap class="listlr"><?=$spans;?> 
-                    <?php	if ($ipsecent['local-subnet']['network'])
+                    <?php	if (!empty($ipsecent['local-subnet']['network']))
 								echo strtoupper($ipsecent['local-subnet']['network']);
 							else
-								echo $ipsecent['local-subnet']['address'];
+								echo $ipsecent['local-subnet']['address'] ?? '';
 					?>
                     <br>
-                    <?=$ipsecent['remote-subnet'];?>
+                    <?=$ipsecent['remote-subnet'] ?? '';?>
                   <?=$spane;?></td>
                   <td class="listr"><?=$spans;?>
-				  <?php if ($ipsecent['interface']) {
+				  <?php if (!empty($ipsecent['interface'])) {
 							$iflabels = array('lan' => 'LAN', 'wan' => 'WAN');
 							  for ($j = 1; isset($config['interfaces']['opt' . $j]); $j++)
-								$iflabels['opt' . $j] = $config['interfaces']['opt' . $j]['descr'];
-							  $if = htmlspecialchars($iflabels[$ipsecent['interface']]);
+								$iflabels['opt' . $j] = $config['interfaces']['opt' . $j]['descr'] ?? '';
+							  $if = htmlspecialchars($iflabels[$ipsecent['interface']] ?? '');
 						} else
 							$if = "WAN";
 						
-						echo $if . "<br>" . $ipsecent['remote-gateway'];
+						echo $if . "<br>" . ($ipsecent['remote-gateway'] ?? '');
 					?>
                   <?=$spane;?></td>
                   <td class="listr"><?=$spans;?>
-				    <?=$ipsecent['p1']['mode'];?>
+				    <?=$ipsecent['p1']['mode'] ?? '';?>
                   <?=$spane;?></td>
                   <td class="listr"><?=$spans;?>
-				    <?=$p1_ealgos[$ipsecent['p1']['encryption-algorithm']];?>
+				    <?=$p1_ealgos[$ipsecent['p1']['encryption-algorithm'] ?? ''] ?? '';?>
                   <?=$spane;?></td>
                   <td class="listr"><?=$spans;?>
-				    <?=$p1_halgos[$ipsecent['p1']['hash-algorithm']];?>
+				    <?=$p1_halgos[$ipsecent['p1']['hash-algorithm'] ?? ''] ?? '';?>
                   <?=$spane;?></td>
                   <td class="listbg"><?=$spans;?>
-                    <?=htmlspecialchars($ipsecent['descr']);?>&nbsp;
+                    <?=htmlspecialchars($ipsecent['descr'] ?? '');?>&nbsp;
                   <?=$spane;?></td>
                   <td valign="middle" nowrap class="list"> <a href="vpn_ipsec_edit.php?id=<?=$i;?>"><img src="e.gif" title="edit tunnel" width="17" height="17" border="0" alt="edit tunnel"></a> 
                     &nbsp;<input name="del_<?=$i;?>" type="image" src="x.gif" width="17" height="17" title="delete tunnel" alt="delete tunnel" onclick="return confirm('Do you really want to delete this tunnel?')"></td>

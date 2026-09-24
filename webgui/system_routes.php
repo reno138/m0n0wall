@@ -31,7 +31,7 @@
 
 require("guiconfig.inc");
 
-if ($ipv6routes = ($_GET['type'] == 'ipv6')) {
+if ($ipv6routes = (($_GET['type'] ?? null) == 'ipv6')) {
 	$configname = 'route6';
 	$typelink = '&type=ipv6';
 } else {
@@ -41,7 +41,7 @@ if ($ipv6routes = ($_GET['type'] == 'ipv6')) {
 $pgtitle = array("System", "Static routes");	/* make group manager happy */
 $pgtitle = array("System", ipv6enabled() ? ($ipv6routes ? 'IPv6 Static routes' : 'IPv4 Static routes') : 'Static routes');
 
-if (!is_array($config['staticroutes'][$configname]))
+if (!is_array($config['staticroutes'][$configname] ?? null))
 	$config['staticroutes'][$configname] = array();
 
 staticroutes_sort();
@@ -52,7 +52,7 @@ if ($_POST) {
 	foreach ($_POST as $pn => $pv) {
 		if (preg_match("/^del_(\d+)_x$/", $pn, $matches)) {
 			$id = $matches[1];
-			if ($a_routes[$id]) {
+			if (!empty($a_routes[$id])) {
 				unset($a_routes[$id]);
 				write_config();
 				touch($d_staticroutesdirty_path);
@@ -64,7 +64,7 @@ if ($_POST) {
 
 	$pconfig = $_POST;
 
-	if ($_POST['apply']) {
+	if (!empty($_POST['apply'])) {
 		$retval = 0;
 		if (!file_exists($d_sysrebootreqd_path)) {
 			$retval = system_routing_configure();
@@ -88,7 +88,7 @@ if ($_POST) {
 ?>
 <?php include("fbegin.inc"); ?>
 <form action="system_routes.php?<?=$typelink?>" method="post">
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
 <?php if (file_exists($d_staticroutesdirty_path)): ?><p>
 <?php print_info_box_np("The static route configuration has been changed.<br>You must apply the changes in order for them to take effect.");?><br>
 <input name="apply" type="submit" class="formbtn" id="apply" value="Apply changes"></p>
@@ -110,7 +110,7 @@ if ($_POST) {
 					$iflabels['pptp'] = "PPTP";
 				  for ($j = 1; isset($config['interfaces']['opt' . $j]); $j++)
 				  	$iflabels['opt' . $j] = $config['interfaces']['opt' . $j]['descr'];
-				  echo htmlspecialchars($iflabels[$route['interface']]); ?>
+				  echo htmlspecialchars($iflabels[$route['interface']] ?? ''); ?>
                   </td>
                   <td class="listr">
                     <?=strtolower($route['network']);?>

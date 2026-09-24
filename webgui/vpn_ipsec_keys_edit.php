@@ -32,19 +32,19 @@
 $pgtitle = array("VPN", "IPsec", "Edit pre-shared key");
 require("guiconfig.inc");
 
-if (!is_array($config['ipsec']['mobilekey'])) {
+if (!is_array($config['ipsec']['mobilekey'] ?? null)) {
 	$config['ipsec']['mobilekey'] = array();
 }
 ipsec_mobilekey_sort();
 $a_secret = &$config['ipsec']['mobilekey'];
 
-$id = $_GET['id'];
+$id = $_GET['id'] ?? null;
 if (isset($_POST['id']))
 	$id = $_POST['id'];
 
-if (isset($id) && $a_secret[$id]) {
-	$pconfig['ident'] = $a_secret[$id]['ident'];
-	$pconfig['psk'] = $a_secret[$id]['pre-shared-key'];
+if (isset($id) && !empty($a_secret[$id])) {
+	$pconfig['ident'] = $a_secret[$id]['ident'] ?? null;
+	$pconfig['psk'] = $a_secret[$id]['pre-shared-key'] ?? null;
 }
 
 if ($_POST) {
@@ -58,28 +58,28 @@ if ($_POST) {
 	
 	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
-	if (preg_match("/[^a-zA-Z0-9@\.\-]/", $_POST['ident']))
+	if (preg_match("/[^a-zA-Z0-9@\.\-]/", $_POST['ident'] ?? ''))
 		$input_errors[] = "The identifier contains invalid characters.";
 	
-	if (!$input_errors && !(isset($id) && $a_secret[$id])) {
+	if (empty($input_errors) && !(isset($id) && !empty($a_secret[$id]))) {
 		/* make sure there are no dupes */
 		foreach ($a_secret as $secretent) {
-			if ($secretent['ident'] == $_POST['ident']) {
+			if (($secretent['ident'] ?? null) == ($_POST['ident'] ?? null)) {
 				$input_errors[] = "Another entry with the same identifier already exists.";
 				break;
 			}
 		}
 	}
 
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 	
-		if (isset($id) && $a_secret[$id])
+		if (isset($id) && !empty($a_secret[$id]))
 			$secretent = $a_secret[$id];
 	
-		$secretent['ident'] = $_POST['ident'];
-		$secretent['pre-shared-key'] = $_POST['psk'];
+		$secretent['ident'] = $_POST['ident'] ?? null;
+		$secretent['pre-shared-key'] = $_POST['psk'] ?? null;
 		
-		if (isset($id) && $a_secret[$id])
+		if (isset($id) && !empty($a_secret[$id]))
 			$a_secret[$id] = $secretent;
 		else
 			$a_secret[] = $secretent;
@@ -93,13 +93,13 @@ if ($_POST) {
 }
 ?>
 <?php include("fbegin.inc"); ?>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
             <form action="vpn_ipsec_keys_edit.php" method="post" name="iform" id="iform">
               <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="content pane">
                 <tr> 
                   <td valign="top" class="vncellreq">Identifier</td>
                   <td class="vtable">
-					<?=$mandfldhtml;?><input name="ident" type="text" class="formfld" id="ident" size="30" value="<?=htmlspecialchars($pconfig['ident']);?>">
+					<?=$mandfldhtml;?><input name="ident" type="text" class="formfld" id="ident" size="30" value="<?=htmlspecialchars($pconfig['ident'] ?? '');?>">
                     <br>
 This can be either an IP address, fully qualified domain name or an e-mail address.       
                   </td>
@@ -107,14 +107,14 @@ This can be either an IP address, fully qualified domain name or an e-mail addre
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">Pre-shared key</td>
                   <td width="78%" class="vtable"> 
-                    <?=$mandfldhtml;?><input name="psk" type="text" class="formfld" id="psk" size="40" value="<?=htmlspecialchars($pconfig['psk']);?>">
+                    <?=$mandfldhtml;?><input name="psk" type="text" class="formfld" id="psk" size="40" value="<?=htmlspecialchars($pconfig['psk'] ?? '');?>">
                   </td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top">&nbsp;</td>
                   <td width="78%"> 
                     <input name="Submit" type="submit" class="formbtn" value="Save"> 
-                    <?php if (isset($id) && $a_secret[$id]): ?>
+                    <?php if (isset($id) && !empty($a_secret[$id])): ?>
                     <input name="id" type="hidden" value="<?=htmlspecialchars($id);?>">
                     <?php endif; ?>
                   </td>

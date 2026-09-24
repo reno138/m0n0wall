@@ -32,7 +32,7 @@
 $pgtitle = array("Services", "Proxy ARP");
 require("guiconfig.inc");
 
-if (!is_array($config['proxyarp']['proxyarpnet'])) {
+if (!is_array($config['proxyarp']['proxyarpnet'] ?? null)) {
 	$config['proxyarp']['proxyarpnet'] = array();
 }
 proxyarp_sort();
@@ -43,7 +43,7 @@ if ($_POST) {
 	foreach ($_POST as $pn => $pv) {
 		if (preg_match("/^del_(\d+)_x$/", $pn, $matches)) {
 			$id = $matches[1];
-			if ($a_proxyarp[$id]) {
+			if (!empty($a_proxyarp[$id])) {
 				unset($a_proxyarp[$id]);
 				write_config();
 				touch($d_proxyarpdirty_path);
@@ -72,7 +72,7 @@ if ($_POST) {
 ?>
 <?php include("fbegin.inc"); ?>
 <form action="services_proxyarp.php" method="post">
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
 <?php if (file_exists($d_proxyarpdirty_path)): ?><p>
 <?php print_info_box_np("The proxy ARP configuration has been changed.<br>You must apply the changes in order for them to take effect.");?><br>
 <input name="apply" type="submit" class="formbtn" id="apply" value="Apply changes"></p>
@@ -88,11 +88,11 @@ if ($_POST) {
                 <tr>
 				  <td class="listlr">
                   <?php
-				  	if ($arpent['interface']) {
+				  	if (!empty($arpent['interface'])) {
 					  $iflabels = array('lan' => 'LAN', 'wan' => 'WAN');
 					  for ($j = 1; isset($config['interfaces']['opt' . $j]); $j++)
-						$iflabels['opt' . $j] = $config['interfaces']['opt' . $j]['descr'];
-					  echo htmlspecialchars($iflabels[$arpent['interface']]);
+						$iflabels['opt' . $j] = $config['interfaces']['opt' . $j]['descr'] ?? '';
+					  echo htmlspecialchars($iflabels[$arpent['interface']] ?? '');
 					} else {
 						echo "WAN";
 					}
@@ -106,11 +106,11 @@ if ($_POST) {
 							else
 					  			echo $arpent['network'];
 						} else if (isset($arpent['range']))
-							echo $arpent['range']['from'] . "-" . $arpent['range']['to'];
+							echo ($arpent['range']['from'] ?? '') . "-" . ($arpent['range']['to'] ?? '');
                     ?>&nbsp;
                   </td>
                   <td class="listbg">
-                    <?=htmlspecialchars($arpent['descr']);?>&nbsp;
+                    <?=htmlspecialchars($arpent['descr'] ?? '');?>&nbsp;
                   </td>
                   <td valign="middle" nowrap class="list"> <a href="services_proxyarp_edit.php?id=<?=$i;?>"><img src="e.gif" title="edit network" width="17" height="17" border="0" alt="edit network"></a>
                      &nbsp;<input name="del_<?=$i;?>" type="image" src="x.gif" width="17" height="17" title="delete network" alt="delete network" onclick="return confirm('Do you really want to delete this network?')"></td>

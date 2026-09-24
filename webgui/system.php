@@ -33,20 +33,20 @@ $pgtitle = array("System", "General setup");
 require("guiconfig.inc");
 
 $pconfig['enableipv6'] = isset($config['system']['enableipv6']);
-$pconfig['hostname'] = $config['system']['hostname'];
-$pconfig['domain'] = $config['system']['domain'];
-list($pconfig['dns1'],$pconfig['dns2'],$pconfig['dns3']) = $config['system']['dnsserver'];
+$pconfig['hostname'] = $config['system']['hostname'] ?? null;
+$pconfig['domain'] = $config['system']['domain'] ?? null;
+list($pconfig['dns1'],$pconfig['dns2'],$pconfig['dns3']) = array_pad($config['system']['dnsserver'] ?? array(), 3, null);
 $pconfig['dnsallowoverride'] = isset($config['system']['dnsallowoverride']);
-$pconfig['username'] = $config['system']['username'];
+$pconfig['username'] = $config['system']['username'] ?? null;
 if (!$pconfig['username'])
 	$pconfig['username'] = "admin";
-$pconfig['webguiproto'] = $config['system']['webgui']['protocol'];
+$pconfig['webguiproto'] = $config['system']['webgui']['protocol'] ?? null;
 if (!$pconfig['webguiproto'])
 	$pconfig['webguiproto'] = "http";
-$pconfig['webguiport'] = $config['system']['webgui']['port'];
-$pconfig['timezone'] = $config['system']['timezone'];
-$pconfig['timeupdateinterval'] = $config['system']['time-update-interval'];
-$pconfig['timeservers'] = $config['system']['timeservers'];
+$pconfig['webguiport'] = $config['system']['webgui']['port'] ?? null;
+$pconfig['timezone'] = $config['system']['timezone'] ?? null;
+$pconfig['timeupdateinterval'] = $config['system']['time-update-interval'] ?? null;
+$pconfig['timeservers'] = $config['system']['timeservers'] ?? null;
 
 if (!isset($pconfig['timeupdateinterval']))
 	$pconfig['timeupdateinterval'] = 300;
@@ -74,34 +74,34 @@ if ($_POST) {
 	
 	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
-	if ($_POST['hostname'] && !is_hostname($_POST['hostname'])) {
+	if (!empty($_POST['hostname']) && !is_hostname($_POST['hostname'])) {
 		$input_errors[] = "The hostname may only contain the characters a-z, 0-9 and '-'.";
 	}
-	if ($_POST['domain'] && !is_domain($_POST['domain'])) {
+	if (!empty($_POST['domain']) && !is_domain($_POST['domain'])) {
 		$input_errors[] = "The domain may only contain the characters a-z, 0-9, '-' and '.'.";
 	}
-	if (($_POST['dns1'] && !is_ipaddr4or6($_POST['dns1'])) || ($_POST['dns2'] && !is_ipaddr4or6($_POST['dns2'])) || ($_POST['dns3'] && !is_ipaddr4or6($_POST['dns3']))) {
+	if ((!empty($_POST['dns1']) && !is_ipaddr4or6($_POST['dns1'])) || (!empty($_POST['dns2']) && !is_ipaddr4or6($_POST['dns2'])) || (!empty($_POST['dns3']) && !is_ipaddr4or6($_POST['dns3']))) {
 		$input_errors[] = "A valid IP address must be specified for the primary/secondary/tertiary DNS server.";
 	}
-	if ($_POST['username'] && !preg_match("/^[a-zA-Z0-9]*$/", $_POST['username'])) {
+	if (!empty($_POST['username']) && !preg_match("/^[a-zA-Z0-9]*$/", $_POST['username'])) {
 		$input_errors[] = "The username may only contain the characters a-z, A-Z and 0-9.";
 	}
-	if ($_POST['webguiport'] && (!is_numericint($_POST['webguiport']) || 
+	if (!empty($_POST['webguiport']) && (!is_numericint($_POST['webguiport']) || 
 			($_POST['webguiport'] < 1) || ($_POST['webguiport'] > 65535))) {
 		$input_errors[] = "A valid TCP/IP port must be specified for the webGUI port.";
 	}
-	if (($_POST['password']) && ($_POST['password'] != $_POST['password2'])) {
+	if ((!empty($_POST['password'])) && ($_POST['password'] != ($_POST['password2'] ?? null))) {
 		$input_errors[] = "The passwords do not match.";
 	}
-	if ($_POST['password'] && strpos($_POST['password'], ":") !== false) {
+	if (!empty($_POST['password']) && strpos($_POST['password'], ":") !== false) {
 		$input_errors[] = "The password may not contain colons (:).";
 	}
 	
-	$t = (int)$_POST['timeupdateinterval'];
+	$t = (int)($_POST['timeupdateinterval'] ?? null);
 	if (($t < 0) || (($t > 0) && ($t < 6)) || ($t > 1440)) {
 		$input_errors[] = "The time update interval must be either 0 (disabled) or between 6 and 1440.";
 	}
-	foreach (explode(' ', $_POST['timeservers']) as $ts) {
+	foreach (explode(' ', $_POST['timeservers'] ?? '') as $ts) {
 		if (!is_domain($ts)) {
 			$input_errors[] = "A NTP Time Server name may only contain the characters a-z, 0-9, '-' and '.'.";
 		}
@@ -110,28 +110,28 @@ if ($_POST) {
 	if (!$input_errors) {
 		$config['system']['hostname'] = strtolower($_POST['hostname']);
 		$config['system']['domain'] = strtolower($_POST['domain']);
-		$oldwebguiproto = $config['system']['webgui']['protocol'];
+		$oldwebguiproto = $config['system']['webgui']['protocol'] ?? null;
 		$config['system']['username'] = $_POST['username'];
-		$config['system']['webgui']['protocol'] = $pconfig['webguiproto'];
-		$oldwebguiport = $config['system']['webgui']['port'];
-		$config['system']['webgui']['port'] = $pconfig['webguiport'];
-		$config['system']['timezone'] = $_POST['timezone'];
-		$config['system']['timeservers'] = strtolower($_POST['timeservers']);
-		$config['system']['time-update-interval'] = $_POST['timeupdateinterval'];
+		$config['system']['webgui']['protocol'] = $pconfig['webguiproto'] ?? null;
+		$oldwebguiport = $config['system']['webgui']['port'] ?? null;
+		$config['system']['webgui']['port'] = $pconfig['webguiport'] ?? null;
+		$config['system']['timezone'] = $_POST['timezone'] ?? null;
+		$config['system']['timeservers'] = strtolower($_POST['timeservers'] ?? '');
+		$config['system']['time-update-interval'] = $_POST['timeupdateinterval'] ?? null;
 		
 		unset($config['system']['dnsserver']);
-		if ($_POST['dns1'])
+		if (!empty($_POST['dns1']))
 			$config['system']['dnsserver'][] = $_POST['dns1'];
-		if ($_POST['dns2'])
+		if (!empty($_POST['dns2']))
 			$config['system']['dnsserver'][] = $_POST['dns2'];
-		if ($_POST['dns3'])
+		if (!empty($_POST['dns3']))
 			$config['system']['dnsserver'][] = $_POST['dns3'];
 		
-		$olddnsallowoverride = $config['system']['dnsallowoverride'];
-		$config['system']['dnsallowoverride'] = $_POST['dnsallowoverride'] ? true : false;
-		$config['system']['enableipv6'] = $_POST['enableipv6'] ? true : false;
+		$olddnsallowoverride = $config['system']['dnsallowoverride'] ?? null;
+		$config['system']['dnsallowoverride'] = !empty($_POST['dnsallowoverride']) ? true : false;
+		$config['system']['enableipv6'] = !empty($_POST['enableipv6']) ? true : false;
 		
-		if ($_POST['password']) {
+		if (!empty($_POST['password'])) {
 			$config['system']['password'] = system_password_hash($_POST['password']);
 		}	
 		
@@ -139,7 +139,7 @@ if ($_POST) {
 		/* when switching from HTTP to HTTPS, check if there's a user-specific certificate;
 		   if not, auto-generate one */
 		if ($config['system']['webgui']['protocol'] == "https" && $oldwebguiproto != $config['system']['webgui']['protocol']) {
-			if (!$config['system']['webgui']['certificate']) {
+			if (empty($config['system']['webgui']['certificate'])) {
 				$ck = generate_self_signed_cert("m0n0wall", $config['system']['hostname'] . "." . $config['system']['domain']);
 				
 				if ($ck === false) {
@@ -182,26 +182,26 @@ if ($_POST) {
 }
 ?>
 <?php include("fbegin.inc"); ?>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
 		<form action="system.php" method="post">
               <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="content pane">
                   <tr> 
                   <td width="22%" valign="top" class="vncellreq">Hostname</td>
-                  <td width="78%" class="vtable"><?=$mandfldhtml;?><input name="hostname" type="text" class="formfld" id="hostname" size="40" value="<?=htmlspecialchars($pconfig['hostname']);?>"> 
+                  <td width="78%" class="vtable"><?=$mandfldhtml;?><input name="hostname" type="text" class="formfld" id="hostname" size="40" value="<?=htmlspecialchars($pconfig['hostname'] ?? '');?>"> 
                     <br> <span class="vexpl">name of the firewall host, without 
                     domain part<br>
                     e.g. <em>firewall</em></span></td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">Domain</td>
-                  <td width="78%" class="vtable"><?=$mandfldhtml;?><input name="domain" type="text" class="formfld" id="domain" size="40" value="<?=htmlspecialchars($pconfig['domain']);?>"> 
+                  <td width="78%" class="vtable"><?=$mandfldhtml;?><input name="domain" type="text" class="formfld" id="domain" size="40" value="<?=htmlspecialchars($pconfig['domain'] ?? '');?>"> 
                     <br> <span class="vexpl">e.g. <em>mycorp.com</em> </span></td>
                 </tr>
                  <tr> 
                   <td width="22%" valign="top" class="vncell">IPv6 support</td>
                   <td width="78%" class="vtable"> 
-                    <input name="enableipv6" type="checkbox" id="enableipv6" value="yes" <?php if ($pconfig['enableipv6']) echo "checked"; ?>>
+                    <input name="enableipv6" type="checkbox" id="enableipv6" value="yes" <?php if (!empty($pconfig['enableipv6'])) echo "checked"; ?>>
                     <strong>Enable IPv6 support</strong><br>
                     After enabling IPv6 support, configure IPv6 addresses on your LAN and WAN interfaces, then add 
                     IPv6 firewall rules.<br>
@@ -210,16 +210,16 @@ if ($_POST) {
                 <tr> 
                   <td width="22%" valign="top" class="vncell">DNS servers</td>
                   <td width="78%" class="vtable">
-                      <input name="dns1" type="text" class="formfld" id="dns1" size="20" value="<?=htmlspecialchars($pconfig['dns1']);?>">
+                      <input name="dns1" type="text" class="formfld" id="dns1" size="20" value="<?=htmlspecialchars($pconfig['dns1'] ?? '');?>">
                       <br>
-                      <input name="dns2" type="text" class="formfld" id="dns2" size="20" value="<?=htmlspecialchars($pconfig['dns2']);?>">
+                      <input name="dns2" type="text" class="formfld" id="dns2" size="20" value="<?=htmlspecialchars($pconfig['dns2'] ?? '');?>">
                       <br>
-                      <input name="dns3" type="text" class="formfld" id="dns3" size="20" value="<?=htmlspecialchars($pconfig['dns3']);?>">
+                      <input name="dns3" type="text" class="formfld" id="dns3" size="20" value="<?=htmlspecialchars($pconfig['dns3'] ?? '');?>">
                       <br>
                       <span class="vexpl">IP addresses; these are also used for 
                       the DHCP service, DNS forwarder and for PPTP VPN clients<br>
                       <br>
-                      <input name="dnsallowoverride" type="checkbox" id="dnsallowoverride" value="yes" <?php if ($pconfig['dnsallowoverride']) echo "checked"; ?>>
+                      <input name="dnsallowoverride" type="checkbox" id="dnsallowoverride" value="yes" <?php if (!empty($pconfig['dnsallowoverride'])) echo "checked"; ?>>
                       <strong>Allow DNS server list to be overridden by DHCP/PPP 
                       on WAN</strong><br>
                       If this option is set, m0n0wall will use DNS servers assigned 
@@ -229,7 +229,7 @@ if ($_POST) {
                 </tr>
                 <tr> 
                   <td valign="top" class="vncell">Username</td>
-                  <td class="vtable"> <input name="username" type="text" class="formfld" id="username" size="20" value="<?=htmlspecialchars($pconfig['username']);?>">
+                  <td class="vtable"> <input name="username" type="text" class="formfld" id="username" size="20" value="<?=htmlspecialchars($pconfig['username'] ?? '');?>">
                     <br>
                      <span class="vexpl">If you want 
                     to change the username for accessing the webGUI, enter it 
@@ -245,13 +245,13 @@ if ($_POST) {
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncell">webGUI protocol</td>
-                  <td width="78%" class="vtable"> <input name="webguiproto" type="radio" value="http" <?php if ($pconfig['webguiproto'] == "http") echo "checked"; ?>>
-                    HTTP &nbsp;&nbsp;&nbsp; <input type="radio" name="webguiproto" value="https" <?php if ($pconfig['webguiproto'] == "https") echo "checked"; ?>>
+                  <td width="78%" class="vtable"> <input name="webguiproto" type="radio" value="http" <?php if (($pconfig['webguiproto'] ?? null) == "http") echo "checked"; ?>>
+                    HTTP &nbsp;&nbsp;&nbsp; <input type="radio" name="webguiproto" value="https" <?php if (($pconfig['webguiproto'] ?? null) == "https") echo "checked"; ?>>
                     HTTPS</td>
                 </tr>
                 <tr> 
                   <td valign="top" class="vncell">webGUI port</td>
-                  <td class="vtable"> <input name="webguiport" type="text" class="formfld" id="webguiport" size="5" value="<?=htmlspecialchars($pconfig['webguiport']);?>"> 
+                  <td class="vtable"> <input name="webguiport" type="text" class="formfld" id="webguiport" size="5" value="<?=htmlspecialchars($pconfig['webguiport'] ?? '');?>"> 
                     <br>
                     <span class="vexpl">Enter a custom port number for the webGUI 
                     above if you want to override the default (80 for HTTP, 443 
@@ -261,7 +261,7 @@ if ($_POST) {
                   <td width="22%" valign="top" class="vncell">Time zone</td>
                   <td width="78%" class="vtable"> <select name="timezone" id="timezone">
                       <?php foreach ($timezonelist as $value): ?>
-                      <option value="<?=htmlspecialchars($value);?>" <?php if ($value == $pconfig['timezone']) echo "selected"; ?>> 
+                      <option value="<?=htmlspecialchars($value);?>" <?php if ($value == ($pconfig['timezone'] ?? null)) echo "selected"; ?>> 
                       <?=htmlspecialchars($value);?>
                       </option>
                       <?php endforeach; ?>
@@ -270,13 +270,13 @@ if ($_POST) {
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncell">Time update interval</td>
-                  <td width="78%" class="vtable"> <input name="timeupdateinterval" type="text" class="formfld" id="timeupdateinterval" size="4" value="<?=htmlspecialchars($pconfig['timeupdateinterval']);?>"> 
+                  <td width="78%" class="vtable"> <input name="timeupdateinterval" type="text" class="formfld" id="timeupdateinterval" size="4" value="<?=htmlspecialchars($pconfig['timeupdateinterval'] ?? '');?>"> 
                     <br> <span class="vexpl">Minutes between network time sync.; 
                     300 recommended, or 0 to disable </span></td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncell">NTP time server</td>
-                  <td width="78%" class="vtable"> <input name="timeservers" type="text" class="formfld" id="timeservers" size="40" value="<?=htmlspecialchars($pconfig['timeservers']);?>"> 
+                  <td width="78%" class="vtable"> <input name="timeservers" type="text" class="formfld" id="timeservers" size="40" value="<?=htmlspecialchars($pconfig['timeservers'] ?? '');?>"> 
                     <br> <span class="vexpl">Use a space to separate multiple 
                     hosts (only one required). Remember to set up at least one 
                     DNS server if you enter a host name here!</span></td>

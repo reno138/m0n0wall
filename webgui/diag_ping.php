@@ -44,21 +44,23 @@ if ($_POST) {
 	$reqdfieldsn = explode(",", "Host,Count");
 	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 
-	if (!is_numericint($_POST['count']) || ($_POST['count'] < 1) || ($_POST['count'] > MAX_COUNT)) {
+	$postcount = $_POST['count'] ?? null;
+	if (!is_numericint($postcount) || ($postcount < 1) || ($postcount > MAX_COUNT)) {
 		$input_errors[] = "Count must be between 1 and {MAX_COUNT}";
 	}
 
 	if (!$input_errors) {
 		$do_ping = true;
-		$host = $_POST['host'];
-		$interface = $_POST['interface'];
-		$count = $_POST['count'];
-		$ipv6 = $_POST['ipv6'];
+		$host = $_POST['host'] ?? '';
+		$interface = $_POST['interface'] ?? '';
+		$count = $_POST['count'] ?? null;
+		$ipv6 = $_POST['ipv6'] ?? null;
 	}
 }
 if (!isset($do_ping)) {
 	$do_ping = false;
 	$host = '';
+	$interface = '';
 	$count = DEFAULT_COUNT;
 	$ipv6 = false;
 }
@@ -71,7 +73,7 @@ function get_interface_addr($ifdescr, $ipv6 = false) {
 	if ($ifdescr == "wan")
 		$if = get_real_wan_interface();
 	else
-		$if = $config['interfaces'][$ifdescr]['if'];
+		$if = $config['interfaces'][$ifdescr]['if'] ?? null;
 	
 	/* try to determine IP address and netmask with ifconfig */
 	unset($ifconfiginfo);
@@ -102,7 +104,7 @@ function get_interface_addr($ifdescr, $ipv6 = false) {
   </td></tr>
   <tr> 
     <td class="tabcont">
-<?php if ($input_errors) print_input_errors($input_errors); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
 			<form action="diag_ping.php" method="post" name="iform" id="iform">
 			  <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="content pane">
                 <tr>
@@ -121,8 +123,8 @@ function get_interface_addr($ifdescr, $ipv6 = false) {
                       <?php $interfaces = array('wan' => 'WAN', 'lan' => 'LAN');
 					  for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
 					    if (isset($config['interfaces']['opt' . $i]['enable']) &&
-							!$config['interfaces']['opt' . $i]['bridge'])
-					  		$interfaces['opt' . $i] = $config['interfaces']['opt' . $i]['descr'];
+							empty($config['interfaces']['opt' . $i]['bridge']))
+					  		$interfaces['opt' . $i] = $config['interfaces']['opt' . $i]['descr'] ?? '';
 					  }
 					  foreach ($interfaces as $iface => $ifacename): ?>
                       <option value="<?=$iface;?>" <?php if ($iface == $interface) echo "selected"; ?>> 

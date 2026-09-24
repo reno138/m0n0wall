@@ -42,11 +42,18 @@ function services_dhcp6c_stop() {
 function services_dhcp6c_configure() {
 	global $config, $g;
 	
+	$d6wans = "";
+	$d6wanm = "";
+	$d6pds = "";
+	$d6pde = "";
+	$d6lan = "";
+	$d6opt = "";
+	
 	/* kill any running dhcp6c */
 	killbypid("{$g['varrun_path']}/dhcp6c.pid");
 	
 	/* write dhcp6c_duid */
-	if ($config['interfaces']['wan']['v6duid']) {
+	if (!empty($config['interfaces']['wan']['v6duid'])) {
 		
 		$dhcp6duid = $config['interfaces']['wan']['v6duid'] ;
 		$fd = fopen("{$g['vardb_path']}/dhcp6c_duid", "w");
@@ -57,6 +64,7 @@ function services_dhcp6c_configure() {
 	
 		$duidbytes = explode(":",$dhcp6duid);
 	
+		$tmpdhcp6duid = "";
 		foreach ($duidbytes as $duidpiece) {
 		    $tmpdhcp6duid .= pack("H*", $duidpiece);    
 		}
@@ -73,7 +81,7 @@ function services_dhcp6c_configure() {
 		return 1;
 	}
 	
-	if ($config['interfaces']['wan']['ipaddr6'] == "DHCP") {
+	if (($config['interfaces']['wan']['ipaddr6'] ?? null) == "DHCP") {
 		mwexec('/sbin/sysctl net.inet6.ip6.accept_rtadv=1');
 		$d6wans = <<<EOD
 		request domain-name-servers;
@@ -83,7 +91,7 @@ function services_dhcp6c_configure() {
 EOD;
 	}
 	$p = 1;
-	if ($config['interfaces']['lan']['ipaddr6'] == "DHCP-PD") {
+	if (($config['interfaces']['lan']['ipaddr6'] ?? null) == "DHCP-PD") {
 		$d6wanm = "\t\tsend ia-pd 0;\n";
 		$d6pds = "id-assoc pd 0 {\n";
 		$d6pde = "};\n";
@@ -108,7 +116,7 @@ EOD;
 	}
 			
 	for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-		if ($config['interfaces']['opt' . $i]['ipaddr6'] == "DHCP-PD") {
+		if (($config['interfaces']['opt' . $i]['ipaddr6'] ?? null) == "DHCP-PD") {
 			$d6wanm = "\t\tsend ia-pd 0;\n";
 			$d6pds = "id-assoc pd 0 {\n";
 			$d6pde = "};\n";
@@ -163,13 +171,13 @@ function services_dhcp6s_configure() {
 	killbypid("{$g['varrun_path']}/dhcp6s.pid");
 	if (!file_exists("{$g['varrun_path']}/dhcp6sctlkey"))  mwexec("touch {$g['varrun_path']}/dhcp6sctlkey");
 	
-	$syscfg = $config['system'];
-	$dhcp6scfg = $config['dhcpd'];
+	$syscfg = $config['system'] ?? null;
+	$dhcp6scfg = $config['dhcpd'] ?? null;
 	
 	/* DHCPv6 enabled on any interfaces? */
 	$dhcp6senable = false;
 	foreach ($dhcp6scfg as $dhcpif => $dhcpifconf) {
-		if (isset($dhcpifconf['v6enable']) && (($dhcpif == "lan") || (isset($config['interfaces'][$dhcpif]['ipaddr6']) && $config['interfaces'][$dhcpif]['if'] && (!$config['interfaces'][$dhcpif]['bridge']))))
+		if (isset($dhcpifconf['v6enable']) && (($dhcpif == "lan") || (isset($config['interfaces'][$dhcpif]['ipaddr6']) && !empty($config['interfaces'][$dhcpif]['if']) && (empty($config['interfaces'][$dhcpif]['bridge'])))))
 			$dhcp6senable = true;
 	}
 	
@@ -183,7 +191,7 @@ function services_dhcp6s_configure() {
 
 	$dhcp6sifs = array();
 	foreach ($dhcp6scfg as $dhcpif => $dhcpifconf) {
-		$ifcfg = $config['interfaces'][$dhcpif];
+		$ifcfg = $config['interfaces'][$dhcpif] ?? null;
 		
 		/* write dhcp6s.conf */
 		$fd = fopen("{$g['varetc_path']}/dhcp6s.{$ifcfg['if']}.conf", "w");
@@ -198,7 +206,7 @@ option domain-name "{$syscfg['domain']}";
 EOD;
 		if (!isset($dhcpifconf['v6enable']))
 			continue;
-		$v6subnet = gen_subnet6($ifcfg['ipaddr6'], $ifcfg['subnet6']);
+		$v6subnet = gen_subnet6($ifcfg['ipaddr6'] ?? '', $ifcfg['subnet6'] ?? '');
 		$dnscfg = "";
 		unset($ifconfiginfo);
 		exec("/sbin/ifconfig " . $ifcfg['if'], $ifconfiginfo);
@@ -209,14 +217,14 @@ EOD;
 			} 
 		}
 			
-		if (is_array($dhcpifconf['dnsserver']) && ($dhcpifconf['dnsserver'][0])) {
+		if (is_array($dhcpifconf['dnsserver'] ?? null) && (!empty($dhcpifconf['dnsserver'][0]))) {
 			list($dnsconfig['dns1'],$dnsconfig['dns2'],$dnsconfig['dns3']) = $dhcpifconf['dnsserver'];
 			if (is_ipaddr6($dnsconfig['dns1']))	$dnscfg .= "option domain-name-servers " . $dnsconfig['dns1'] . ";\n";
 			if (is_ipaddr6($dnsconfig['dns2']))	$dnscfg .= "option domain-name-servers " . $dnsconfig['dns2'] . ";\n";
 			if (is_ipaddr6($dnsconfig['dns3']))	$dnscfg .= "option domain-name-servers " . $dnsconfig['dns3'] . ";\n";
 		} else if (isset($config['dnsmasq']['enable'])) {
-			$dnscfg .= "option domain-name-servers " . $ifcfg['ipaddr6'] . ";\n";
-		} else if (is_array($syscfg['dnsserver']) && ($syscfg['dnsserver'][0])) {
+			$dnscfg .= "option domain-name-servers " . ($ifcfg['ipaddr6'] ?? '') . ";\n";
+		} else if (is_array($syscfg['dnsserver'] ?? null) && (!empty($syscfg['dnsserver'][0]))) {
 			list($dnsconfig['dns1'],$dnsconfig['dns2'],$dnsconfig['dns3']) = $syscfg['dnsserver'];
 			if (is_ipaddr6($dnsconfig['dns1']))	$dnscfg .= "option domain-name-servers " . $dnsconfig['dns1'] . ";\n";
 			if (is_ipaddr6($dnsconfig['dns2']))	$dnscfg .= "option domain-name-servers " . $dnsconfig['dns2'] . ";\n";
@@ -241,10 +249,10 @@ host m0n0wall {
 
 EOD;
 		/* add static mappings */
-		if (is_array($dhcpifconf['staticmap'])) {
+		if (is_array($dhcpifconf['staticmap'] ?? null)) {
 			$i = 0;
 			foreach ($dhcpifconf['staticmap'] as $sm) {
-				if (is_ipaddr6($sm['ipaddr'])){
+				if (is_ipaddr6($sm['ipaddr'] ?? '')){
 					$dhcp6sconf .= <<<EOD
 host reserved{$i} {
         duid {$sm['mac']};
@@ -283,7 +291,7 @@ function services_dhcrelay_configure() {
 	/* kill any running dhcrelay */
 	killbypid("{$g['varrun_path']}/dhcrelay.pid");
 	
-	$dhcrelaycfg = $config['dhcrelay'];
+	$dhcrelaycfg = $config['dhcrelay'] ?? null;
 	
 	/* DHCPRelay enabled on any interfaces? */
 	$dhcrelayenable = false;
@@ -293,7 +301,7 @@ function services_dhcrelay_configure() {
 			if (isset($dhcrelayifconf['enable']) &&
 				(($dhcrelayif == "lan") ||
 				(isset($config['interfaces'][$dhcrelayif]['enable']) &&
-				$config['interfaces'][$dhcrelayif]['if'] && (!$config['interfaces'][$dhcrelayif]['bridge'])))) {
+				!empty($config['interfaces'][$dhcrelayif]['if']) && (empty($config['interfaces'][$dhcrelayif]['bridge']))))) {
 				
 				$dhcrelayenable = true;
 				break;
@@ -312,26 +320,26 @@ function services_dhcrelay_configure() {
 	$dhcrelayifs = array();
 	foreach ($dhcrelaycfg as $dhcrelayif => $dhcrelayifconf) {
 		
-		$ifcfg = $config['interfaces'][$dhcrelayif];
+		$ifcfg = $config['interfaces'][$dhcrelayif] ?? null;
 		
 		if (!isset($dhcrelayifconf['enable']) ||
 			(($dhcrelayif != "lan") &&
-			(!isset($ifcfg['enable']) || !$ifcfg['if'] || $ifcfg['bridge'])))
+			(!isset($ifcfg['enable']) || empty($ifcfg['if']) || !empty($ifcfg['bridge']))))
 			continue;
 			
-		$dhcrelayifs[] = $ifcfg['if'];
+		$dhcrelayifs[] = $ifcfg['if'] ?? null;
 	}
 
 	/* In order for the relay to work, it needs to be active on the 
 	   interface in which the destination server sits */
 	foreach ($config['interfaces'] as $ifname) {
-		$subnet = $ifname['ipaddr'] . "/" . $ifname['subnet'];
-		if (ip_in_subnet($dhcrelaycfg['server'],$subnet)) 
-			$destif = $ifname['if'];	
+		$subnet = ($ifname['ipaddr'] ?? '') . "/" . ($ifname['subnet'] ?? '');
+		if (ip_in_subnet($dhcrelaycfg['server'] ?? '',$subnet)) 
+			$destif = $ifname['if'] ?? null;	
 	}
 	
 	if (!isset($destif)) 
-		$destif = $config['interfaces']['wan']['if'];
+		$destif = $config['interfaces']['wan']['if'] ?? null;
 	
 	$dhcrelayifs[] = $destif;
 	$dhcrelayifs = array_unique($dhcrelayifs);
@@ -342,7 +350,8 @@ function services_dhcrelay_configure() {
 	if (isset($dhcrelaycfg['agentoption']))	
 		$cmd .=  " -a -m replace";
 
-	$cmd .= " {$dhcrelaycfg['server']}";
+	$dhcrelayserver = $dhcrelaycfg['server'] ?? '';
+	$cmd .= " {$dhcrelayserver}";
 	mwexec($cmd);
 		
 	if (!$g['booting']) {
@@ -525,11 +534,13 @@ function services_snmpd_configure() {
 		                   "udp:ADDR:161". The old form is not an error, it
 		                   just does not bind where you asked. */
 		$community = preg_replace('/[^A-Za-z0-9_.-]/', '',
-		                          $config['snmpd']['rocommunity']);
+		                          $config['snmpd']['rocommunity'] ?? '');
+		$syslocation = $config['snmpd']['syslocation'] ?? '';
+		$syscontact = $config['snmpd']['syscontact'] ?? '';
 		$snmpdconf = <<<EOD
 sysDescr "$sysDescr"
-sysLocation "{$config['snmpd']['syslocation']}"
-sysContact "{$config['snmpd']['syscontact']}"
+sysLocation "{$syslocation}"
+sysContact "{$syscontact}"
 rocommunity {$community}
 
 EOD;
@@ -563,36 +574,36 @@ function services_proxyarp_configure() {
 	/* kill any running choparp */
 	killbyname("choparp");
 	
-	if (is_array($config['proxyarp']) && count($config['proxyarp'])) {
+	if (is_array($config['proxyarp'] ?? null) && count($config['proxyarp'])) {
 		
 		$paa = array();
 		
 		/* group by interface */
-		foreach ($config['proxyarp']['proxyarpnet'] as $paent) {
-			if ($paent['interface'])
+		foreach (($config['proxyarp']['proxyarpnet'] ?? null) as $paent) {
+			if (!empty($paent['interface']))
 				$if = $paent['interface'];
 			else
 				$if = "wan";
 			
-			if (!is_array($paa[$if]))
+			if (!is_array($paa[$if] ?? null))
 				$paa[$if] = array();
 			
 			$paa[$if][] = $paent;
 		} 
 	
 		foreach ($paa as $paif => $paents) {
-			if ($paif == "wan" && !(is_ipaddr($config['interfaces']['wan']['ipaddr']) ||
-					($config['interfaces']['wan']['ipaddr'] == "dhcp")))
+			if ($paif == "wan" && !(is_ipaddr($config['interfaces']['wan']['ipaddr'] ?? '') ||
+					(($config['interfaces']['wan']['ipaddr'] ?? null) == "dhcp")))
 				continue;
 			
-			$args = $config['interfaces'][$paif]['if'] . " auto";
+			$args = ($config['interfaces'][$paif]['if'] ?? '') . " auto";
 		
 			foreach ($paents as $paent) {
 				if (isset($paent['network']))
 					$args .= " " . escapeshellarg($paent['network']);
 				else if (isset($paent['range']))
-					$args .= " " . escapeshellarg($paent['range']['from'] . "-" . 
-						$paent['range']['to']);
+					$args .= " " . escapeshellarg(($paent['range']['from'] ?? '') . "-" . 
+						($paent['range']['to'] ?? ''));
 			}
 			
 			mwexec_bg("/usr/local/sbin/choparp " . $args);
@@ -610,12 +621,12 @@ function services_dnsupdate_process() {
 		
 		if ($wanip) {
 				
-			$keyname = $config['dnsupdate']['keyname'];
+			$keyname = $config['dnsupdate']['keyname'] ?? '';
 			/* trailing dot */
 			if (substr($keyname, -1) != ".")
 				$keyname .= ".";
 			
-			$hostname = $config['dnsupdate']['host'];
+			$hostname = $config['dnsupdate']['host'] ?? '';
 			/* trailing dot */
 			if (substr($hostname, -1) != ".")
 				$hostname .= ".";
@@ -623,21 +634,23 @@ function services_dnsupdate_process() {
 			/* write private key file
 			   this is dumb - public and private keys are the same for HMAC-MD5,
 			   but nsupdate insists on having both */
+			$keydata = $config['dnsupdate']['keydata'] ?? '';
 			$fd = fopen("{$g['varetc_path']}/K{$keyname}+157+00000.private", "w");
+			$privkey = "";
 			$privkey .= <<<EOD
 Private-key-format: v1.2
 Algorithm: 157 (HMAC)
-Key: {$config['dnsupdate']['keydata']}
+Key: {$keydata}
 
 EOD;
 			fwrite($fd, $privkey);
 			fclose($fd);
 			
 			/* write public key file */
-			if ($config['dnsupdate']['keytype'] == "host") {
+			if (($config['dnsupdate']['keytype'] ?? null) == "host") {
 				$flags = 513;
 				$proto = 3;
-			} else if ($config['dnsupdate']['keytype'] == "user") {
+			} else if (($config['dnsupdate']['keytype'] ?? null) == "user") {
 				$flags = 0;
 				$proto = 2;
 			} else {
@@ -646,12 +659,13 @@ EOD;
 			}
 			
 			$fd = fopen("{$g['varetc_path']}/K{$keyname}+157+00000.key", "w");
-			fwrite($fd, "{$keyname} IN KEY {$flags} {$proto} 157 {$config['dnsupdate']['keydata']}\n");
+			fwrite($fd, "{$keyname} IN KEY {$flags} {$proto} 157 {$keydata}\n");
 			fclose($fd);
 			
 			/* generate update instructions */
 			$upinst =  "update delete {$hostname} A\n";
-			$upinst .= "update add {$hostname} {$config['dnsupdate']['ttl']} A {$wanip}\n";
+			$dnsupdatettl = $config['dnsupdate']['ttl'] ?? '';
+			$upinst .= "update add {$hostname} {$dnsupdatettl} A {$wanip}\n";
 			$upinst .= "\n";	/* mind that trailing newline! */
 			
 			$fd = fopen("{$g['varetc_path']}/nsupdatecmds", "w");
@@ -717,11 +731,11 @@ function services_croen_configure() {
 				$conf_first = FALSE;
 			}
 			// Write jobs
-			foreach ($config['croen']['jobset'] AS $jobset_id => $jobset) {
+			foreach (($config['croen']['jobset'] ?? null) AS $jobset_id => $jobset) {
 				// Ignore disabled jobsets
 				if (!isset($jobset['disabled'])) {
 					fwrite($fd, "\njob = ".
-						$jobset_id." ".$jobset['repeat'].(isset($jobset['time']) ? " ".$jobset['time'] : "").
+						$jobset_id." ".($jobset['repeat'] ?? '').(isset($jobset['time']) ? " ".$jobset['time'] : "").
 						(isset($jobset['date']) ? " ".$jobset['date'] :
 						(isset($jobset['weekday']) ? " ".$jobset['weekday'] :
 						(isset($jobset['day']) ? " ".$jobset['day'] :

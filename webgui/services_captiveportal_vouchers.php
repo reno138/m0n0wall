@@ -29,11 +29,11 @@
 $pgtitle = array("Services", "Captive portal", "Vouchers");
 require("guiconfig.inc");
 
-if (!is_array($config['voucher'])) {
+if (!is_array($config['voucher'] ?? null)) {
     $config['voucher'] = array();
 }
 
-if (!is_array($config['voucher']['roll'])) {
+if (!is_array($config['voucher']['roll'] ?? null)) {
     $config['voucher']['roll'] = array();
 }
 if (!isset($config['voucher']['charset'])) {
@@ -62,7 +62,7 @@ if (!isset($config['voucher']['publickey'])) {
 		$output = fread($fd, 16384);
 	    pclose($fd);
 		
-		list($privkey, $pubkey) = explode("\0", $output);
+		list($privkey, $pubkey) = array_pad(explode("\0", $output), 2, null);
 		
 	    $config['voucher']['publickey'] = base64_encode($pubkey);
 	    $config['voucher']['privatekey'] = base64_encode($privkey);
@@ -81,7 +81,7 @@ if ($_POST) {
 	foreach ($_POST as $pn => $pv) {
 		if (preg_match("/^del_(\d+)_x$/", $pn, $matches)) {
 			$id = $matches[1];
-			if ($a_roll[$id]) {
+			if (!empty($a_roll[$id])) {
 		        $roll = $a_roll[$id]['number']; 
 		        voucher_lock();
 		        unset($a_roll[$id]);
@@ -96,8 +96,8 @@ if ($_POST) {
 }
 
 /* print all vouchers of the selected roll */
-if ($_GET['act'] == "csv") {
-    $privkey = base64_decode($config['voucher']['privatekey']);
+if (($_GET['act'] ?? null) == "csv") {
+    $privkey = base64_decode($config['voucher']['privatekey'] ?? '');
     if (strstr($privkey,"BEGIN RSA PRIVATE KEY")) {
         $fd = fopen("{$g['varetc_path']}/voucher.private","w");
         if (!$fd) {
@@ -108,10 +108,10 @@ if ($_GET['act'] == "csv") {
             fclose($fd);
 
             $a_voucher = &$config['voucher']['roll'];
-            $id = $_GET['id'];
-            if (isset($id) && $a_voucher[$id]) {
-                $number = $a_voucher[$id]['number'];
-                $count = $a_voucher[$id]['count'];
+            $id = $_GET['id'] ?? null;
+            if (isset($id) && !empty($a_voucher[$id])) {
+                $number = $a_voucher[$id]['number'] ?? null;
+                $count = $a_voucher[$id]['count'] ?? null;
 
                 header("Content-Type: application/octet-stream");
                 header("Content-Disposition: attachment; filename=vouchers_roll$number.csv");
@@ -126,16 +126,16 @@ if ($_GET['act'] == "csv") {
 }
 
 $pconfig['enable'] = isset($config['voucher']['enable']);
-$pconfig['charset'] = $config['voucher']['charset'];
-$pconfig['rollbits'] = $config['voucher']['rollbits'];
-$pconfig['ticketbits'] = $config['voucher']['ticketbits'];
-$pconfig['saveinterval'] = $config['voucher']['saveinterval'];
-$pconfig['checksumbits'] = $config['voucher']['checksumbits'];
-$pconfig['magic'] = $config['voucher']['magic'];
-$pconfig['publickey'] = base64_decode($config['voucher']['publickey']);
-$pconfig['privatekey'] = base64_decode($config['voucher']['privatekey']);
-$pconfig['msgnoaccess'] = $config['voucher']['msgnoaccess'];
-$pconfig['msgexpired'] = $config['voucher']['msgexpired'];
+$pconfig['charset'] = $config['voucher']['charset'] ?? null;
+$pconfig['rollbits'] = $config['voucher']['rollbits'] ?? null;
+$pconfig['ticketbits'] = $config['voucher']['ticketbits'] ?? null;
+$pconfig['saveinterval'] = $config['voucher']['saveinterval'] ?? null;
+$pconfig['checksumbits'] = $config['voucher']['checksumbits'] ?? null;
+$pconfig['magic'] = $config['voucher']['magic'] ?? null;
+$pconfig['publickey'] = base64_decode($config['voucher']['publickey'] ?? '');
+$pconfig['privatekey'] = base64_decode($config['voucher']['privatekey'] ?? '');
+$pconfig['msgnoaccess'] = $config['voucher']['msgnoaccess'] ?? null;
+$pconfig['msgexpired'] = $config['voucher']['msgexpired'] ?? null;
 
 if ($_POST) {
 
@@ -143,53 +143,53 @@ if ($_POST) {
 	$pconfig = $_POST;
 
 	/* input validation */
-	if ($_POST['enable']) {
+	if (!empty($_POST['enable'])) {
 		$reqdfields = explode(" ", "charset rollbits ticketbits checksumbits publickey magic saveinterval");
 		$reqdfieldsn = explode(",", "charset,rollbits,ticketbits,checksumbits,publickey,magic,saveinterval");
 		
 		do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	}
 	
-	if ($_POST['charset'] && (strlen($_POST['charset'] < 2))) {
+	if (!empty($_POST['charset']) && (strlen($_POST['charset'] < 2))) {
 		$input_errors[] = "Need at least 2 characters to create vouchers.";
 	}
-	if ($_POST['charset'] && (strpos($_POST['charset'],"\"")>0)) {
+	if (!empty($_POST['charset']) && (strpos($_POST['charset'],"\"")>0)) {
 		$input_errors[] = "Double quotes aren't allowed.";
 	}
-	if ($_POST['charset'] && (strpos($_POST['charset'],",")>0)) {
+	if (!empty($_POST['charset']) && (strpos($_POST['charset'],",")>0)) {
 		$input_errors[] = "',' aren't allowed.";
 	}
-	if ($_POST['rollbits'] && (!is_numeric($_POST['rollbits']) || ($_POST['rollbits'] < 1) || ($_POST['rollbits'] > 31))) {
+	if (!empty($_POST['rollbits']) && (!is_numeric($_POST['rollbits']) || ($_POST['rollbits'] < 1) || ($_POST['rollbits'] > 31))) {
 		$input_errors[] = "# of Bits to store Roll Id needs to be between 1..31.";
 	}
-	if ($_POST['ticketbits'] && (!is_numeric($_POST['ticketbits']) || ($_POST['ticketbits'] < 1) || ($_POST['ticketbits'] > 16))) {
+	if (!empty($_POST['ticketbits']) && (!is_numeric($_POST['ticketbits']) || ($_POST['ticketbits'] < 1) || ($_POST['ticketbits'] > 16))) {
 		$input_errors[] = "# of Bits to store Ticket Id needs to be between 1..16.";
 	}
-	if ($_POST['checksumbits'] && (!is_numeric($_POST['checksumbits']) || ($_POST['checksumbits'] < 1) || ($_POST['checksumbits'] > 31))) {
+	if (!empty($_POST['checksumbits']) && (!is_numeric($_POST['checksumbits']) || ($_POST['checksumbits'] < 1) || ($_POST['checksumbits'] > 31))) {
 		$input_errors[] = "# of Bits to store checksum needs to be between 1..31.";
 	}
-	if ($_POST['saveinterval'] && (!is_numeric($_POST['saveinterval']) || ($_POST['saveinterval'] < 1))) {
+	if (!empty($_POST['saveinterval']) && (!is_numeric($_POST['saveinterval']) || ($_POST['saveinterval'] < 1))) {
 		$input_errors[] = "Save interval in minutes cant be negative.";
 	}
-	if ($_POST['publickey'] && (!strstr($_POST['publickey'],"BEGIN PUBLIC KEY"))) {
+	if (!empty($_POST['publickey']) && (!strstr($_POST['publickey'],"BEGIN PUBLIC KEY"))) {
 		$input_errors[] = "This doesn't look like an RSA Public key.";
 	}
-	if ($_POST['privatekey'] && (!strstr($_POST['privatekey'],"BEGIN RSA PRIVATE KEY"))) {
+	if (!empty($_POST['privatekey']) && (!strstr($_POST['privatekey'],"BEGIN RSA PRIVATE KEY"))) {
 		$input_errors[] = "This doesn't look like an RSA Private key.";
 	}
 
-	if (!$input_errors) {
-        $config['voucher']['enable'] = $_POST['enable'] ? true : false;
-        $config['voucher']['charset'] = $_POST['charset'];
-        $config['voucher']['rollbits'] = $_POST['rollbits'];
-        $config['voucher']['ticketbits'] = $_POST['ticketbits'];
-        $config['voucher']['checksumbits'] = $_POST['checksumbits'];
-        $config['voucher']['magic'] = $_POST['magic'];
-        $config['voucher']['saveinterval'] = $_POST['saveinterval'];
-        $config['voucher']['publickey'] = base64_encode($_POST['publickey']);
-        $config['voucher']['privatekey'] = base64_encode($_POST['privatekey']);
-        $config['voucher']['msgnoaccess'] = $_POST['msgnoaccess'];
-        $config['voucher']['msgexpired'] = $_POST['msgexpired'];
+	if (empty($input_errors)) {
+        $config['voucher']['enable'] = !empty($_POST['enable']) ? true : false;
+        $config['voucher']['charset'] = $_POST['charset'] ?? null;
+        $config['voucher']['rollbits'] = $_POST['rollbits'] ?? null;
+        $config['voucher']['ticketbits'] = $_POST['ticketbits'] ?? null;
+        $config['voucher']['checksumbits'] = $_POST['checksumbits'] ?? null;
+        $config['voucher']['magic'] = $_POST['magic'] ?? null;
+        $config['voucher']['saveinterval'] = $_POST['saveinterval'] ?? null;
+        $config['voucher']['publickey'] = base64_encode($_POST['publickey'] ?? '');
+        $config['voucher']['privatekey'] = base64_encode($_POST['privatekey'] ?? '');
+        $config['voucher']['msgnoaccess'] = $_POST['msgnoaccess'] ?? null;
+        $config['voucher']['msgexpired'] = $_POST['msgexpired'] ?? null;
         voucher_lock();
 		write_config();
         voucher_configure();
@@ -220,8 +220,8 @@ function enable_change(enable_change) {
 }
 //-->
 </script>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
 <form action="services_captiveportal_vouchers.php" method="post" enctype="multipart/form-data" name="iform" id="iform">
 <table width="100%" border="0" cellpadding="0" cellspacing="0" summary="tab pane">
   <tr><td class="tabnavtbl">
@@ -243,7 +243,7 @@ function enable_change(enable_change) {
 	<tr> 
 	  <td width="22%" valign="top" class="vtable">&nbsp;</td>
 	  <td width="78%" class="vtable">
-		<input name="enable" type="checkbox" value="yes" <?php if ($pconfig['enable']) echo "checked"; ?> onClick="enable_change(false)">
+		<input name="enable" type="checkbox" value="yes" <?php if (!empty($pconfig['enable'])) echo "checked"; ?> onClick="enable_change(false)">
 		<strong>Enable Vouchers</strong></td>
 	</tr>
 	<tr>
@@ -261,19 +261,19 @@ function enable_change(enable_change) {
 	<?php $i = 0; foreach($a_roll as $rollent): ?>
 		<tr>
                   <td class="listlr">
-                    <?=htmlspecialchars($rollent['number']); ?>&nbsp;
+                    <?=htmlspecialchars($rollent['number'] ?? ''); ?>&nbsp;
                   </td>
                   <td class="listr">
-                    <?=htmlspecialchars($rollent['minutes']);?>&nbsp;
+                    <?=htmlspecialchars($rollent['minutes'] ?? '');?>&nbsp;
                   </td>
                   <td class="listr">
-                    <?=htmlspecialchars($rollent['count']);?>&nbsp;
+                    <?=htmlspecialchars($rollent['count'] ?? '');?>&nbsp;
                   </td>
                   <td class="listr">
-                    <?=htmlspecialchars($rollent['comment']); ?>&nbsp;
+                    <?=htmlspecialchars($rollent['comment'] ?? ''); ?>&nbsp;
                   </td>
                   <td valign="middle" nowrap class="list"> 
-                  <?php if ($pconfig['enable']): ?> 
+                  <?php if (!empty($pconfig['enable'])): ?> 
                     <a href="services_captiveportal_vouchers_edit.php?id=<?=$i; ?>"><img src="e.gif" title="edit voucher" width="17" height="17" border="0" alt="edit voucher"></a>
 					<input name="del_<?=$i;?>" type="image" src="x.gif" width="17" height="17" title="delete voucher roll" alt="delete voucher roll" onclick="return confirm('Do you really want to delete this voucher roll and render all vouchers from this roll invalid?')">
                     <a href="services_captiveportal_vouchers.php?act=csv&amp;id=<?=$i; ?>"><img src="log_s.gif" title="generate vouchers for this roll to CSV file" width="11" height="15" border="0" alt="generate vouchers for this roll to CSV file"></a>
@@ -283,12 +283,12 @@ function enable_change(enable_change) {
 	<?php $i++; endforeach; ?>
 		<tr> 
 			  <td class="list" colspan="4"></td>
-              <?php if ($pconfig['enable']): ?> 
+              <?php if (!empty($pconfig['enable'])): ?> 
 			  <td class="list"> <a href="services_captiveportal_vouchers_edit.php"><img src="plus.gif" title="add voucher" width="17" height="17" border="0" alt="add voucher"></a></td>
               <?php endif;?>
 		      </tr>
         </table>     
-<?php if ($pconfig['enable']): ?> 
+<?php if (!empty($pconfig['enable'])): ?> 
 Create, generate and activate Rolls with Vouchers that allow access through the 
 captive portal for the configured time. Once a voucher is activated, 
 its clock is started and runs uninterrupted until it expires. During that
@@ -301,69 +301,69 @@ Enable Voucher support first using the checkbox above and hit Save at the bottom
 	<tr>
       <td valign="top" class="vncellreq">Voucher public key</td>
       <td class="vtable">
-        <textarea name="publickey" cols="65" rows="4" id="publickey" class="formpre"><?=htmlspecialchars($pconfig['publickey']);?></textarea>
+        <textarea name="publickey" cols="65" rows="4" id="publickey" class="formpre"><?=htmlspecialchars($pconfig['publickey'] ?? '');?></textarea>
         <br>
     Paste an RSA public key (64 Bit or smaller) in PEM format here. This key is used to decrypt vouchers.</td>
 	</tr>
 	<tr>
       <td valign="top" class="vncell">Voucher private key</td>
       <td class="vtable">
-        <textarea name="privatekey" cols="65" rows="5" id="privatekey" class="formpre"><?=htmlspecialchars($pconfig['privatekey']);?></textarea>
+        <textarea name="privatekey" cols="65" rows="5" id="privatekey" class="formpre"><?=htmlspecialchars($pconfig['privatekey'] ?? '');?></textarea>
         <br>
     Paste an RSA private key (64 Bit or smaller) in PEM format here. This key is only used to generate encrypted vouchers and doesn't need to be available if the vouchers have been generated offline.</td>
 	</tr>
 	<tr> 
        <td width="22%" valign="top" class="vncellreq">Character set</td>
        <td width="78%" class="vtable">
-         <input name="charset" type="text" class="formfld" id="charset" size="80" value="<?=htmlspecialchars($pconfig['charset']);?>">
+         <input name="charset" type="text" class="formfld" id="charset" size="80" value="<?=htmlspecialchars($pconfig['charset'] ?? '');?>">
          <br>
          Tickets are generated with the specified character set. It should contain printable characters (numbers, lower case and upper case letters) that are hard to confuse with others. Avoid e.g. 0/O and l/1.</td>
     </tr>
 	<tr> 
        <td width="22%" valign="top" class="vncellreq"># of Roll Bits</td>
        <td width="78%" class="vtable">
-         <input name="rollbits" type="text" class="formfld" id="rollbits" size="2" value="<?=htmlspecialchars($pconfig['rollbits']);?>">
+         <input name="rollbits" type="text" class="formfld" id="rollbits" size="2" value="<?=htmlspecialchars($pconfig['rollbits'] ?? '');?>">
          <br>
          Reserves a range in each voucher to store the Roll# it belongs to. Allowed range: 1..31. Sum of Roll+Ticket+Checksum bits must be one Bit less than the RSA key size.</td>
     </tr>
 	<tr> 
        <td width="22%" valign="top" class="vncellreq"># of Ticket Bits</td>
        <td width="78%" class="vtable">
-         <input name="ticketbits" type="text" class="formfld" id="ticketbits" size="2" value="<?=htmlspecialchars($pconfig['ticketbits']);?>">
+         <input name="ticketbits" type="text" class="formfld" id="ticketbits" size="2" value="<?=htmlspecialchars($pconfig['ticketbits'] ?? '');?>">
          <br>
          Reserves a range in each voucher to store the Ticket# it belongs to. Allowed range: 1..16. Using 16 bits allows a roll to have up to 65535 vouchers. A bit array, stored in RAM and in the config, is used to mark if a voucher has been used. A bit array for 65535 vouchers requires 8 KB of storage.</td>
     </tr>
 	<tr> 
        <td width="22%" valign="top" class="vncellreq"># of Checksum Bits</td>
        <td width="78%" class="vtable">
-         <input name="checksumbits" type="text" class="formfld" id="checksumbits" size="2" value="<?=htmlspecialchars($pconfig['checksumbits']);?>">
+         <input name="checksumbits" type="text" class="formfld" id="checksumbits" size="2" value="<?=htmlspecialchars($pconfig['checksumbits'] ?? '');?>">
          <br>
          Reserves a range in each voucher to store a simple checksum over Roll# and Ticket#. Allowed range is 0..31.</td>
     </tr>
 	<tr> 
        <td width="22%" valign="top" class="vncellreq">Magic Number</td>
        <td width="78%" class="vtable">
-         <input name="magic" type="text" class="formfld" id="magic" size="20" value="<?=htmlspecialchars($pconfig['magic']);?>">
+         <input name="magic" type="text" class="formfld" id="magic" size="20" value="<?=htmlspecialchars($pconfig['magic'] ?? '');?>">
          <br>
          Magic number stored in every voucher. Verified during voucher check. Size depends on how many bits are left by Roll+Ticket+Checksum bits. If all bits are used, no magic number will be used and checked.</td>
     </tr>
 	<tr> 
        <td width="22%" valign="top" class="vncellreq">Save Interval</td>
        <td width="78%" class="vtable">
-         <input name="saveinterval" type="text" class="formfld" id="saveinterval" size="4" value="<?=htmlspecialchars($pconfig['saveinterval']);?>">
+         <input name="saveinterval" type="text" class="formfld" id="saveinterval" size="4" value="<?=htmlspecialchars($pconfig['saveinterval'] ?? '');?>">
          Minutes<br>
          The list of active and used vouchers can be stored in the system's configuration file once every x minutes to survive power outages. No save is done if no new vouchers have been activated.  Enter 0 to never write runtime state to XML config.</td>
     </tr>
 	<tr> 
        <td width="22%" valign="top" class="vncellreq">Invalid Voucher Message</td>
        <td width="78%" class="vtable">
-         <input name="msgnoaccess" type="text" class="formfld" id="msgnoaccess" size="80" value="<?=htmlspecialchars($pconfig['msgnoaccess']);?>">
+         <input name="msgnoaccess" type="text" class="formfld" id="msgnoaccess" size="80" value="<?=htmlspecialchars($pconfig['msgnoaccess'] ?? '');?>">
          Error message displayed for invalid vouchers on captive portal error page ($PORTAL_MESSAGE$).</td>
     </tr>
 	<tr> 
        <td width="22%" valign="top" class="vncellreq">Expired Voucher Message</td>
        <td width="78%" class="vtable">
-         <input name="msgexpired" type="text" class="formfld" id="msgexpired" size="80" value="<?=htmlspecialchars($pconfig['msgexpired']);?>">
+         <input name="msgexpired" type="text" class="formfld" id="msgexpired" size="80" value="<?=htmlspecialchars($pconfig['msgexpired'] ?? '');?>">
          Error message displayed for expired vouchers on captive portal error page ($PORTAL_MESSAGE$).</td>
     </tr>
     <tr>

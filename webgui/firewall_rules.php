@@ -31,7 +31,7 @@
 
 require("guiconfig.inc");
 
-if ($ipv6rules = ($_GET['type'] == 'ipv6')) {
+if ($ipv6rules = (($_GET['type'] ?? null) == 'ipv6')) {
 	$configname = 'rule6';
 	$typelink = '&type=ipv6';
 } else {
@@ -41,26 +41,26 @@ if ($ipv6rules = ($_GET['type'] == 'ipv6')) {
 $pgtitle = array("Firewall", "Rules");	/* make group manager happy */
 $pgtitle = array("Firewall", ipv6enabled() ? ($ipv6rules ? 'IPv6 Rules' : 'IPv4 Rules') : 'Rules');
 
-if (!is_array($config['filter'][$configname])) {
+if (!is_array($config['filter'][$configname] ?? null)) {
 	$config['filter'][$configname] = array();
 }
 filter_rules_sort();
 $a_filter = &$config['filter'][$configname];
 
-$if = $_GET['if'];
-if ($_POST['if'])
+$if = $_GET['if'] ?? null;
+if (!empty($_POST['if']))
 	$if = $_POST['if'];
 	
 $iflist = array("lan" => "LAN", "wan" => "WAN");
 
-if ((($config['l2tp']['mode'] == "server" )) && !$ipv6rules)
+if (((($config['l2tp']['mode'] ?? null) == "server" )) && !$ipv6rules)
 	$iflist['l2tp'] = "L2TP VPN";
 
 if (isset($config['ipsec']['enable']))
 	$iflist['ipsec'] = "IPsec VPN";
 
 for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-	$iflist['opt' . $i] = $config['interfaces']['opt' . $i]['descr'];
+	$iflist['opt' . $i] = $config['interfaces']['opt' . $i]['descr'] ?? null;
 }
 
 if (!$if || !isset($iflist[$if]))
@@ -70,7 +70,7 @@ if ($_POST) {
 
 	$pconfig = $_POST;
 
-	if ($_POST['apply']) {
+	if (!empty($_POST['apply'])) {
 		$retval = 0;
 		
 		if (!file_exists($d_sysrebootreqd_path)) {
@@ -94,7 +94,7 @@ if ($_POST) {
 
 if (isset($_POST['del_x'])) {
 	/* delete selected rules */
-	if (is_array($_POST['rule']) && count($_POST['rule'])) {
+	if (is_array($_POST['rule'] ?? null) && count($_POST['rule'])) {
 		foreach ($_POST['rule'] as $rulei) {
 			unset($a_filter[$rulei]);
 		}
@@ -118,13 +118,13 @@ if (isset($_POST['del_x'])) {
 		}
 	}
 	/* move selected rules before this rule */
-	if (isset($movebtn) && is_array($_POST['rule']) && count($_POST['rule'])) {
+	if (isset($movebtn) && is_array($_POST['rule'] ?? null) && count($_POST['rule'])) {
 		$a_filter_new = array();
 		
 		/* copy all rules < $movebtn and not selected */
 		for ($i = 0; $i < $movebtn; $i++) {
 			if (!in_array($i, $_POST['rule']))
-				$a_filter_new[] = $a_filter[$i];
+				$a_filter_new[] = $a_filter[$i] ?? null;
 		}
 		
 		/* copy all selected rules */
@@ -153,7 +153,7 @@ if (isset($_POST['del_x'])) {
 	}
 	
 	if (isset($togglebtn)) {
-		if ($a_filter[$togglebtn]) {
+		if (!empty($a_filter[$togglebtn])) {
 			$a_filter[$togglebtn]['disabled'] = !isset($a_filter[$togglebtn]['disabled']);
 			write_config();
 			touch($d_filterconfdirty_path);
@@ -221,7 +221,7 @@ function fr_insline(id, on) {
 // -->
 </script>
 <form action="firewall_rules.php<?=($typelink ? '?' . $typelink : '')?>" method="post">
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
 <?php if (file_exists($d_filterconfdirty_path)): ?><p>
 <?php print_info_box_np("The firewall rule configuration has been changed.<br>You must apply the changes in order for them to take effect.");?><br>
 <input name="apply" type="submit" class="formbtn" id="apply" value="Apply changes"></p>
@@ -288,16 +288,16 @@ function fr_insline(id, on) {
 <?php endif; ?>
 				<?php $nrules = 0; for ($i = 0; isset($a_filter[$i]); $i++):
 					$filterent = $a_filter[$i];
-					if ($filterent['interface'] != $if)
+					if (($filterent['interface'] ?? null) != $if)
 						continue;
 				?>
                 <tr valign="top" id="fr<?=$nrules;?>">
                   <td class="listt"><input type="checkbox" id="frc<?=$nrules;?>" name="rule[]" value="<?=$i;?>" onClick="fr_bgcolor('<?=$nrules;?>')" style="margin: 0; padding: 0; width: 15px; height: 15px;"></td>
                   <td class="listt" align="center">
-				  <?php if ($filterent['type'] == "block")
+				  <?php if (($filterent['type'] ?? null) == "block")
 				  			$iconfn = "block";
-						else if ($filterent['type'] == "reject") {
-							if ($filterent['protocol'] == "tcp" || $filterent['protocol'] == "udp")
+						else if (($filterent['type'] ?? null) == "reject") {
+							if (($filterent['protocol'] ?? null) == "tcp" || ($filterent['protocol'] ?? null) == "udp")
 								$iconfn = "reject";
 							else
 								$iconfn = "block";
@@ -324,19 +324,19 @@ function fr_insline(id, on) {
                     <?=$textss;?><?php if (isset($filterent['protocol'])) echo strtoupper($filterent['protocol']); else echo "*"; ?><?=$textse;?>
                   </td>
                   <td class="listr" onClick="fr_toggle(<?=$nrules;?>)">
-				    <?=$textss;?><?php echo htmlspecialchars(pprint_address($filterent['source'])); ?><?=$textse;?>
+				    <?=$textss;?><?php echo htmlspecialchars(pprint_address($filterent['source'] ?? null)); ?><?=$textse;?>
                   </td>
                   <td class="listr" onClick="fr_toggle(<?=$nrules;?>)">
-                    <?=$textss;?><?php echo htmlspecialchars(pprint_port($filterent['source']['port'])); ?><?=$textse;?>
+                    <?=$textss;?><?php echo htmlspecialchars(pprint_port($filterent['source']['port'] ?? null)); ?><?=$textse;?>
                   </td>
                   <td class="listr" onClick="fr_toggle(<?=$nrules;?>)"> 
-				    <?=$textss;?><?php echo htmlspecialchars(pprint_address($filterent['destination'])); ?><?=$textse;?>
+				    <?=$textss;?><?php echo htmlspecialchars(pprint_address($filterent['destination'] ?? null)); ?><?=$textse;?>
                   </td>
                   <td class="listr" onClick="fr_toggle(<?=$nrules;?>)"> 
-                    <?=$textss;?><?php echo htmlspecialchars(pprint_port($filterent['destination']['port'])); ?><?=$textse;?>
+                    <?=$textss;?><?php echo htmlspecialchars(pprint_port($filterent['destination']['port'] ?? null)); ?><?=$textse;?>
                   </td>
                   <td class="listbg" onClick="fr_toggle(<?=$nrules;?>)"> 
-                    <?=$textss;?><?=htmlspecialchars($filterent['descr']);?>&nbsp;<?=$textse;?>
+                    <?=$textss;?><?=htmlspecialchars($filterent['descr'] ?? '');?>&nbsp;<?=$textse;?>
                   </td>
                   <td valign="middle" nowrap class="list">
 				    <table border="0" cellspacing="0" cellpadding="1" summary="button pane">

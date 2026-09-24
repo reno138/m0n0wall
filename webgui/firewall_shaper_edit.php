@@ -32,20 +32,20 @@
 $pgtitle = array("Firewall", "Traffic shaper", "Edit rule");
 require("guiconfig.inc");
 
-if (!is_array($config['shaper']['rule'])) {
+if (!is_array($config['shaper']['rule'] ?? null)) {
 	$config['shaper']['rule'] = array();
 }
 $a_shaper = &$config['shaper']['rule'];
 
 $specialsrcdst = explode(" ", "any lan");
 
-$id = $_GET['id'];
+$id = $_GET['id'] ?? null;
 if (isset($_POST['id']))
-	$id = $_POST['id'];
+	$id = $_POST['id'] ?? null;
 	
-$after = $_GET['after'];
+$after = $_GET['after'] ?? null;
 if (isset($_POST['after']))
-	$after = $_POST['after'];
+	$after = $_POST['after'] ?? null;
 	
 if (isset($_GET['dup'])) {
 	$id = $_GET['dup'];
@@ -65,10 +65,10 @@ function address_to_pconfig($adr, &$padr, &$pmask, &$pnot, &$pbeginport, &$pendp
 		
 	if (isset($adr['any']))
 		$padr = "any";
-	else if ($adr['network'])
+	else if (!empty($adr['network']))
 		$padr = $adr['network'];
-	else if ($adr['address']) {
-		list($padr, $pmask) = explode("/", $adr['address']);
+	else if (!empty($adr['address'])) {
+		list($padr, $pmask) = array_pad(explode("/", $adr['address']), 2, null);
 		if (!$pmask)
 			$pmask = 32;
 	}
@@ -78,8 +78,8 @@ function address_to_pconfig($adr, &$padr, &$pmask, &$pnot, &$pbeginport, &$pendp
 	else
 		$pnot = 0;
 	
-	if ($adr['port']) {
-		list($pbeginport, $pendport) = explode("-", $adr['port']);
+	if (!empty($adr['port'])) {
+		list($pbeginport, $pendport) = array_pad(explode("-", $adr['port']), 2, null);
 		if (!$pendport)
 			$pendport = $pbeginport;
 	} else {
@@ -112,19 +112,19 @@ function pconfig_to_address(&$adr, $padr, $pmask, $pnot, $pbeginport, $pendport)
 	}
 }
 
-if (isset($id) && $a_shaper[$id]) {
-	$pconfig['interface'] = $a_shaper[$id]['interface'];
+if (isset($id) && !empty($a_shaper[$id])) {
+	$pconfig['interface'] = $a_shaper[$id]['interface'] ?? null;
 	
 	if (isset($a_shaper[$id]['protocol']))
-		$pconfig['proto'] = $a_shaper[$id]['protocol'];
+		$pconfig['proto'] = $a_shaper[$id]['protocol'] ?? null;
 	else
 		$pconfig['proto'] = "any";
 	
-	address_to_pconfig($a_shaper[$id]['source'], $pconfig['src'],
+	address_to_pconfig($a_shaper[$id]['source'] ?? null, $pconfig['src'],
 		$pconfig['srcmask'], $pconfig['srcnot'],
 		$pconfig['srcbeginport'], $pconfig['srcendport']);
 		
-	address_to_pconfig($a_shaper[$id]['destination'], $pconfig['dst'],
+	address_to_pconfig($a_shaper[$id]['destination'] ?? null, $pconfig['dst'],
 		$pconfig['dstmask'], $pconfig['dstnot'],
 		$pconfig['dstbeginport'], $pconfig['dstendport']);
 	
@@ -134,18 +134,18 @@ if (isset($id) && $a_shaper[$id]) {
 		$pconfig['target'] = "targetqueue:" . $a_shaper[$id]['targetqueue'];
 	}
 	
-	$pconfig['direction'] = $a_shaper[$id]['direction'];
-	$pconfig['iptos'] = $a_shaper[$id]['iptos'];
-	$pconfig['iplen'] = $a_shaper[$id]['iplen'];
-	$pconfig['tcpflags'] = $a_shaper[$id]['tcpflags'];
-	$pconfig['descr'] = $a_shaper[$id]['descr'];
+	$pconfig['direction'] = $a_shaper[$id]['direction'] ?? null;
+	$pconfig['iptos'] = $a_shaper[$id]['iptos'] ?? null;
+	$pconfig['iplen'] = $a_shaper[$id]['iplen'] ?? null;
+	$pconfig['tcpflags'] = $a_shaper[$id]['tcpflags'] ?? null;
+	$pconfig['descr'] = $a_shaper[$id]['descr'] ?? null;
 	$pconfig['disabled'] = isset($a_shaper[$id]['disabled']);
 	
-	if ($pconfig['srcbeginport'] == 0) {
+	if (($pconfig['srcbeginport'] ?? null) == 0) {
 		$pconfig['srcbeginport'] = "any";
 		$pconfig['srcendport'] = "any";
 	}
-	if ($pconfig['dstbeginport'] == 0) {
+	if (($pconfig['dstbeginport'] ?? null) == 0) {
 		$pconfig['dstbeginport'] = "any";
 		$pconfig['dstendport'] = "any";
 	}
@@ -161,71 +161,71 @@ if (isset($_GET['dup']))
 
 if ($_POST) {
 
-	if (($_POST['proto'] != "tcp") && ($_POST['proto'] != "udp") && ($_POST['proto'] != "any")) {
+	if ((($_POST['proto'] ?? null) != "tcp") && (($_POST['proto'] ?? null) != "udp") && (($_POST['proto'] ?? null) != "any")) {
 		$_POST['srcbeginport'] = 0;
 		$_POST['srcendport'] = 0;
 		$_POST['dstbeginport'] = 0;
 		$_POST['dstendport'] = 0;
 	} else {
 	
-		if ($_POST['srcbeginport_cust'] && !$_POST['srcbeginport'])
-			$_POST['srcbeginport'] = $_POST['srcbeginport_cust'];
-		if ($_POST['srcendport_cust'] && !$_POST['srcendport'])
-			$_POST['srcendport'] = $_POST['srcendport_cust'];
+		if (!empty($_POST['srcbeginport_cust']) && empty($_POST['srcbeginport']))
+			$_POST['srcbeginport'] = $_POST['srcbeginport_cust'] ?? null;
+		if (!empty($_POST['srcendport_cust']) && empty($_POST['srcendport']))
+			$_POST['srcendport'] = $_POST['srcendport_cust'] ?? null;
 	
-		if ($_POST['srcbeginport'] == "any") {
+		if (($_POST['srcbeginport'] ?? null) == "any") {
 			$_POST['srcbeginport'] = 0;
 			$_POST['srcendport'] = 0;
 		} else {			
-			if (!$_POST['srcendport'])
-				$_POST['srcendport'] = $_POST['srcbeginport'];
+			if (empty($_POST['srcendport']))
+				$_POST['srcendport'] = $_POST['srcbeginport'] ?? null;
 		}
-		if ($_POST['srcendport'] == "any")
-			$_POST['srcendport'] = $_POST['srcbeginport'];
+		if (($_POST['srcendport'] ?? null) == "any")
+			$_POST['srcendport'] = $_POST['srcbeginport'] ?? null;
 		
-		if ($_POST['dstbeginport_cust'] && !$_POST['dstbeginport'])
-			$_POST['dstbeginport'] = $_POST['dstbeginport_cust'];
-		if ($_POST['dstendport_cust'] && !$_POST['dstendport'])
-			$_POST['dstendport'] = $_POST['dstendport_cust'];
+		if (!empty($_POST['dstbeginport_cust']) && empty($_POST['dstbeginport']))
+			$_POST['dstbeginport'] = $_POST['dstbeginport_cust'] ?? null;
+		if (!empty($_POST['dstendport_cust']) && empty($_POST['dstendport']))
+			$_POST['dstendport'] = $_POST['dstendport_cust'] ?? null;
 		
-		if ($_POST['dstbeginport'] == "any") {
+		if (($_POST['dstbeginport'] ?? null) == "any") {
 			$_POST['dstbeginport'] = 0;
 			$_POST['dstendport'] = 0;
 		} else {			
-			if (!$_POST['dstendport'])
-				$_POST['dstendport'] = $_POST['dstbeginport'];
+			if (empty($_POST['dstendport']))
+				$_POST['dstendport'] = $_POST['dstbeginport'] ?? null;
 		}
-		if ($_POST['dstendport'] == "any")
-			$_POST['dstendport'] = $_POST['dstbeginport'];		
+		if (($_POST['dstendport'] ?? null) == "any")
+			$_POST['dstendport'] = $_POST['dstbeginport'] ?? null;		
 	}
 		
-	if (is_specialnet($_POST['srctype'])) {
-		$_POST['src'] = $_POST['srctype'];
+	if (is_specialnet($_POST['srctype'] ?? '')) {
+		$_POST['src'] = $_POST['srctype'] ?? null;
 		$_POST['srcmask'] = 0;
-	} else if ($_POST['srctype'] == "single") {
+	} else if (($_POST['srctype'] ?? null) == "single") {
 		$_POST['srcmask'] = 32;
 	}
-	if (is_specialnet($_POST['dsttype'])) {
-		$_POST['dst'] = $_POST['dsttype'];
+	if (is_specialnet($_POST['dsttype'] ?? '')) {
+		$_POST['dst'] = $_POST['dsttype'] ?? null;
 		$_POST['dstmask'] = 0;
-	}  else if ($_POST['dsttype'] == "single") {
+	}  else if (($_POST['dsttype'] ?? null) == "single") {
 		$_POST['dstmask'] = 32;
 	}
 	
 	$intos = array();
 	foreach ($iptos as $tos) {
-		if ($_POST['iptos_' . $tos] == "on")
+		if (($_POST['iptos_' . $tos] ?? null) == "on")
 			$intos[] = $tos;
-		else if ($_POST['iptos_' . $tos] == "off")
+		else if (($_POST['iptos_' . $tos] ?? null) == "off")
 			$intos[] = "!" . $tos;
 	}
 	$_POST['iptos'] = join(",", $intos);
 	
 	$intcpflags = array();
 	foreach ($tcpflags as $tcpflag) {
-		if ($_POST['tcpflags_' . $tcpflag] == "on")
+		if (($_POST['tcpflags_' . $tcpflag] ?? null) == "on")
 			$intcpflags[] = $tcpflag;
-		else if ($_POST['tcpflags_' . $tcpflag] == "off")
+		else if (($_POST['tcpflags_' . $tcpflag] ?? null) == "off")
 			$intcpflags[] = "!" . $tcpflag;
 	}
 	$_POST['tcpflags'] = join(",", $intcpflags);
@@ -237,101 +237,101 @@ if ($_POST) {
 	$reqdfields = explode(" ", "target proto src dst");
 	$reqdfieldsn = explode(",", "Target,Protocol,Source,Destination");
 	
-	if (!(is_specialnet($_POST['srctype']) || ($_POST['srctype'] == "single"))) {
+	if (!(is_specialnet($_POST['srctype'] ?? '') || (($_POST['srctype'] ?? null) == "single"))) {
 		$reqdfields[] = "srcmask";
 		$reqdfieldsn[] = "Source bit count";
 	}
-	if (!(is_specialnet($_POST['dsttype']) || ($_POST['dsttype'] == "single"))) {
+	if (!(is_specialnet($_POST['dsttype'] ?? '') || (($_POST['dsttype'] ?? null) == "single"))) {
 		$reqdfields[] = "dstmask";
 		$reqdfieldsn[] = "Destination bit count";
 	}
 	
 	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
-	if (!$_POST['srcbeginport']) {
+	if (empty($_POST['srcbeginport'])) {
 		$_POST['srcbeginport'] = 0;
 		$_POST['srcendport'] = 0;
 	}
-	if (!$_POST['dstbeginport']) {
+	if (empty($_POST['dstbeginport'])) {
 		$_POST['dstbeginport'] = 0;
 		$_POST['dstendport'] = 0;
 	}
 	
-	if (($_POST['srcbeginport'] && !is_port($_POST['srcbeginport']))) {
+	if ((!empty($_POST['srcbeginport']) && !is_port($_POST['srcbeginport']))) {
 		$input_errors[] = "The start source port must be an integer between 1 and 65535.";
 	}
-	if (($_POST['srcendport'] && !is_port($_POST['srcendport']))) {
+	if ((!empty($_POST['srcendport']) && !is_port($_POST['srcendport']))) {
 		$input_errors[] = "The end source port must be an integer between 1 and 65535.";
 	}
-	if (($_POST['dstbeginport'] && !is_port($_POST['dstbeginport']))) {
+	if ((!empty($_POST['dstbeginport']) && !is_port($_POST['dstbeginport']))) {
 		$input_errors[] = "The start destination port must be an integer between 1 and 65535.";
 	}
-	if (($_POST['dstendport'] && !is_port($_POST['dstendport']))) {
+	if ((!empty($_POST['dstendport']) && !is_port($_POST['dstendport']))) {
 		$input_errors[] = "The end destination port must be an integer between 1 and 65535.";
 	}
 	
-	if (!is_specialnet($_POST['srctype'])) {
-		if (($_POST['src'] && !is_ipaddroranyalias($_POST['src']))) {
+	if (!is_specialnet($_POST['srctype'] ?? '')) {
+		if ((!empty($_POST['src']) && !is_ipaddroranyalias($_POST['src']))) {
 			$input_errors[] = "A valid source IP address or alias must be specified.";
 		}
-		if (($_POST['srcmask'] && !is_numericint($_POST['srcmask']))) {
+		if ((!empty($_POST['srcmask']) && !is_numericint($_POST['srcmask']))) {
 			$input_errors[] = "A valid source bit count must be specified.";
 		}
 	}
-	if (!is_specialnet($_POST['dsttype'])) {
-		if (($_POST['dst'] && !is_ipaddroranyalias($_POST['dst']))) {
+	if (!is_specialnet($_POST['dsttype'] ?? '')) {
+		if ((!empty($_POST['dst']) && !is_ipaddroranyalias($_POST['dst']))) {
 			$input_errors[] = "A valid destination IP address or alias must be specified.";
 		}
-		if (($_POST['dstmask'] && !is_numericint($_POST['dstmask']))) {
+		if ((!empty($_POST['dstmask']) && !is_numericint($_POST['dstmask']))) {
 			$input_errors[] = "A valid destination bit count must be specified.";
 		}
 	}
 	
-	if ($_POST['srcbeginport'] > $_POST['srcendport']) {
+	if (($_POST['srcbeginport'] ?? null) > ($_POST['srcendport'] ?? null)) {
 		/* swap */
-		$tmp = $_POST['srcendport'];
-		$_POST['srcendport'] = $_POST['srcbeginport'];
+		$tmp = $_POST['srcendport'] ?? null;
+		$_POST['srcendport'] = $_POST['srcbeginport'] ?? null;
 		$_POST['srcbeginport'] = $tmp;
 	}
-	if ($_POST['dstbeginport'] > $_POST['dstendport']) {
+	if (($_POST['dstbeginport'] ?? null) > ($_POST['dstendport'] ?? null)) {
 		/* swap */
-		$tmp = $_POST['dstendport'];
-		$_POST['dstendport'] = $_POST['dstbeginport'];
+		$tmp = $_POST['dstendport'] ?? null;
+		$_POST['dstendport'] = $_POST['dstbeginport'] ?? null;
 		$_POST['dstbeginport'] = $tmp;
 	}
 	
-	if (($_POST['iplen'] && !preg_match("/^(\d+)(-(\d+))?$/", $_POST['iplen']))) {
+	if ((!empty($_POST['iplen']) && !preg_match("/^(\d+)(-(\d+))?$/", $_POST['iplen']))) {
 		$input_errors[] = "The IP packet length must be an integer or a range (from-to).";
 	}
 
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 		$shaperent = array();
-		$shaperent['interface'] = $_POST['interface'];
+		$shaperent['interface'] = $_POST['interface'] ?? null;
 		
-		if ($_POST['proto'] != "any")
-			$shaperent['protocol'] = $_POST['proto'];
+		if (($_POST['proto'] ?? null) != "any")
+			$shaperent['protocol'] = $_POST['proto'] ?? null;
 		else
 			unset($shaperent['protocol']);
 		
-		pconfig_to_address($shaperent['source'], $_POST['src'],
-			$_POST['srcmask'], $_POST['srcnot'],
-			$_POST['srcbeginport'], $_POST['srcendport']);
+		pconfig_to_address($shaperent['source'], $_POST['src'] ?? null,
+			$_POST['srcmask'] ?? null, $_POST['srcnot'] ?? null,
+			$_POST['srcbeginport'] ?? null, $_POST['srcendport'] ?? null);
 			
-		pconfig_to_address($shaperent['destination'], $_POST['dst'],
-			$_POST['dstmask'], $_POST['dstnot'],
-			$_POST['dstbeginport'], $_POST['dstendport']);
+		pconfig_to_address($shaperent['destination'], $_POST['dst'] ?? null,
+			$_POST['dstmask'] ?? null, $_POST['dstnot'] ?? null,
+			$_POST['dstbeginport'] ?? null, $_POST['dstendport'] ?? null);
 		
-		$shaperent['direction'] = $_POST['direction'];
-		$shaperent['iplen'] = $_POST['iplen'];
-		$shaperent['iptos'] = $_POST['iptos'];
-		$shaperent['tcpflags'] = $_POST['tcpflags'];
-		$shaperent['descr'] = $_POST['descr'];
-		$shaperent['disabled'] = $_POST['disabled'] ? true : false;
+		$shaperent['direction'] = $_POST['direction'] ?? null;
+		$shaperent['iplen'] = $_POST['iplen'] ?? null;
+		$shaperent['iptos'] = $_POST['iptos'] ?? null;
+		$shaperent['tcpflags'] = $_POST['tcpflags'] ?? null;
+		$shaperent['descr'] = $_POST['descr'] ?? null;
+		$shaperent['disabled'] = !empty($_POST['disabled']) ? true : false;
 		
-		list($targettype,$target) = explode(":", $_POST['target']);
+		list($targettype,$target) = array_pad(explode(":", $_POST['target'] ?? ''), 2, null);
 		$shaperent[$targettype] = $target;
 		
-		if (isset($id) && $a_shaper[$id]) {
+		if (isset($id) && !empty($a_shaper[$id])) {
 			// Scheduler: update matching jobs
 			croen_update_job(Array('shaper-enable_rule', 'shaper-disable_rule'), $a_shaper[$id]['descr'], ($shaperent['descr'] != '' ? $shaperent['descr'] : FALSE));
 			$a_shaper[$id] = $shaperent;
@@ -448,30 +448,30 @@ function dst_rep_change() {
 }
 //-->
 </script>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
-<?php if (is_array($config['shaper']['pipe']) && (count($config['shaper']['pipe']) > 0)): ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
+<?php if (is_array($config['shaper']['pipe'] ?? null) && (count($config['shaper']['pipe']) > 0)): ?>
             <form action="firewall_shaper_edit.php" method="post" name="iform" id="iform">
               <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="content pane">
                 <tr> 
                   <td valign="top" class="vncellreq">Target</td>
                   <td class="vtable"><select name="target" class="formfld">
                       <?php 
-	       if (is_array($config['shaper']['pipe']) && count($config['shaper']['pipe']) > 0):
+	       if (is_array($config['shaper']['pipe'] ?? null) && count($config['shaper']['pipe']) > 0):
 					  foreach ($config['shaper']['pipe'] as $pipei => $pipe): ?>
-                      <option value="<?="targetpipe:$pipei";?>" <?php if ("targetpipe:$pipei" == $pconfig['target']) echo "selected"; ?>> 
+                      <option value="<?="targetpipe:$pipei";?>" <?php if ("targetpipe:$pipei" == ($pconfig['target'] ?? null)) echo "selected"; ?>> 
                       <?php
 					  	echo htmlspecialchars("Pipe " . ($pipei + 1));
-						if ($pipe['descr'])
+						if (!empty($pipe['descr']))
 							echo htmlspecialchars(" (" . $pipe['descr'] . ")");
 					  ?>
                       </option>
                       <?php endforeach; endif;
-               if (is_array($config['shaper']['queue']) && count($config['shaper']['queue']) > 0):
+               if (is_array($config['shaper']['queue'] ?? null) && count($config['shaper']['queue']) > 0):
 					  foreach ($config['shaper']['queue'] as $queuei => $queue): ?>
-                      <option value="<?="targetqueue:$queuei";?>" <?php if ("targetqueue:$queuei" == $pconfig['target']) echo "selected"; ?>> 
+                      <option value="<?="targetqueue:$queuei";?>" <?php if ("targetqueue:$queuei" == ($pconfig['target'] ?? null)) echo "selected"; ?>> 
                       <?php
 					  	echo htmlspecialchars("Queue " . ($queuei + 1));
-						if ($queue['descr'])
+						if (!empty($queue['descr']))
 							echo htmlspecialchars(" (" . $queue['descr'] . ")");
 					  ?>
                       </option>
@@ -483,7 +483,7 @@ function dst_rep_change() {
                 <tr>
                   <td valign="top" class="vncellreq">Disabled</td>
                   <td class="vtable">
-                    <input name="disabled" type="checkbox" id="disabled" value="yes" <?php if ($pconfig['disabled']) echo "checked"; ?>>
+                    <input name="disabled" type="checkbox" id="disabled" value="yes" <?php if (!empty($pconfig['disabled'])) echo "checked"; ?>>
                     <strong>Disable this rule</strong><br>
                     <span class="vexpl">Set this option to disable this rule without removing it from the list.</span></td>
                 </tr>
@@ -495,7 +495,7 @@ function dst_rep_change() {
 					  	$interfaces['opt' . $i] = $config['interfaces']['opt' . $i]['descr'];
 					  }
 					  foreach ($interfaces as $iface => $ifacename): ?>
-                      <option value="<?=$iface;?>" <?php if ($iface == $pconfig['interface']) echo "selected"; ?>> 
+                      <option value="<?=$iface;?>" <?php if ($iface == ($pconfig['interface'] ?? null)) echo "selected"; ?>> 
                       <?=htmlspecialchars($ifacename);?>
                       </option>
                       <?php endforeach; ?>
@@ -507,7 +507,7 @@ function dst_rep_change() {
                   <td width="22%" valign="top" class="vncellreq">Protocol</td>
                   <td width="78%" class="vtable"><select name="proto" class="formfld" onchange="proto_change()">
                       <?php $protocols = explode(" ", "TCP UDP ICMP ESP AH GRE IPv6 IGMP any"); foreach ($protocols as $proto): ?>
-                      <option value="<?=strtolower($proto);?>" <?php if (strtolower($proto) == $pconfig['proto']) echo "selected"; ?>> 
+                      <option value="<?=strtolower($proto);?>" <?php if (strtolower($proto) == ($pconfig['proto'] ?? null)) echo "selected"; ?>> 
                       <?=htmlspecialchars($proto);?>
                       </option>
                       <?php endforeach; ?>
@@ -517,7 +517,7 @@ function dst_rep_change() {
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">Source</td>
-                  <td width="78%" class="vtable"> <input name="srcnot" type="checkbox" id="srcnot" value="yes" <?php if ($pconfig['srcnot']) echo "checked"; ?>> 
+                  <td width="78%" class="vtable"> <input name="srcnot" type="checkbox" id="srcnot" value="yes" <?php if (!empty($pconfig['srcnot'])) echo "checked"; ?>> 
                     <strong>not</strong><br>
                     Use this option to invert the sense of the match.<br> <br> 
                     <table border="0" cellspacing="0" cellpadding="0" summary="type-address widget">
@@ -525,18 +525,18 @@ function dst_rep_change() {
                         <td>Type:&nbsp;&nbsp;</td>
 						<td></td>
                         <td><select name="srctype" class="formfld" onChange="typesel_change()">
-                            <?php $sel = is_specialnet($pconfig['src']); ?>
-                            <option value="any" <?php if ($pconfig['src'] == "any") { echo "selected"; } ?>> 
+                            <?php $sel = is_specialnet($pconfig['src'] ?? ''); ?>
+                            <option value="any" <?php if (($pconfig['src'] ?? null) == "any") { echo "selected"; } ?>> 
                             any</option>
-                            <option value="single" <?php if (($pconfig['srcmask'] == 32) && !$sel) { echo "selected"; $sel = 1; } ?>> 
+                            <option value="single" <?php if ((($pconfig['srcmask'] ?? null) == 32) && !$sel) { echo "selected"; $sel = 1; } ?>> 
                             Single host or alias</option>
                             <option value="network" <?php if (!$sel) echo "selected"; ?>> 
                             Network</option>
-                            <option value="lan" <?php if ($pconfig['src'] == "lan") { echo "selected"; } ?>> 
+                            <option value="lan" <?php if (($pconfig['src'] ?? null) == "lan") { echo "selected"; } ?>> 
                             LAN subnet</option>
                             <?php for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++): ?>
-                            <option value="opt<?=$i;?>" <?php if ($pconfig['src'] == "opt" . $i) { echo "selected"; } ?>> 
-                            <?=htmlspecialchars($config['interfaces']['opt' . $i]['descr']);?>
+                            <option value="opt<?=$i;?>" <?php if (($pconfig['src'] ?? null) == "opt" . $i) { echo "selected"; } ?>> 
+                            <?=htmlspecialchars($config['interfaces']['opt' . $i]['descr'] ?? '');?>
                             subnet</option>
                             <?php endfor; ?>
                           </select></td>
@@ -544,11 +544,11 @@ function dst_rep_change() {
                       <tr> 
                         <td>Address:&nbsp;&nbsp;</td>
 						<td><?=$mandfldhtmlspc;?></td>
-                        <td><input name="src" type="text" class="formfldalias" id="src" size="20" value="<?php if (!is_specialnet($pconfig['src'])) echo htmlspecialchars($pconfig['src']);?>">
+                        <td><input name="src" type="text" class="formfldalias" id="src" size="20" value="<?php if (!is_specialnet($pconfig['src'] ?? '')) echo htmlspecialchars($pconfig['src'] ?? '');?>">
                           / 
                           <select name="srcmask" class="formfld" id="srcmask">
                             <?php for ($i = 31; $i > 0; $i--): ?>
-                            <option value="<?=$i;?>" <?php if ($i == $pconfig['srcmask']) echo "selected"; ?>> 
+                            <option value="<?=$i;?>" <?php if ($i == ($pconfig['srcmask'] ?? null)) echo "selected"; ?>> 
                             <?=$i;?>
                             </option>
                             <?php endfor; ?>
@@ -564,31 +564,31 @@ function dst_rep_change() {
                         <td>from:&nbsp;&nbsp;</td>
                         <td><select name="srcbeginport" class="formfld" onchange="src_rep_change();ext_change()">
                             <option value="">(other)</option>
-                            <option value="any" <?php $bfound = 0; if ($pconfig['srcbeginport'] == "any") { echo "selected"; $bfound = 1; } ?>>any</option>
+                            <option value="any" <?php $bfound = 0; if (($pconfig['srcbeginport'] ?? null) == "any") { echo "selected"; $bfound = 1; } ?>>any</option>
                             <?php foreach ($wkports as $wkport => $wkportdesc): ?>
-                            <option value="<?=$wkport;?>" <?php if ($wkport == $pconfig['srcbeginport']) {
+                            <option value="<?=$wkport;?>" <?php if ($wkport == ($pconfig['srcbeginport'] ?? null)) {
 																echo "selected";
 																$bfound = 1;
 															}?>> 
                             <?=htmlspecialchars($wkportdesc);?>
                             </option>
                             <?php endforeach; ?>
-                          </select> <input name="srcbeginport_cust" type="text" size="5" value="<?php if (!$bfound && $pconfig['srcbeginport']) echo htmlspecialchars($pconfig['srcbeginport']); ?>"></td>
+                          </select> <input name="srcbeginport_cust" type="text" size="5" value="<?php if (!$bfound && !empty($pconfig['srcbeginport'])) echo htmlspecialchars($pconfig['srcbeginport'] ?? ''); ?>"></td>
                       </tr>
                       <tr> 
                         <td>to:</td>
                         <td><select name="srcendport" class="formfld" onchange="ext_change()">
                             <option value="">(other)</option>
-                            <option value="any" <?php $bfound = 0; if ($pconfig['srcendport'] == "any") { echo "selected"; $bfound = 1; } ?>>any</option>
+                            <option value="any" <?php $bfound = 0; if (($pconfig['srcendport'] ?? null) == "any") { echo "selected"; $bfound = 1; } ?>>any</option>
                             <?php foreach ($wkports as $wkport => $wkportdesc): ?>
-                            <option value="<?=$wkport;?>" <?php if ($wkport == $pconfig['srcendport']) {
+                            <option value="<?=$wkport;?>" <?php if ($wkport == ($pconfig['srcendport'] ?? null)) {
 																echo "selected";
 																$bfound = 1;
 															}?>> 
                             <?=htmlspecialchars($wkportdesc);?>
                             </option>
                             <?php endforeach; ?>
-                          </select> <input name="srcendport_cust" type="text" size="5" value="<?php if (!$bfound && $pconfig['srcendport']) echo htmlspecialchars($pconfig['srcendport']); ?>"></td>
+                          </select> <input name="srcendport_cust" type="text" size="5" value="<?php if (!$bfound && !empty($pconfig['srcendport'])) echo htmlspecialchars($pconfig['srcendport'] ?? ''); ?>"></td>
                       </tr>
                     </table>
                     <br> <span class="vexpl">Specify the port or port range for 
@@ -597,7 +597,7 @@ function dst_rep_change() {
                     want to filter a single port</span></td>
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">Destination</td>
-                  <td width="78%" class="vtable"> <input name="dstnot" type="checkbox" id="dstnot" value="yes" <?php if ($pconfig['dstnot']) echo "checked"; ?>> 
+                  <td width="78%" class="vtable"> <input name="dstnot" type="checkbox" id="dstnot" value="yes" <?php if (!empty($pconfig['dstnot'])) echo "checked"; ?>> 
                     <strong>not</strong><br>
                     Use this option to invert the sense of the match.<br> <br> 
                     <table border="0" cellspacing="0" cellpadding="0" summary="type-address widget">
@@ -605,18 +605,18 @@ function dst_rep_change() {
                         <td>Type:&nbsp;&nbsp;</td>
 						<td></td>
                         <td><select name="dsttype" class="formfld" onChange="typesel_change()">
-                            <?php $sel = is_specialnet($pconfig['dst']); ?>
-                            <option value="any" <?php if ($pconfig['dst'] == "any") { echo "selected"; } ?>> 
+                            <?php $sel = is_specialnet($pconfig['dst'] ?? ''); ?>
+                            <option value="any" <?php if (($pconfig['dst'] ?? null) == "any") { echo "selected"; } ?>> 
                             any</option>
-                            <option value="single" <?php if (($pconfig['dstmask'] == 32) && !$sel) { echo "selected"; $sel = 1; } ?>> 
+                            <option value="single" <?php if ((($pconfig['dstmask'] ?? null) == 32) && !$sel) { echo "selected"; $sel = 1; } ?>> 
                             Single host or alias</option>
                             <option value="network" <?php if (!$sel) echo "selected"; ?>> 
                             Network</option>
-                            <option value="lan" <?php if ($pconfig['dst'] == "lan") { echo "selected"; } ?>> 
+                            <option value="lan" <?php if (($pconfig['dst'] ?? null) == "lan") { echo "selected"; } ?>> 
                             LAN subnet</option>
                             <?php for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++): ?>
-                            <option value="opt<?=$i;?>" <?php if ($pconfig['dst'] == "opt" . $i) { echo "selected"; } ?>> 
-                            <?=htmlspecialchars($config['interfaces']['opt' . $i]['descr']);?>
+                            <option value="opt<?=$i;?>" <?php if (($pconfig['dst'] ?? null) == "opt" . $i) { echo "selected"; } ?>> 
+                            <?=htmlspecialchars($config['interfaces']['opt' . $i]['descr'] ?? '');?>
                             subnet</option>
                             <?php endfor; ?>
                           </select> </td>
@@ -624,11 +624,11 @@ function dst_rep_change() {
                       <tr> 
                         <td>Address:&nbsp;&nbsp;</td>
 						<td><?=$mandfldhtmlspc;?></td>
-                        <td><input name="dst" type="text" class="formfldalias" id="dst" size="20" value="<?php if (!is_specialnet($pconfig['dst'])) echo htmlspecialchars($pconfig['dst']);?>">
+                        <td><input name="dst" type="text" class="formfldalias" id="dst" size="20" value="<?php if (!is_specialnet($pconfig['dst'] ?? '')) echo htmlspecialchars($pconfig['dst'] ?? '');?>">
                           / 
                           <select name="dstmask" class="formfld" id="dstmask">
                             <?php for ($i = 31; $i > 0; $i--): ?>
-                            <option value="<?=$i;?>" <?php if ($i == $pconfig['dstmask']) echo "selected"; ?>> 
+                            <option value="<?=$i;?>" <?php if ($i == ($pconfig['dstmask'] ?? null)) echo "selected"; ?>> 
                             <?=$i;?>
                             </option>
                             <?php endfor; ?>
@@ -644,31 +644,31 @@ function dst_rep_change() {
                         <td>from:&nbsp;&nbsp;</td>
                         <td><select name="dstbeginport" class="formfld" onchange="dst_rep_change();ext_change()">
                             <option value="">(other)</option>
-                            <option value="any" <?php $bfound = 0; if ($pconfig['dstbeginport'] == "any") { echo "selected"; $bfound = 1; } ?>>any</option>
+                            <option value="any" <?php $bfound = 0; if (($pconfig['dstbeginport'] ?? null) == "any") { echo "selected"; $bfound = 1; } ?>>any</option>
                             <?php foreach ($wkports as $wkport => $wkportdesc): ?>
-                            <option value="<?=$wkport;?>" <?php if ($wkport == $pconfig['dstbeginport']) {
+                            <option value="<?=$wkport;?>" <?php if ($wkport == ($pconfig['dstbeginport'] ?? null)) {
 																echo "selected";
 																$bfound = 1;
 															}?>> 
                             <?=htmlspecialchars($wkportdesc);?>
                             </option>
                             <?php endforeach; ?>
-                          </select> <input name="dstbeginport_cust" type="text" size="5" value="<?php if (!$bfound && $pconfig['dstbeginport']) echo htmlspecialchars($pconfig['dstbeginport']); ?>"></td>
+                          </select> <input name="dstbeginport_cust" type="text" size="5" value="<?php if (!$bfound && !empty($pconfig['dstbeginport'])) echo htmlspecialchars($pconfig['dstbeginport'] ?? ''); ?>"></td>
                       </tr>
                       <tr> 
                         <td>to:</td>
                         <td><select name="dstendport" class="formfld" onchange="ext_change()">
                             <option value="">(other)</option>
-                            <option value="any" <?php $bfound = 0; if ($pconfig['dstendport'] == "any") { echo "selected"; $bfound = 1; } ?>>any</option>
+                            <option value="any" <?php $bfound = 0; if (($pconfig['dstendport'] ?? null) == "any") { echo "selected"; $bfound = 1; } ?>>any</option>
                             <?php foreach ($wkports as $wkport => $wkportdesc): ?>
-                            <option value="<?=$wkport;?>" <?php if ($wkport == $pconfig['dstendport']) {
+                            <option value="<?=$wkport;?>" <?php if ($wkport == ($pconfig['dstendport'] ?? null)) {
 																echo "selected";
 																$bfound = 1;
 															}?>> 
                             <?=htmlspecialchars($wkportdesc);?>
                             </option>
                             <?php endforeach; ?>
-                          </select> <input name="dstendport_cust" type="text" size="5" value="<?php if (!$bfound && $pconfig['dstendport']) echo htmlspecialchars($pconfig['dstendport']); ?>"></td>
+                          </select> <input name="dstendport_cust" type="text" size="5" value="<?php if (!$bfound && !empty($pconfig['dstendport'])) echo htmlspecialchars($pconfig['dstendport'] ?? ''); ?>"></td>
                       </tr>
                     </table>
                     <br> <span class="vexpl">Specify the port or port range for 
@@ -678,9 +678,9 @@ function dst_rep_change() {
                 <tr> 
                   <td valign="top" class="vncell">Direction</td>
                   <td class="vtable"> <select name="direction" class="formfld">
-                      <option value="" <?php if (!$pconfig['direction']) echo "selected"; ?>>any</option>
-                      <option value="in" <?php if ($pconfig['direction'] == "in") echo "selected"; ?>>in</option>
-                      <option value="out" <?php if ($pconfig['direction'] == "out") echo "selected"; ?>>out</option>
+                      <option value="" <?php if (empty($pconfig['direction'])) echo "selected"; ?>>any</option>
+                      <option value="in" <?php if (($pconfig['direction'] ?? null) == "in") echo "selected"; ?>>in</option>
+                      <option value="out" <?php if (($pconfig['direction'] ?? null) == "out") echo "selected"; ?>>out</option>
                     </select> <br>
                     Use this to match only packets travelling in a given direction 
                     on the interface specified above (as seen from the firewall's 
@@ -690,7 +690,7 @@ function dst_rep_change() {
                   <td width="22%" valign="top" class="vncell">IP Type of Service (TOS)</td>
                   <td width="78%" class="vtable"> <table border="0" cellspacing="0" cellpadding="0">
                       <?php 
-				  $iniptos = explode(",", $pconfig['iptos']);
+				  $iniptos = explode(",", $pconfig['iptos'] ?? '');
 				  foreach ($iptos as $tos): $dontcare = true; ?>
                       <tr> 
                         <td width="80" nowrap><strong> 
@@ -710,7 +710,7 @@ function dst_rep_change() {
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncell">IP packet length</td>
-                  <td width="78%" class="vtable"><input name="iplen" type="text" id="iplen" size="10" value="<?=htmlspecialchars($pconfig['iplen']);?>"> 
+                  <td width="78%" class="vtable"><input name="iplen" type="text" id="iplen" size="10" value="<?=htmlspecialchars($pconfig['iplen'] ?? '');?>"> 
                     <br>
                     Setting this makes the rule match packets of a given length 
                     (either a single value or a range in the syntax <em>from-to</em>, 
@@ -720,7 +720,7 @@ function dst_rep_change() {
                   <td width="22%" valign="top" class="vncell">TCP flags</td>
                   <td width="78%" class="vtable"> <table border="0" cellspacing="0" cellpadding="0" summary="tcp flags widget">
                       <?php 
-				  $inflags = explode(",", $pconfig['tcpflags']);
+				  $inflags = explode(",", $pconfig['tcpflags'] ?? '');
 				  foreach ($tcpflags as $tcpflag): $dontcare = true; ?>
                       <tr> 
                         <td width="40" nowrap><strong> 
@@ -740,14 +740,14 @@ function dst_rep_change() {
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncell">Description</td>
-                  <td width="78%" class="vtable"> <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr']);?>"> 
+                  <td width="78%" class="vtable"> <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr'] ?? '');?>"> 
                     <br> <span class="vexpl">You may enter a description here 
                     for your reference (not parsed).</span></td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top">&nbsp;</td>
                   <td width="78%"> <input name="Submit" type="submit" class="formbtn" value="Save"> 
-                    <?php if (isset($id) && $a_shaper[$id]): ?>
+                    <?php if (isset($id) && !empty($a_shaper[$id])): ?>
                     <input name="id" type="hidden" value="<?=htmlspecialchars($id);?>">
                     <?php endif; ?>
 					<input name="after" type="hidden" value="<?=htmlspecialchars($after);?>">

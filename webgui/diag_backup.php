@@ -39,17 +39,18 @@ if ($_POST) {
 
 	unset($input_errors);
 	
-	if (stristr($_POST['Submit'], "Restore"))
+	$mode = "";
+	if (stristr($_POST['Submit'] ?? '', "Restore"))
 		$mode = "restore";
-	else if (stristr($_POST['Submit'], "Download"))
+	else if (stristr($_POST['Submit'] ?? '', "Download"))
 		$mode = "download";
 		
 	if ($mode) {
 		if ($mode == "download") {
 			config_lock();
 			
-			$fn = "config-" . $config['system']['hostname'] . "." . 
-				$config['system']['domain'] . "-" . date("YmdHis") . ".xml";
+			$fn = "config-" . ($config['system']['hostname'] ?? '') . "." . 
+				($config['system']['domain'] ?? '') . "-" . date("YmdHis") . ".xml";
 			
 			$fs = filesize($g['conf_path'] . "/config.xml");
 			header("Content-Type: application/octet-stream"); 
@@ -59,13 +60,13 @@ if ($_POST) {
 			config_unlock();
 			exit;
 		} else if ($mode == "restore") {
-			if (is_uploaded_file($_FILES['conffile']['tmp_name'])) {
-				if (config_install($_FILES['conffile']['tmp_name']) == 0) {
+			if (is_uploaded_file($_FILES['conffile']['tmp_name'] ?? '')) {
+				if (config_install($_FILES['conffile']['tmp_name'] ?? '') == 0) {
 					system_reboot();
 					$savemsg = "The configuration has been restored. The firewall is now rebooting.";
 				} else {
 					$errstr = "The configuration could not be restored.";
-					if ($xmlerr)
+					if (!empty($xmlerr))
 						$errstr .= " (XML error: $xmlerr)";
 					$input_errors[] = $errstr;
 				}
@@ -78,8 +79,8 @@ if ($_POST) {
 ?>
 <?php include("fbegin.inc"); ?>
             <form action="diag_backup.php" method="post" enctype="multipart/form-data">
-            <?php if ($input_errors) print_input_errors($input_errors); ?>
-            <?php if ($savemsg) print_info_box($savemsg); ?>
+            <?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
+            <?php if (!empty($savemsg)) print_info_box($savemsg); ?>
               <table width="100%" border="0" cellspacing="0" cellpadding="6" summary="inner content pane">
                 <tr> 
                   <td colspan="2" class="listtopic">Backup configuration</td>

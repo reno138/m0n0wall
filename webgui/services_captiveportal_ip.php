@@ -32,7 +32,7 @@
 $pgtitle = array("Services", "Captive portal", "Allowed IP Addresses");
 require("guiconfig.inc");
 
-if (!is_array($config['captiveportal']['allowedip']))
+if (!is_array($config['captiveportal']['allowedip'] ?? null))
 	$config['captiveportal']['allowedip'] = array();
 
 allowedips_sort();
@@ -42,7 +42,7 @@ if ($_POST) {
 
 	$pconfig = $_POST;
 
-	if ($_POST['apply']) {
+	if (!empty($_POST['apply'])) {
 		$retval = 0;
 		if (!file_exists($d_sysrebootreqd_path)) {
 			$retval = captiveportal_allowedip_configure();
@@ -60,7 +60,7 @@ if ($_POST) {
 	foreach ($_POST as $pn => $pv) {
 		if (preg_match("/^del_(\d+)_x$/", $pn, $matches)) {
 			$id = $matches[1];
-			if ($a_allowedips[$id]) {
+			if (!empty($a_allowedips[$id])) {
 				unset($a_allowedips[$id]);
 				write_config();
 				touch($d_allowedipsdirty_path);
@@ -74,7 +74,7 @@ if ($_POST) {
 ?>
 <?php include("fbegin.inc"); ?>
 <form action="services_captiveportal_ip.php" method="post">
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
 <?php if (file_exists($d_allowedipsdirty_path)): ?><p>
 <?php print_info_box_np("The captive portal IP address configuration has been changed.<br>You must apply the changes in order for them to take effect.");?><br>
 <input name="apply" type="submit" class="formbtn" id="apply" value="Apply changes"></p>
@@ -104,16 +104,16 @@ if ($_POST) {
   <?php $i = 0; foreach ($a_allowedips as $ip): ?>
 	<tr>
 	  <td class="listlr">
-		<?php if($ip['dir'] == "to") 
+		<?php if(($ip['dir'] ?? null) == "to") 
 			echo "any <img src=\"in.gif\" width=\"11\" height=\"11\" align=\"middle\" alt=\"\">";
 		?>	
-		<?=strtolower($ip['ip']);?>
-		<?php if($ip['dir'] == "from") 
+		<?=strtolower($ip['ip'] ?? '');?>
+		<?php if(($ip['dir'] ?? null) == "from") 
 			echo "<img src=\"in.gif\" width=\"11\" height=\"11\" align=\"absmiddle\" alt=\"\"> any";
 		?>	
 	  </td>
 	  <td class="listbg">
-		<?=htmlspecialchars($ip['descr']);?>&nbsp;
+		<?=htmlspecialchars($ip['descr'] ?? '');?>&nbsp;
 	  </td>
 	  <td valign="middle" nowrap class="list"> <a href="services_captiveportal_ip_edit.php?id=<?=$i;?>"><img src="e.gif" title="edit address" width="17" height="17" border="0" alt="edit address"></a>
 		 &nbsp;<input name="del_<?=$i;?>" type="image" src="x.gif" width="17" height="17" title="delete address" alt="delete address" onclick="return confirm('Do you really want to delete this address?')"></td>

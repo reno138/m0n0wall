@@ -32,24 +32,24 @@
 $pgtitle = array("VPN", "L2TP/IPsec", "Configuration");
 require("guiconfig.inc");
 
-if (!is_array($config['ipsec_l2tp']['radius'])) {
+if (!is_array($config['ipsec_l2tp']['radius'] ?? null)) {
 	$config['ipsec_l2tp']['radius'] = array();
 }
 $ipsec_l2tpcfg = &$config['l2tp'];
 
-$pconfig['remoteip'] = $ipsec_l2tpcfg['remoteip'];
-$pconfig['localip'] = $ipsec_l2tpcfg['localip'];
-$pconfig['redir'] = $ipsec_l2tpcfg['redir'];
-$pconfig['mode'] = $ipsec_l2tpcfg['mode'];
+$pconfig['remoteip'] = $ipsec_l2tpcfg['remoteip'] ?? null;
+$pconfig['localip'] = $ipsec_l2tpcfg['localip'] ?? null;
+$pconfig['redir'] = $ipsec_l2tpcfg['redir'] ?? null;
+$pconfig['mode'] = $ipsec_l2tpcfg['mode'] ?? null;
 $pconfig['req128'] = isset($ipsec_l2tpcfg['req128']);
 $pconfig['radiusenable'] = isset($ipsec_l2tpcfg['radius']['enable']);
 $pconfig['radacct_enable'] = isset($ipsec_l2tpcfg['radius']['accounting']);
-$pconfig['radiusserver'] = $ipsec_l2tpcfg['radius']['server'];
-$pconfig['radiussecret'] = $ipsec_l2tpcfg['radius']['secret'];
-$pconfig['psk'] = $ipsec_l2tpcfg['ipsec']['psk'] ;
+$pconfig['radiusserver'] = $ipsec_l2tpcfg['radius']['server'] ?? null;
+$pconfig['radiussecret'] = $ipsec_l2tpcfg['radius']['secret'] ?? null;
+$pconfig['psk'] = $ipsec_l2tpcfg['ipsec']['psk'] ?? null ;
 
-$pconfig['nunits'] = $ipsec_l2tpcfg['nunits'];
-if (!$pconfig['nunits'])
+$pconfig['nunits'] = $ipsec_l2tpcfg['nunits'] ?? null;
+if (empty($pconfig['nunits']))
 	$pconfig['nunits'] = 16;
 
 if ($_POST) {
@@ -58,11 +58,11 @@ if ($_POST) {
 	$pconfig = $_POST;
 
 	/* input validation */
-	if ($_POST['mode'] == "server") {
+	if (($_POST['mode'] ?? null) == "server") {
 		$reqdfields = explode(" ", "localip remoteip");
 		$reqdfieldsn = explode(",", "Server address,Remote start address");
 		
-		if ($_POST['radiusenable']) {
+		if (!empty($_POST['radiusenable'])) {
 			$reqdfields = array_merge($reqdfields, explode(" ", "radiusserver radiussecret"));
 			$reqdfieldsn = array_merge($reqdfieldsn, 
 				explode(",", "RADIUS server address,RADIUS shared secret"));
@@ -70,51 +70,51 @@ if ($_POST) {
 		
 		do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 		
-		if (($_POST['localip'] && !is_ipaddr($_POST['localip']))) {
+		if ((!empty($_POST['localip']) && !is_ipaddr($_POST['localip']))) {
 			$input_errors[] = "A valid server address must be specified.";
 		}
-		if (($_POST['subnet'] && !is_ipaddr($_POST['remoteip']))) {
+		if ((!empty($_POST['subnet']) && !is_ipaddr($_POST['remoteip'] ?? ''))) {
 			$input_errors[] = "A valid remote start address must be specified.";
 		}
-		if (($_POST['radiusserver'] && !is_ipaddr($_POST['radiusserver']))) {
+		if ((!empty($_POST['radiusserver']) && !is_ipaddr($_POST['radiusserver']))) {
 			$input_errors[] = "A valid RADIUS server address must be specified.";
 		}
 		
-		if (!$input_errors) {	
-			$_POST['remoteip'] = $pconfig['remoteip'] = gen_subnet($_POST['remoteip'], $ipsec_l2tp_subnet_sizes[$_POST['nunits']]);
+		if (empty($input_errors)) {	
+			$_POST['remoteip'] = $pconfig['remoteip'] = gen_subnet($_POST['remoteip'] ?? '', $ipsec_l2tp_subnet_sizes[$_POST['nunits'] ?? ''] ?? null);
 			$subnet_start = ip2long($_POST['remoteip']);
-			$subnet_end = ip2long($_POST['remoteip']) + $_POST['nunits'] - 1;
+			$subnet_end = ip2long($_POST['remoteip']) + ($_POST['nunits'] ?? null) - 1;
 						
-			if ((ip2long($_POST['localip']) >= $subnet_start) && 
-			    (ip2long($_POST['localip']) <= $subnet_end)) {
+			if ((ip2long($_POST['localip'] ?? '') >= $subnet_start) && 
+			    (ip2long($_POST['localip'] ?? '') <= $subnet_end)) {
 				$input_errors[] = "The specified server address lies in the remote subnet.";	
 			}
-			if ($_POST['localip'] == $config['interfaces']['lan']['ipaddr']) {
+			if (($_POST['localip'] ?? null) == ($config['interfaces']['lan']['ipaddr'] ?? null)) {
 				$input_errors[] = "The specified server address is equal to the LAN interface address.";	
 			}
 		}
-	} else if ($_POST['mode'] == "redir") {
+	} else if (($_POST['mode'] ?? null) == "redir") {
 		$reqdfields = explode(" ", "redir");
 		$reqdfieldsn = explode(",", "IPsec/L2TP redirection target address");
 		
 		do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 		
-		if (($_POST['redir'] && !is_ipaddr($_POST['redir']))) {
+		if ((!empty($_POST['redir']) && !is_ipaddr($_POST['redir']))) {
 			$input_errors[] = "A valid target address must be specified.";
 		}
 	}
 
-	if (!$input_errors) {
-		$ipsec_l2tpcfg['nunits'] = $_POST['nunits'];
-		$ipsec_l2tpcfg['remoteip'] = $_POST['remoteip'];
-		$ipsec_l2tpcfg['redir'] = $_POST['redir'];
-		$ipsec_l2tpcfg['localip'] = $_POST['localip'];
-		$ipsec_l2tpcfg['mode'] = $_POST['mode'];
-		$ipsec_l2tpcfg['radius']['enable'] = $_POST['radiusenable'] ? true : false;
-		$ipsec_l2tpcfg['radius']['accounting'] = $_POST['radacct_enable'] ? true : false;
-		$ipsec_l2tpcfg['radius']['server'] = $_POST['radiusserver'];
-		$ipsec_l2tpcfg['radius']['secret'] = $_POST['radiussecret'];
-		$ipsec_l2tpcfg['ipsec']['psk'] = $_POST['psk'];
+	if (empty($input_errors)) {
+		$ipsec_l2tpcfg['nunits'] = $_POST['nunits'] ?? null;
+		$ipsec_l2tpcfg['remoteip'] = $_POST['remoteip'] ?? null;
+		$ipsec_l2tpcfg['redir'] = $_POST['redir'] ?? null;
+		$ipsec_l2tpcfg['localip'] = $_POST['localip'] ?? null;
+		$ipsec_l2tpcfg['mode'] = $_POST['mode'] ?? null;
+		$ipsec_l2tpcfg['radius']['enable'] = !empty($_POST['radiusenable']) ? true : false;
+		$ipsec_l2tpcfg['radius']['accounting'] = !empty($_POST['radacct_enable']) ? true : false;
+		$ipsec_l2tpcfg['radius']['server'] = $_POST['radiusserver'] ?? null;
+		$ipsec_l2tpcfg['radius']['secret'] = $_POST['radiussecret'] ?? null;
+		$ipsec_l2tpcfg['ipsec']['psk'] = $_POST['psk'] ?? null;
 			
 		write_config();
 		
@@ -178,8 +178,8 @@ function enable_change(enable_over) {
 //-->
 </script>
 <form action="vpn_ipsec_l2tp.php" method="post" name="iform" id="iform">
-<?php if ($input_errors) print_input_errors($input_errors); ?>
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
 <table width="100%" border="0" cellpadding="0" cellspacing="0" summary="tab pane">
   <tr><td class="tabnavtbl">
   <ul id="tabnav">
@@ -197,19 +197,19 @@ function enable_change(enable_over) {
                   <td width="22%" valign="top" class="vtable">&nbsp;</td>
                   <td width="78%" class="vtable"> 
                     <input name="mode" type="radio" onclick="enable_change(false)" value="off"
-				  	<?php if (($pconfig['mode'] != "server") && ($pconfig['mode'] != "redir")) echo "checked";?>>
+				  	<?php if ((($pconfig['mode'] ?? null) != "server") && (($pconfig['mode'] ?? null) != "redir")) echo "checked";?>>
                     Off</td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vtable">&nbsp;</td>
                   <td width="78%" class="vtable">
-<input type="radio" name="mode" value="server" onclick="enable_change(false)" <?php if ($pconfig['mode'] == "server") echo "checked"; ?>>
+<input type="radio" name="mode" value="server" onclick="enable_change(false)" <?php if (($pconfig['mode'] ?? null) == "server") echo "checked"; ?>>
                     Enable IPsec/L2TP server</td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">IPSEC PSK</td>
                   <td width="78%" class="vtable"> 
-                    <?=$mandfldhtml;?><input name="psk" type="password" class="formfld" id="psk" size="20" value="<?=htmlspecialchars($pconfig['psk']);?>"> 
+                    <?=$mandfldhtml;?><input name="psk" type="password" class="formfld" id="psk" size="20" value="<?=htmlspecialchars($pconfig['psk'] ?? '');?>"> 
                     <br>
                     Enter the IPSEC Pre-Shared Key the IPsec/L2TP server should use on its side 
                     for all clients.</td>
@@ -217,7 +217,7 @@ function enable_change(enable_over) {
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">Server address</td>
                   <td width="78%" class="vtable"> 
-                    <?=$mandfldhtml;?><input name="localip" type="text" class="formfld" id="localip" size="20" value="<?=htmlspecialchars($pconfig['localip']);?>"> 
+                    <?=$mandfldhtml;?><input name="localip" type="text" class="formfld" id="localip" size="20" value="<?=htmlspecialchars($pconfig['localip'] ?? '');?>"> 
                     <br>
                     Enter the IP address the IPsec/L2TP server should use on its side 
                     for all clients.</td>
@@ -226,12 +226,12 @@ function enable_change(enable_over) {
                   <td width="22%" valign="top" class="vncellreq">Remote address 
                     range</td>
                   <td width="78%" class="vtable"> 
-                    <?=$mandfldhtml;?><input name="remoteip" type="text" class="formfld" id="remoteip" size="20" value="<?=htmlspecialchars($pconfig['remoteip']);?>">
+                    <?=$mandfldhtml;?><input name="remoteip" type="text" class="formfld" id="remoteip" size="20" value="<?=htmlspecialchars($pconfig['remoteip'] ?? '');?>">
                     <select name="nunits">
                     <?php
                     	foreach ($ipsec_l2tp_subnet_sizes as $units => $sncidr) {
                     		echo "<option value=\"$units\"";
-                    		if ($units == $pconfig['nunits'])
+                    		if ($units == ($pconfig['nunits'] ?? null))
                     			echo " selected";
                     		echo ">/$sncidr ($units addresses)</option>\n";
                     	}

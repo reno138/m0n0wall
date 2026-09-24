@@ -79,16 +79,16 @@ if ($_POST && !file_exists($d_firmwarelock_path)) {
 	unset($input_errors);
 	unset($sig_warning);
 	
-	if (stristr($_POST['Submit'], "Enable"))
+	if (stristr($_POST['Submit'] ?? '', "Enable"))
 		$mode = "enable";
-	else if (stristr($_POST['Submit'], "Disable"))
+	else if (stristr($_POST['Submit'] ?? '', "Disable"))
 		$mode = "disable";
-	else if (stristr($_POST['Submit'], "Upgrade") || $_POST['sig_override'])
+	else if (stristr($_POST['Submit'] ?? '', "Upgrade") || !empty($_POST['sig_override']))
 		$mode = "upgrade";
-	else if ($_POST['sig_no'])
+	else if (!empty($_POST['sig_no']))
 		unlink("{$g['ftmp_path']}/firmware.img");
 		
-	if ($mode) {
+	if (!empty($mode)) {
 		if ($mode == "enable") {
 			exec_rc_script("/etc/rc.firmware enable");
 			touch($d_fwupenabled_path);
@@ -97,9 +97,9 @@ if ($_POST && !file_exists($d_firmwarelock_path)) {
 			if (file_exists($d_fwupenabled_path))
 				unlink($d_fwupenabled_path);
 		} else if ($mode == "upgrade") {
-			if (is_uploaded_file($_FILES['ulfile']['tmp_name'])) {
+			if (is_uploaded_file($_FILES['ulfile']['tmp_name'] ?? '')) {
 				/* verify firmware image(s) */
-				if (!stristr($_FILES['ulfile']['name'], $g['fullplatform']) && !$_POST['sig_override'])
+				if (!stristr($_FILES['ulfile']['name'], $g['fullplatform']) && empty($_POST['sig_override']))
 					$input_errors[] = "The uploaded image file is not for this platform ({$g['fullplatform']}).";
 				else if (!file_exists($_FILES['ulfile']['tmp_name'])) {
 					/* probably out of memory for the MFS */
@@ -131,7 +131,7 @@ if ($_POST && !file_exists($d_firmwarelock_path)) {
 				$input_errors[] = "No image file has been uploaded.";
 			}
 
-			if (!$input_errors && !file_exists($d_firmwarelock_path) && (!$sig_warning || $_POST['sig_override'])) {			
+			if (empty($input_errors) && !file_exists($d_firmwarelock_path) && (empty($sig_warning) || !empty($_POST['sig_override']))) {			
 				/* fire up the update script in the background */
 				touch($d_firmwarelock_path);
 				exec_rc_script_async("/etc/rc.firmware upgrade {$g['ftmp_path']}/firmware.img");
@@ -146,12 +146,12 @@ if ($_POST && !file_exists($d_firmwarelock_path)) {
 }
 ?>
 <?php include("fbegin.inc"); ?>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
-<?php if ($savemsg) print_info_box($savemsg); ?>
-<?php if ($fwinfo) echo $fwinfo; ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
+<?php if (!empty($fwinfo)) echo $fwinfo; ?>
 <?php if (!in_array($g['platform'], $fwupplatforms)): ?>
 <p><strong>Firmware uploading is not supported on this platform.</strong></p>
-<?php elseif ($sig_warning && !$input_errors): ?>
+<?php elseif (!empty($sig_warning) && empty($input_errors)): ?>
 <form action="system_firmware.php" method="post">
 <?php 
 $sig_warning = "<strong>" . $sig_warning . "</strong><br>This means that the image you uploaded " .

@@ -32,7 +32,7 @@
 $pgtitle = array("Interfaces", "Assign network ports");
 require("guiconfig.inc");
 
-if (!is_array($config['wlans']['wlan']))
+if (!is_array($config['wlans']['wlan'] ?? null))
 	$config['wlans']['wlan'] = array();
 
 $a_wlans = &$config['wlans']['wlan'] ;
@@ -40,13 +40,13 @@ $a_wlans = &$config['wlans']['wlan'] ;
 function wlan_inuse($num) {
 	global $config, $g;
 
-	if ($config['interfaces']['lan']['if'] == "wlan{$num}")
+	if (($config['interfaces']['lan']['if'] ?? null) == "wlan{$num}")
 		return true;
-	if ($config['interfaces']['wan']['if'] == "wlan{$num}")
+	if (($config['interfaces']['wan']['if'] ?? null) == "wlan{$num}")
 		return true;
 	
 	for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-		if ($config['interfaces']['opt' . $i]['if'] == "wlan{$num}")
+		if (($config['interfaces']['opt' . $i]['if'] ?? null) == "wlan{$num}")
 			return true;
 	}
 	
@@ -75,10 +75,10 @@ if ($_POST) {
 				unset($a_wlans[$id]);
 
 				/* renumber all interfaces that use WLANs */
-				$config['interfaces']['lan']['if'] = renumber_wlan($config['interfaces']['lan']['if'], $id);
-				$config['interfaces']['wan']['if'] = renumber_wlan($config['interfaces']['wan']['if'], $id);
+				$config['interfaces']['lan']['if'] = renumber_wlan($config['interfaces']['lan']['if'] ?? null, $id);
+				$config['interfaces']['wan']['if'] = renumber_wlan($config['interfaces']['wan']['if'] ?? null, $id);
 				for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++)
-					$config['interfaces']['opt' . $i]['if'] = renumber_wlan($config['interfaces']['opt' . $i]['if'], $id);
+					$config['interfaces']['opt' . $i]['if'] = renumber_wlan($config['interfaces']['opt' . $i]['if'] ?? null, $id);
 
 				write_config();
 				touch($d_sysrebootreqd_path);
@@ -91,7 +91,7 @@ if ($_POST) {
 
 ?>
 <?php include("fbegin.inc"); ?>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
 <?php if (file_exists($d_sysrebootreqd_path)) print_info_box(get_std_save_message(0)); ?>
 <form action="interfaces_wlan.php" method="post" name="iform" id="iform">
 <table width="100%" border="0" cellpadding="0" cellspacing="0" summary="tab pane">
@@ -114,13 +114,13 @@ if ($_POST) {
 			  <?php $i = 0; foreach ($a_wlans as $wlan): ?>
                 <tr>
                   <td class="listlr">
-					<?=htmlspecialchars($wlan['if']);?>
+					<?=htmlspecialchars($wlan['if'] ?? '');?>
                   </td>
                   <td class="listr">
-					<?=htmlspecialchars($wlan['ssid']);?>
+					<?=htmlspecialchars($wlan['ssid'] ?? '');?>
                   </td>
                   <td class="listbg">
-                    <?=htmlspecialchars($wlan['descr']);?>&nbsp;
+                    <?=htmlspecialchars($wlan['descr'] ?? '');?>&nbsp;
                   </td>
                   <td valign="middle" nowrap class="list"> <a href="interfaces_wlan_edit.php?id=<?=$i;?>"><img src="e.gif" title="edit WLAN" width="17" height="17" border="0" alt="edit WLAN"></a>
                      &nbsp;<input name="del_<?=$i;?>" type="image" src="x.gif" width="17" height="17" title="delete WLAN" alt="delete WLAN" onclick="return confirm('Do you really want to delete this WLAN?')"></td>

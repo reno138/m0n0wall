@@ -33,21 +33,22 @@ require_once("functions.inc");
 
 function interfaces_secondaries_configure($if) {
 	global $config, $g;
-	$ifcfg = $config['interfaces'][$if];
-	if (is_array($config['secondaries']['secondary'])) {
+	$ifcfg = $config['interfaces'][$if] ?? null;
+	$ifconfig = "";
+	if (is_array($config['secondaries']['secondary'] ?? null)) {
 		$a_secondaries = &$config['secondaries']['secondary'];
 		foreach ($a_secondaries as $secondary) {
-			if ($if == $secondary['if']) {
-				if (!ipv6enabled() && is_ipaddr6($secondary['ipaddr'])){
+			if ($if == ($secondary['if'] ?? null)) {
+				if (!ipv6enabled() && is_ipaddr6($secondary['ipaddr'] ?? '')){
 					continue;
 				}
-				if (ipv6enabled() && is_ipaddr6($secondary['ipaddr'])){
+				if (ipv6enabled() && is_ipaddr6($secondary['ipaddr'] ?? '')){
 					$ifconfig = $config['interfaces'][$if]['if'] . " inet6 ";
 				}
-				if (is_ipaddr($secondary['ipaddr'])){
+				if (is_ipaddr($secondary['ipaddr'] ?? '')){
 					$ifconfig = $config['interfaces'][$if]['if'] . " inet ";
 				}
-				$ifconfig .=  $secondary['ipaddr'] . "/" . $secondary['prefix']  . " alias";
+				$ifconfig .=  ($secondary['ipaddr'] ?? '') . "/" . ($secondary['prefix'] ?? '')  . " alias";
 				mwexec("/sbin/ifconfig " . $ifconfig);
 			}
 		}
@@ -65,20 +66,20 @@ function interfaces_loopback_configure() {
 function interfaces_vlan_configure() {
 	global $config, $g;
 	
-	if (is_array($config['vlans']['vlan']) && count($config['vlans']['vlan'])) {
+	if (is_array($config['vlans']['vlan'] ?? null) && count($config['vlans']['vlan'])) {
 		
 		$i = 0;
 		
 		foreach ($config['vlans']['vlan'] as $vlan) {
 			
 			$cmd = "/sbin/ifconfig vlan{$i} create vlan " . 
-				escapeshellarg($vlan['tag']) . " vlandev " . 
-				escapeshellarg($vlan['if']);
+				escapeshellarg($vlan['tag'] ?? '') . " vlandev " . 
+				escapeshellarg($vlan['if'] ?? '');
 			
 			mwexec($cmd);
 			
 			/* make sure the parent interface is up */
-			mwexec("/sbin/ifconfig " . escapeshellarg($vlan['if']) . " up");
+			mwexec("/sbin/ifconfig " . escapeshellarg($vlan['if'] ?? '') . " up");
 			
 			$i++;
 		}
@@ -96,16 +97,16 @@ function interfaces_lan_configure() {
 	$lancfg = $config['interfaces']['lan'];
 	
 	/* MAC spoofing? */
-	if ($lancfg['spoofmac'])
+	if (!empty($lancfg['spoofmac']))
 		mwexec("/sbin/ifconfig " . escapeshellarg($lancfg['if']) . 
 			" link " . escapeshellarg($lancfg['spoofmac']));
 	
 	/* media */
-	if ($lancfg['media'] || $lancfg['mediaopt']) {
+	if (!empty($lancfg['media']) || !empty($lancfg['mediaopt'])) {
 		$cmd = "/sbin/ifconfig " . escapeshellarg($lancfg['if']);
-		if ($lancfg['media'])
+		if (!empty($lancfg['media']))
 			$cmd .= " media " . escapeshellarg($lancfg['media']);
-		if ($lancfg['mediaopt'])
+		if (!empty($lancfg['mediaopt']))
 			$cmd .= " mediaopt " . escapeshellarg($lancfg['mediaopt']);
 		mwexec($cmd);
 	}
@@ -167,14 +168,14 @@ function interfaces_lan_configure6() {
 	remove_all_ipv6_addresses($lancfg['if']);
 	mwexec('/sbin/ifconfig ' . $lancfg['if'] . ' inet6 -accept_rtadv no_radr');
 	if (ipv6enabled()) {
-		if ($lancfg['ipaddr6'] == "6to4") {
+		if (($lancfg['ipaddr6'] ?? null) == "6to4") {
 			/* take second /64 from 6to4 prefix on WAN interface */
 			$v6addr = calc_6to4_address("lan");
 			if ($v6addr)
 				mwexec("/sbin/ifconfig " . escapeshellarg($lancfg['if']) . " inet6 $v6addr prefixlen 64 alias");
-		} else if ($lancfg['ipaddr6'] == "DHCP-PD") {
+		} else if (($lancfg['ipaddr6'] ?? null) == "DHCP-PD") {
 			services_dhcp6c_configure();
-		} else if ($lancfg['ipaddr6'] && $lancfg['subnet6']) {
+		} else if (!empty($lancfg['ipaddr6']) && !empty($lancfg['subnet6'])) {
 			mwexec('/sbin/ifconfig ' . escapeshellarg($lancfg['if']) .
 				' inet6 ' . escapeshellarg($lancfg['ipaddr6']) .
 				' prefixlen ' . escapeshellarg($lancfg['subnet6'] . ' alias')
@@ -237,7 +238,7 @@ function interfaces_bridge_configure() {
 			$iflist['opt' . $i] = 'opt' . $i;
 	foreach($iflist as $if) {
 		// go through all interfaces and check for bridged interfaces
-		if ($config['interfaces'][$if]['bridge']) {
+		if (!empty($config['interfaces'][$if]['bridge'])) {
 			// this interface is bridged
 			$bridgefound = false;
 			if ($bridge_if_num == -1) {
@@ -353,27 +354,27 @@ function interfaces_optional_configure_if($opti) {
 	global $config, $g;
 	global $bridgeconfig;
 	
-	$optcfg = $config['interfaces']['opt' . $opti];
+	$optcfg = $config['interfaces']['opt' . $opti] ?? null;
 	
 	if ($g['booting']) {
 		$optdescr = "";
-		if ($optcfg['descr'])
+		if (!empty($optcfg['descr']))
 			$optdescr = " ({$optcfg['descr']})";
 		echo "Configuring OPT{$opti}{$optdescr} interface... ";
 	}
 	
 	if (isset($optcfg['enable'])) {		
 		/* MAC spoofing? */
-		if ($optcfg['spoofmac'])
+		if (!empty($optcfg['spoofmac']))
 			mwexec("/sbin/ifconfig " . escapeshellarg($optcfg['if']) . 
 				" link " . escapeshellarg($optcfg['spoofmac']));
 		
 		/* media */
-		if ($optcfg['media'] || $optcfg['mediaopt']) {
+		if (!empty($optcfg['media']) || !empty($optcfg['mediaopt'])) {
 			$cmd = "/sbin/ifconfig " . escapeshellarg($optcfg['if']);
-			if ($optcfg['media'])
+			if (!empty($optcfg['media']))
 				$cmd .= " media " . escapeshellarg($optcfg['media']);
-			if ($optcfg['mediaopt'])
+			if (!empty($optcfg['mediaopt']))
 				$cmd .= " mediaopt " . escapeshellarg($optcfg['mediaopt']);
 			mwexec($cmd);
 		}
@@ -386,7 +387,7 @@ function interfaces_optional_configure_if($opti) {
 			mwexec("/sbin/ifconfig " . escapeshellarg($optcfg['if']) .  " polling");
 	
 		/* bridged? */
-		if ($optcfg['bridge']) {
+		if (!empty($optcfg['bridge'])) {
 			interfaces_bridge_configure();
 		} else {
 			mwexec("/sbin/ifconfig " . escapeshellarg($optcfg['if']) . " " . 
@@ -407,19 +408,19 @@ function interfaces_optional_configure_if($opti) {
 function interfaces_optional_configure_if6($opti) {
 	global $config, $g;
 	
-	$optcfg = $config['interfaces']['opt' . $opti];
+	$optcfg = $config['interfaces']['opt' . $opti] ?? null;
 	
 	if (isset($optcfg['enable'])) {
-		remove_all_ipv6_addresses($optcfg['if']);
+		remove_all_ipv6_addresses($optcfg['if'] ?? '');
 		mwexec('/sbin/ifconfig ' . $optcfg['if'] . ' inet6 -accept_rtadv no_radr');
 		if (ipv6enabled()) {
-			if ($optcfg['ipaddr6'] == "6to4") {
+			if (($optcfg['ipaddr6'] ?? null) == "6to4") {
 				$v6addr = calc_6to4_address("opt" . $opti);
 				if ($v6addr)
 					mwexec("/sbin/ifconfig " . escapeshellarg($optcfg['if']) . " inet6 $v6addr prefixlen 64 alias");
-			} else if ($optcfg['ipaddr6'] == "DHCP-PD") {
+			} else if (($optcfg['ipaddr6'] ?? null) == "DHCP-PD") {
 					services_dhcp6c_configure();
-			} else if ($optcfg['ipaddr6'] && $optcfg['subnet6']) {
+			} else if (!empty($optcfg['ipaddr6']) && !empty($optcfg['subnet6'])) {
 				mwexec('/sbin/ifconfig ' . escapeshellarg($optcfg['if']) .
 					' inet6 ' . escapeshellarg($optcfg['ipaddr6']) .
 					' prefixlen ' . escapeshellarg($optcfg['subnet6'] . ' alias')
@@ -435,12 +436,12 @@ function interfaces_wlan_configure() {
 	global $config, $g;
 	
 	/* wireless configuration */
-	if (is_array($config['wlans']['wlan']) && count($config['wlans']['wlan'])) {
+	if (is_array($config['wlans']['wlan'] ?? null) && count($config['wlans']['wlan'])) {
 		$i = 0;
 		
 		foreach ($config['wlans']['wlan'] as $wlan) {
 			$wlanmode = "ap";
-			switch ($wlan['mode']) {
+			switch ($wlan['mode'] ?? null) {
 				case 'ibss':
 				case 'IBSS':
 					$wlanmode = "ibss";
@@ -453,9 +454,9 @@ function interfaces_wlan_configure() {
 			
 			/* create subinterface */
 			$ifcargs = "wlan$i create wlandev " . 
-				escapeshellarg($wlan['if']) . " wlanmode " . $wlanmode;
+				escapeshellarg($wlan['if'] ?? '') . " wlanmode " . $wlanmode;
 			
-			if ($wlan['standard'])
+			if (!empty($wlan['standard']))
 				$ifcargs .= " mode " . escapeshellarg($wlan['standard']);
 			
 			if (isset($wlan['ht']))
@@ -463,8 +464,8 @@ function interfaces_wlan_configure() {
 			else
 				$ifcargs .= " -ht";
 
-			$ifcargs .= " ssid " . escapeshellarg($wlan['ssid']) . " channel " . 
-				escapeshellarg($wlan['channel']);
+			$ifcargs .= " ssid " . escapeshellarg($wlan['ssid'] ?? '') . " channel " . 
+				escapeshellarg($wlan['channel'] ?? '');
 
 			/* $wlan, not $wlcfg: no such variable exists in this function, and
 			   isset() on it hid that, so Hide SSID never took effect. */
@@ -500,9 +501,9 @@ function interfaces_wlan_configure_encryption($if, $wlcfg) {
 	/* killing hostapd leaves the interface in down state - make sure it's up again */
 	mwexec("/sbin/ifconfig " . escapeshellarg($if) . " up");
 
-	if ($wlcfg['wpa']['mode'] && $wlcfg['wpa']['mode'] != "none") {
+	if (!empty($wlcfg['wpa']['mode']) && $wlcfg['wpa']['mode'] != "none") {
 
-		if ($wlcfg['mode'] == "hostap") {
+		if (($wlcfg['mode'] ?? null) == "hostap") {
 			/* use WPA in hostap mode */
 			$hostapdcfg = generate_hostapd_config($if, $wlcfg);
 			
@@ -523,12 +524,13 @@ function interfaces_wlan_configure_encryption($if, $wlcfg) {
 	} else {
 		/* use WEP (or no encryption) */
 	
-		if (isset($wlcfg['wep']['enable']) && is_array($wlcfg['wep']['key'])) {
+		if (isset($wlcfg['wep']['enable']) && is_array($wlcfg['wep']['key'] ?? null)) {
 			$ifcargs = escapeshellarg($if) . " wepmode on";
 			
 			$i = 1;
 			foreach ($wlcfg['wep']['key'] as $wepkey) {
-				$ifcargs .= " wepkey " . escapeshellarg("{$i}:{$wepkey['value']}");
+				$wepkeyvalue = $wepkey['value'] ?? '';
+				$ifcargs .= " wepkey " . escapeshellarg("{$i}:{$wepkeyvalue}");
 				if (isset($wepkey['txkey'])) {
 					$ifcargs .= " weptxkey {$i}";
 				}
@@ -573,16 +575,16 @@ function interfaces_wan_configure() {
 	while (mwexec("/sbin/ifconfig " . escapeshellarg($wancfg['if']) . " -alias") == 0);
 	mwexec("/sbin/ifconfig " . escapeshellarg($wancfg['if']) . " down");
 	
-	if ($wancfg['spoofmac'])
+	if (!empty($wancfg['spoofmac']))
 		mwexec("/sbin/ifconfig " . escapeshellarg($wancfg['if']) . 
 			" link " . escapeshellarg($wancfg['spoofmac']));
 		
 	/* media */
-	if ($wancfg['media'] || $wancfg['mediaopt']) {
+	if (!empty($wancfg['media']) || !empty($wancfg['mediaopt'])) {
 		$cmd = "/sbin/ifconfig " . escapeshellarg($wancfg['if']);
-		if ($wancfg['media'])
+		if (!empty($wancfg['media']))
 			$cmd .= " media " . escapeshellarg($wancfg['media']);
-		if ($wancfg['mediaopt'])
+		if (!empty($wancfg['mediaopt']))
 			$cmd .= " mediaopt " . escapeshellarg($wancfg['mediaopt']);
 		mwexec($cmd);
 	}
@@ -594,7 +596,7 @@ function interfaces_wan_configure() {
 	if (isset($config['system']['polling']))
 		mwexec("/sbin/ifconfig " . escapeshellarg($wancfg['if']) .  " polling") ;
 	
-	switch ($wancfg['ipaddr']) {
+	switch ($wancfg['ipaddr'] ?? null) {
 	
 		case 'dhcp':
 			interfaces_wan_dhcp_configure();
@@ -613,7 +615,7 @@ function interfaces_wan_configure() {
 			break;
 			
 		default:
-			if (isset($wancfg['ispointtopoint']) && $wancfg['pointtopoint']) {
+			if (isset($wancfg['ispointtopoint']) && !empty($wancfg['pointtopoint'])) {
 				mwexec("/sbin/ifconfig " . escapeshellarg($wancfg['if']) . " " . 
 					escapeshellarg($wancfg['ipaddr'] . "/" . $wancfg['subnet']) . 
 					" " . escapeshellarg($wancfg['pointtopoint']) . $addflags . " up");
@@ -624,7 +626,7 @@ function interfaces_wan_configure() {
 			
 			/* install default route */
 			mwexec("/sbin/route delete default");
-			mwexec("/sbin/route add default " . escapeshellarg($wancfg['gateway']));
+			mwexec("/sbin/route add default " . escapeshellarg($wancfg['gateway'] ?? ''));
 			
 			/* resync ipfilter (done automatically for DHCP/PPPoE/PPTP) */
 			filter_resync();
@@ -688,7 +690,7 @@ function interfaces_wan_configure6($newwanip = false) {
 	}
 	
 	if (ipv6enabled()) {
-		if ($wancfg['ipaddr6'] == "6to4") {
+		if (($wancfg['ipaddr6'] ?? null) == "6to4") {
 			/* obtain current IPv4 address and make a 6to4 address out of it */
 			$v6addr = calc_6to4_address("wan");
 			
@@ -707,34 +709,37 @@ function interfaces_wan_configure6($newwanip = false) {
 					interfaces_optional_configure6();
 				}
 			}
-		} else if ($wancfg['ipaddr6'] == "DHCP") {
+		} else if (($wancfg['ipaddr6'] ?? null) == "DHCP") {
 			services_dhcp6c_configure();
 			mwexec('/sbin/ifconfig ' . $wanif . ' inet6 accept_rtadv -no_radr');
 			mwexec("/sbin/sysctl net.inet6.ip6.rfc6204w3=1");
-		} else if ($wancfg['ipaddr6'] == "ppp") {
+		} else if (($wancfg['ipaddr6'] ?? null) == "ppp") {
 			if ($newwanip) {
 				/* called from up-script -> add IPv6 default route */
 				mwexec('/sbin/route delete -inet6 default');
 				mwexec('/sbin/route add -inet6 default -iface ' . $g['pppoe_interface']);
 				mwexec('/sbin/ifconfig ' . $wanif . ' inet6 accept_rtadv no_radr');
 			}
-			if ($config['interfaces']['lan']['ipaddr6'] == "DHCP-PD") {
+			if (($config['interfaces']['lan']['ipaddr6'] ?? null) == "DHCP-PD") {
 				services_dhcp6c_configure();
 			}
-		} else if ($wancfg['ipaddr6'] == "aiccu") {
+		} else if (($wancfg['ipaddr6'] ?? null) == "aiccu") {
 			/* fire up AICCU, which will take care of setting the IP address
 			   on gif0 and adding the default route */
 			
 			/* can only start AICCU once the IPv4 connectivity is
 			   ready; otherwise it will exit immediately... */
-			if ($newwanip || is_ipaddr($wancfg['ipaddr'])) {
-				if (is_ipaddr($wancfg['ipaddr'])) {
+			if ($newwanip || is_ipaddr($wancfg['ipaddr'] ?? '')) {
+				if (is_ipaddr($wancfg['ipaddr'] ?? '')) {
 					sleep(10);
 				}
+				$aiccuuser = $wancfg['aiccu']['username'] ?? '';
+				$aiccupass = $wancfg['aiccu']['password'] ?? '';
+				$aiccutunnelid = $wancfg['aiccu']['tunnelid'] ?? '';
 				$aiccuconf = <<<EOD
-username {$wancfg['aiccu']['username']}
-password {$wancfg['aiccu']['password']}
-tunnel_id {$wancfg['aiccu']['tunnelid']}
+username {$aiccuuser}
+password {$aiccupass}
+tunnel_id {$aiccutunnelid}
 ipv6_interface gif0
 daemonize true
 automatic true
@@ -780,12 +785,12 @@ EOD;
 				mwexec_bg("{$g['tmp_path']}/gifwatch.sh");
 			}
 		} else {
-			if ($wancfg['ipaddr6'] && $wancfg['subnet6'] && ($wancfg['tunnel6'] || $wancfg['gateway6'])) {
+			if (!empty($wancfg['ipaddr6']) && !empty($wancfg['subnet6']) && (!empty($wancfg['tunnel6']) || !empty($wancfg['gateway6']))) {
 				$wanif6 = $wancfg['if'];
-				$gw6 = escapeshellarg($wancfg['gateway6']);
+				$gw6 = escapeshellarg($wancfg['gateway6'] ?? '');
 				
 				/* use GIF tunnel? */
-				if ($wancfg['tunnel6']) {
+				if (!empty($wancfg['tunnel6'])) {
 					$curwanip6 = get_current_wan_address(false);
 					
 					if ($curwanip6) {
@@ -832,7 +837,7 @@ function interfaces_wan_dhcp_configure() {
  
  	$dhclientconf = "";
  
- 	if ($wancfg['dhcphostname']) {
+ 	if (!empty($wancfg['dhcphostname'])) {
 		$dhclientconf .= <<<EOD
 send dhcp-client-identifier "{$wancfg['dhcphostname']}";
 interface "{$wancfg['if']}" {
@@ -893,7 +898,7 @@ function interfaces_wan_pppoe_configure() {
 	global $config, $g;
 	
 	$wancfg = $config['interfaces']['wan'];
-	$pppoecfg = $config['pppoe'];
+	$pppoecfg = $config['pppoe'] ?? null;
 	
 	/* generate mpd.conf */
 	$fd = fopen("{$g['varetc_path']}/mpd.conf", "w");
@@ -903,7 +908,7 @@ function interfaces_wan_pppoe_configure() {
 	}
 	
 	$mtu = 1492;
-	if ($pppoecfg['mtu'])
+	if (!empty($pppoecfg['mtu']))
 		$mtu = $pppoecfg['mtu'];
 	
 	$mpdconf = <<<EOD
@@ -922,7 +927,7 @@ EOD;
 
 
 	/* IPv6 enabled on WAN interface? */
-	if ($wancfg['ipaddr6'] == "ppp") {
+	if (($wancfg['ipaddr6'] ?? null) == "ppp") {
 		$mpdconf .= "	set bundle enable ipv6cp\n";
 	}
 
@@ -939,12 +944,15 @@ EOD;
 		}
 	}
 	
+	$pppoeuser = $pppoecfg['username'] ?? '';
+	$pppoepass = $pppoecfg['password'] ?? '';
+	$pppoeprovider = $pppoecfg['provider'] ?? '';
 	$mpdconf .= <<<EOD
 	
 	create link static L1 pppoe
 	set link action bundle B1
-	set auth authname "{$pppoecfg['username']}"
-	set auth password "{$pppoecfg['password']}"
+	set auth authname "{$pppoeuser}"
+	set auth password "{$pppoepass}"
 	set link keep-alive 10 60
 	set link max-redial 0
 	set link no acfcomp protocomp
@@ -952,7 +960,7 @@ EOD;
 	set link accept chap
 	set link mtu $mtu
 	set pppoe iface {$wancfg['if']}
-	set pppoe service "{$pppoecfg['provider']}"
+	set pppoe service "{$pppoeprovider}"
 	open
 
 EOD;
@@ -984,7 +992,7 @@ function interfaces_wan_pptp_configure() {
 	global $config, $g;
 	
 	$wancfg = $config['interfaces']['wan'];
-	$pptpcfg = $config['pptp'];
+	$pptpcfg = $config['pptp'] ?? null;
 	
 	/* generate mpd.conf */
 	$fd = fopen("{$g['varetc_path']}/mpd.conf", "w");
@@ -1007,7 +1015,7 @@ pptp:
 EOD;
 
 	/* IPv6 enabled on WAN interface? */
-	if ($wancfg['ipaddr6'] == "ppp") {
+	if (($wancfg['ipaddr6'] ?? null) == "ppp") {
 		$mpdconf .= "	set bundle enable ipv6cp\n";
 	}
 	
@@ -1019,12 +1027,16 @@ EOD;
 EOD;
 	}
 	
+	$pptpuser = $pptpcfg['username'] ?? '';
+	$pptppass = $pptpcfg['password'] ?? '';
+	$pptplocal = $pptpcfg['local'] ?? '';
+	$pptpremote = $pptpcfg['remote'] ?? '';
 	$mpdconf .= <<<EOD
 	
 	create link static L1 pptp
 	set link action bundle B1
-	set auth authname "{$pptpcfg['username']}"
-	set auth password "{$pptpcfg['password']}"
+	set auth authname "{$pptpuser}"
+	set auth password "{$pptppass}"
 	set link keep-alive 10 60
 	set link max-redial 0
 	set link no acfcomp protocomp
@@ -1032,8 +1044,8 @@ EOD;
 	set link accept chap
 	set pptp enable outcall
 	set pptp disable windowing
-	set pptp self {$pptpcfg['local']}
-	set pptp peer {$pptpcfg['remote']}
+	set pptp self {$pptplocal}
+	set pptp peer {$pptpremote}
 	open
 
 EOD;
@@ -1043,7 +1055,7 @@ EOD;
 	
 	/* configure interface */
 	mwexec("/sbin/ifconfig " . escapeshellarg($wancfg['if']) . " " . 
-		escapeshellarg($pptpcfg['local'] . "/" . $pptpcfg['subnet']));
+		escapeshellarg(($pptpcfg['local'] ?? '') . "/" . ($pptpcfg['subnet'] ?? '')));
 	
 	/* fire up mpd */
 	mwexec("/usr/local/sbin/mpd5 -b -d {$g['varetc_path']} -p {$g['varrun_path']}/mpd.pid pptp");
@@ -1069,7 +1081,7 @@ function interfaces_wan_modem_configure() {
 	global $config, $g;
 	
 	$wancfg = $config['interfaces']['wan'];
-	$modemcfg = $config['modem'];
+	$modemcfg = $config['modem'] ?? null;
 	
 	/* generate mpd.conf */
 	if (!file_exists("{$g['varetc_path']}/mpd-modem"))
@@ -1097,7 +1109,7 @@ modem:
 EOD;
 
 	/* IPv6 enabled on WAN interface? */
-	if ($wancfg['ipaddr6'] == "ppp") {
+	if (($wancfg['ipaddr6'] ?? null) == "ppp") {
 		$mpdconf .= "	set bundle enable ipv6cp\n";
 	}
 	
@@ -1109,11 +1121,14 @@ EOD;
 EOD;
 	}
 	
+	$modemuser = $modemcfg['username'] ?? '';
+	$modempass = $modemcfg['password'] ?? '';
+	$modemapn = $modemcfg['apn'] ?? '';
 	$mpdconf .= <<<EOD
 	
 	create link static L1 modem
-	set auth authname "{$modemcfg['username']}"
-	set auth password "{$modemcfg['password']}"
+	set auth authname "{$modemuser}"
+	set auth password "{$modempass}"
 	set link keep-alive 10 60
 	set link max-redial 0
 	set link disable pap chap
@@ -1128,7 +1143,7 @@ EOD;
 	set modem watch -cd
 	set modem var \$DialPrefix "DT"
 	set modem var \$Telephone "*99***1#"
-	set modem var \$APNstring "{$modemcfg['apn']}"
+	set modem var \$APNstring "{$modemapn}"
 	open
 
 
@@ -1163,7 +1178,7 @@ function interfaces_wan_modem_up() {
 
 function interfaces_rtadvd_configure() {
 	global $config, $g;
-	$syscfg = $config['system'];
+	$syscfg = $config['system'] ?? null;
 
 	/* kill any running rtadvd */
 	killbyname('rtadvd');
@@ -1187,10 +1202,10 @@ function interfaces_rtadvd_configure() {
 		}
 		$rtadvdifs .= ' ' . $config['interfaces']['lan']['if'];
 		$rtadvdconf .= $config['interfaces']['lan']['if'] . ":raflags=\"" . $raflags . "\":maxinterval#10:mininterval#4:prefixlen#";
-		if ($config['interfaces']['lan']['ipv6mode'] == "DHCP-PD") {
-			$rtadvdconf .= 64 - $config['interfaces']['lan']['slalen'];
+		if (($config['interfaces']['lan']['ipv6mode'] ?? null) == "DHCP-PD") {
+			$rtadvdconf .= 64 - ($config['interfaces']['lan']['slalen'] ?? null);
 		} else {
-			$rtadvdconf .= $config['interfaces']['lan']['subnet6'];
+			$rtadvdconf .= $config['interfaces']['lan']['subnet6'] ?? '';
 		}
 		if (isset($config['interfaces']['lan']['ipv6ramtu']) && $config['interfaces']['lan']['ipv6ramtu'] > 0) {
 			$rtadvdconf .= ":mtu#" . $config['interfaces']['lan']['ipv6ramtu'];
@@ -1198,15 +1213,15 @@ function interfaces_rtadvd_configure() {
 
 		$dnsservers = array();
 		if (isset($config['dnsmasq']['enable']))
-			$dnsservers = array($config['interfaces']['lan']['ipaddr6']);
-		else if (is_array($syscfg['dnsserver']) && ($syscfg['dnsserver'][0]))
+			$dnsservers = array($config['interfaces']['lan']['ipaddr6'] ?? '');
+		else if (is_array($syscfg['dnsserver'] ?? null) && (!empty($syscfg['dnsserver'][0])))
 			$dnsservers = $syscfg['dnsserver'];
 		
 		$dnsservers = array_filter($dnsservers, "is_ipaddr6");
 		if (!empty($dnsservers))
 			$rtadvdconf .= ":rdnss=\"" . join(",", $dnsservers) . "\"";
 
-		$rtadvdconf .= ":dnssl=\"" . $syscfg['domain'] . "\"";
+		$rtadvdconf .= ":dnssl=\"" . ($syscfg['domain'] ?? '') . "\"";
 		$rtadvdconf .= ":\n";
 
 	}
@@ -1220,7 +1235,7 @@ function interfaces_rtadvd_configure() {
 	for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
 		$optcfg = $config['interfaces']['opt' . $i];
 		if (isset($optcfg['ipv6ra']) && isset($optcfg['enable']) &&
-			$optcfg['if'] && !$optcfg['bridge']) {
+			!empty($optcfg['if']) && empty($optcfg['bridge'])) {
 			$raflags = "";
 			if (isset($config['interfaces']['opt' . $i]['ipv6ram'])) {
 				$raflags .= "m";
@@ -1231,10 +1246,10 @@ function interfaces_rtadvd_configure() {
 			$rtadvdifs .= ' ' . $optcfg['if'];
 			/* maybe this can be configurable in the future */
 			$rtadvdconf .= $optcfg['if'] . ":raflags=\"" . $raflags . "\":maxinterval#10:mininterval#4:prefixlen#";
-			if ($config['interfaces']['opt' . $i]['ipv6mode'] == "DHCP-PD") {
-				$rtadvdconf .= 64 - $config['interfaces']['opt' . $i]['slalen'];
+			if (($config['interfaces']['opt' . $i]['ipv6mode'] ?? null) == "DHCP-PD") {
+				$rtadvdconf .= 64 - ($config['interfaces']['opt' . $i]['slalen'] ?? null);
 			} else {
-				$rtadvdconf .= $config['interfaces']['opt' . $i]['subnet6'];
+				$rtadvdconf .= $config['interfaces']['opt' . $i]['subnet6'] ?? '';
 			}
 			if (isset($config['interfaces']['opt' . $i]['ipv6ramtu']) && $config['interfaces']['opt' . $i]['ipv6ramtu'] > 0) {
 				$rtadvdconf .= ":mtu#" . $config['interfaces']['opt' . $i]['ipv6ramtu'];
@@ -1242,15 +1257,15 @@ function interfaces_rtadvd_configure() {
 
 			$dnsservers = array();
 			if (isset($config['dnsmasq']['enable']))
-				$dnsservers = array($optcfg['ipaddr6']);
-			else if (is_array($syscfg['dnsserver']) && ($syscfg['dnsserver'][0]))
+				$dnsservers = array($optcfg['ipaddr6'] ?? '');
+			else if (is_array($syscfg['dnsserver'] ?? null) && (!empty($syscfg['dnsserver'][0])))
 				$dnsservers = $syscfg['dnsserver'];
 			
 			$dnsservers = array_filter($dnsservers, "is_ipaddr6");
 			if (!empty($dnsservers))
 				$rtadvdconf .= ":rdnss=\"" . join(",", $dnsservers) . "\"";
 
-			$rtadvdconf .= ":dnssl=\"" . $syscfg['domain'] . "\"";
+			$rtadvdconf .= ":dnssl=\"" . ($syscfg['domain'] ?? '') . "\"";
 			$rtadvdconf .= ":\n";
 		}
 	}
@@ -1313,7 +1328,8 @@ function interfaces_autoreassign() {
 	   only intend to handle the normal case (one Ethernet interface per logical
 	   interface) */
 	foreach ($logifs as $logif) {
-		if (isset($iflist[$config['interfaces'][$logif]['if']]) || preg_match("/^(vlan|wlan)/", $config['interfaces'][$logif]['if']))
+		$logifif = $config['interfaces'][$logif]['if'] ?? '';
+		if (isset($iflist[$logifif]) || preg_match("/^(vlan|wlan)/", $logifif))
 			return;
 	}
 	
@@ -1367,18 +1383,18 @@ function get_real_wan_interface($ipv6 = false) {
 	$wanif = $wancfg['if'];
 	
 	if ($ipv6) {
-		if ($wancfg['ipaddr6'] == "6to4")
+		if (($wancfg['ipaddr6'] ?? null) == "6to4")
 			$wanif = "stf0";
-		else if ($wancfg['ipaddr6'] == "aiccu" && !isset($config['interfaces']['wan']['aiccu']['ayiya']))
+		else if (($wancfg['ipaddr6'] ?? null) == "aiccu" && !isset($config['interfaces']['wan']['aiccu']['ayiya']))
 			$wanif = "gif0";
-		else if ($wancfg['ipaddr6'] == "aiccu" && isset($config['interfaces']['wan']['aiccu']['ayiya']))
+		else if (($wancfg['ipaddr6'] ?? null) == "aiccu" && isset($config['interfaces']['wan']['aiccu']['ayiya']))
 			$wanif = "tun0";
-		else if ($wancfg['tunnel6'])
+		else if (!empty($wancfg['tunnel6']))
 			$wanif = "gif0";
-		else if ($wancfg['ipaddr6'] == "ppp")
+		else if (($wancfg['ipaddr6'] ?? null) == "ppp")
 			$wanif = $g['pppoe_interface'];
 	} else {
-		if (($wancfg['ipaddr'] == "pppoe") || ($wancfg['ipaddr'] == "pptp") || ($wancfg['ipaddr'] == "modem")) {
+		if ((($wancfg['ipaddr'] ?? null) == "pppoe") || (($wancfg['ipaddr'] ?? null) == "pptp") || (($wancfg['ipaddr'] ?? null) == "modem")) {
 			$wanif = $g['pppoe_interface'];
 		}
 	}
@@ -1391,7 +1407,7 @@ function get_current_wan_address($ipv6 = false) {
 	
 	$wancfg = $config['interfaces']['wan'];
 	
-	if (in_array($wancfg['ipaddr'], array('pppoe','dhcp','pptp','modem')) || ($ipv6 && $wancfg['ipaddr6'] == "aiccu")) {
+	if (in_array($wancfg['ipaddr'] ?? null, array('pppoe','dhcp','pptp','modem')) || ($ipv6 && ($wancfg['ipaddr6'] ?? null) == "aiccu")) {
 		/* dynamic WAN IP address, find out which one */
 		$wanif = get_real_wan_interface($ipv6);
 		
@@ -1415,7 +1431,7 @@ function get_current_wan_address($ipv6 = false) {
 
 			if (isset($ifinfo[1])) {
 				$aif = preg_split("/\s+/", $ifinfo[1]);
-				$curwanip = chop($aif[3]);
+				$curwanip = chop($aif[3] ?? '');
 
 				if ($curwanip && is_ipaddr($curwanip) && ($curwanip != "0.0.0.0"))
 					return $curwanip;
@@ -1425,7 +1441,7 @@ function get_current_wan_address($ipv6 = false) {
 		return null;
 	} else {
 		/* static WAN IP address */
-		return $wancfg[$ipv6 ? 'ipaddr6' : 'ipaddr'];
+		return $wancfg[$ipv6 ? 'ipaddr6' : 'ipaddr'] ?? null;
 	}
 }
 
@@ -1434,54 +1450,59 @@ function get_interface_mac($interface) {
         /* build interface list with netstat */
         exec("/usr/bin/netstat -I $interface -nW -f link", $linkinfo);
         array_shift($linkinfo);
-        $alink = preg_split("/\s+/", $linkinfo[0]);
-        $mac = chop($alink[3]);
+        $alink = preg_split("/\s+/", $linkinfo[0] ?? '');
+        $mac = chop($alink[3] ?? '');
         return $mac;
 }
 
 function generate_hostapd_config($if, $wlcfg) {
+	$wlssid = $wlcfg['ssid'] ?? '';
+	$wpaversion = $wlcfg['wpa']['version'] ?? '';
 	$config = <<<EOD
 interface=$if
 driver=bsd
 logger_syslog=-1
 logger_syslog_level=2
 logger_stdout=0
-ssid={$wlcfg['ssid']}
-wpa={$wlcfg['wpa']['version']}
+ssid={$wlssid}
+wpa={$wpaversion}
 
 EOD;
 	
-	if ($wlcfg['wpa']['mode'] == "psk") {
+	if (($wlcfg['wpa']['mode'] ?? null) == "psk") {
+		$wpapsk = $wlcfg['wpa']['psk'] ?? '';
 		$config .= <<<EOD
 wpa_key_mgmt=WPA-PSK
-wpa_passphrase={$wlcfg['wpa']['psk']}
+wpa_passphrase={$wpapsk}
 
 EOD;
-	} else if ($wlcfg['wpa']['mode'] == "enterprise") {
+	} else if (($wlcfg['wpa']['mode'] ?? null) == "enterprise") {
 	
 		$authport = 1812;
 		$acctport = 1813;
-		if ($wlcfg['wpa']['radius']['authport'])
+		if (!empty($wlcfg['wpa']['radius']['authport']))
 			$authport = $wlcfg['wpa']['radius']['authport'];
-		if ($wlcfg['wpa']['radius']['acctport'])
+		if (!empty($wlcfg['wpa']['radius']['acctport']))
 			$acctport = $wlcfg['wpa']['radius']['acctport'];
+		$radiusserver = $wlcfg['wpa']['radius']['server'] ?? '';
+		$radiussecret = $wlcfg['wpa']['radius']['secret'] ?? '';
 	
 		$config .= <<<EOD
 ieee8021x=1
 wpa_key_mgmt=WPA-EAP
-auth_server_addr={$wlcfg['wpa']['radius']['server']}
+auth_server_addr={$radiusserver}
 auth_server_port={$authport}
-auth_server_shared_secret={$wlcfg['wpa']['radius']['secret']}
-acct_server_addr={$wlcfg['wpa']['radius']['server']}
+auth_server_shared_secret={$radiussecret}
+acct_server_addr={$radiusserver}
 acct_server_port={$acctport}
-acct_server_shared_secret={$wlcfg['wpa']['radius']['secret']}
+acct_server_shared_secret={$radiussecret}
 
 EOD;
 	}
 	
-	if ($wlcfg['wpa']['cipher'] == "tkip")
+	if (($wlcfg['wpa']['cipher'] ?? null) == "tkip")
 		$config .= "wpa_pairwise=TKIP\n";
-	else if ($wlcfg['wpa']['cipher'] == "ccmp")
+	else if (($wlcfg['wpa']['cipher'] ?? null) == "ccmp")
 		$config .= "wpa_pairwise=CCMP\n";
 	else
 		$config .= "wpa_pairwise=TKIP CCMP\n";
@@ -1522,6 +1543,7 @@ function remove_all_ipv6_addresses($if) {
 function calc_6to4_address($if) {
 	$wan_v6nibbles = convert_to_6to4_nibbles(get_current_wan_address(false));
 	if ($wan_v6nibbles) {
+		$nth = null;
 		if ($if == "wan")
 			$nth = 0;
 		else if ($if == "lan")
@@ -1536,6 +1558,7 @@ function calc_6to4_address($if) {
 
 function get_dhcppd_address($if) {
 	$addresses = get_interface_ipv6_adresses($if);
+	$ipv6addr = null;
 
 	foreach ($addresses as $adr) {
 		if ((!preg_match('/^fe80:/', $adr[0])) || (!preg_match('/autoconf$/',$adr[0]))) {
@@ -1553,7 +1576,7 @@ function suggest_ipv6_lan_addr(){
 	
 	foreach ($logarr as $logent) {
 		$logent = preg_split("/\s+/", $logent, 6);
-		$lograsrch = strstr($logent[5] , "<prefix_check> prefix ");
+		$lograsrch = strstr($logent[5] ?? '' , "<prefix_check> prefix ");
 		if ($lograsrch) {
 			$prefixpos = strpos($lograsrch, "/",0);
 			$sugipv6lan = substr($lograsrch,21,$prefixpos -21);	

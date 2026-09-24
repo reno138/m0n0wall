@@ -32,20 +32,22 @@
 $pgtitle = array("Services", "DNS forwarder", "Edit Domain Override");
 require("guiconfig.inc");
 
-if (!is_array($config['dnsmasq']['domainoverrides'])) {
+if (!is_array($config['dnsmasq']['domainoverrides'] ?? null)) {
 	$config['dnsmasq']['domainoverrides'] = array();
 }
 domainoverrides_sort();
 $a_domainOverrides = &$config['dnsmasq']['domainoverrides'];
 
-$id = $_GET['id'];
+$id = $_GET['id'] ?? null;
 if (isset($_POST['id']))
 	$id = $_POST['id'];
 
-if (isset($id) && $a_domainOverrides[$id]) {
-	$pconfig['domain'] = $a_domainOverrides[$id]['domain'];
-	$pconfig['ip'] = $a_domainOverrides[$id]['ip'];
-	$pconfig['descr'] = $a_domainOverrides[$id]['descr'];
+$pconfig = array();
+
+if (isset($id) && !empty($a_domainOverrides[$id])) {
+	$pconfig['domain'] = $a_domainOverrides[$id]['domain'] ?? null;
+	$pconfig['ip'] = $a_domainOverrides[$id]['ip'] ?? null;
+	$pconfig['descr'] = $a_domainOverrides[$id]['descr'] ?? null;
 }
 
 if ($_POST) {
@@ -59,21 +61,21 @@ if ($_POST) {
 	
 	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
-	if (($_POST['domain'] && !is_domain($_POST['domain']))) {
+	if ((!empty($_POST['domain']) && !is_domain($_POST['domain']))) {
 		$input_errors[] = "A valid domain must be specified.";
 	}
-	if (($_POST['ip'] && !is_ipaddr4or6($_POST['ip']))) {
+	if ((!empty($_POST['ip']) && !is_ipaddr4or6($_POST['ip']))) {
 		$input_errors[] = "A valid IP address must be specified.";
 	}
 
 
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 		$doment = array();
-		$doment['domain'] = $_POST['domain'];
-		$doment['ip'] = $_POST['ip'];
-		$doment['descr'] = $_POST['descr'];
+		$doment['domain'] = $_POST['domain'] ?? null;
+		$doment['ip'] = $_POST['ip'] ?? null;
+		$doment['descr'] = $_POST['descr'] ?? null;
 
-		if (isset($id) && $a_domainOverrides[$id])
+		if (isset($id) && !empty($a_domainOverrides[$id]))
 			$a_domainOverrides[$id] = $doment;
 		else
 			$a_domainOverrides[] = $doment;
@@ -88,27 +90,27 @@ if ($_POST) {
 }
 ?>
 <?php include("fbegin.inc"); ?>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
             <form action="services_dnsmasq_domainoverride_edit.php" method="post" name="iform" id="iform">
               <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="content pane">
 				<tr>
                   <td width="22%" valign="top" class="vncellreq">Domain</td>
                   <td width="78%" class="vtable"> 
-                    <?=$mandfldhtml;?><input name="domain" type="text" class="formfld" id="domain" size="40" value="<?=htmlspecialchars($pconfig['domain']);?>">
+                    <?=$mandfldhtml;?><input name="domain" type="text" class="formfld" id="domain" size="40" value="<?=htmlspecialchars($pconfig['domain'] ?? '');?>">
                     <br> <span class="vexpl">Domain to override (note: this does not have to be a valid TLD)<br>
                     e.g. <em>test</em></span></td>
                 </tr>
 				<tr>
                   <td width="22%" valign="top" class="vncellreq">IP address</td>
                   <td width="78%" class="vtable"> 
-                    <?=$mandfldhtml;?><input name="ip" type="text" class="formfld" id="ip" size="40" value="<?=htmlspecialchars($pconfig['ip']);?>">
+                    <?=$mandfldhtml;?><input name="ip" type="text" class="formfld" id="ip" size="40" value="<?=htmlspecialchars($pconfig['ip'] ?? '');?>">
                     <br><span class="vexpl">IP address of the authoritative DNS server for this domain
                     </span></td>
                 </tr>
 				<tr>
                   <td width="22%" valign="top" class="vncell">Description</td>
                   <td width="78%" class="vtable"> 
-                    <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr']);?>">
+                    <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr'] ?? '');?>">
                     <br> <span class="vexpl">You may enter a description here
                     for your reference (not parsed).</span></td>
                 </tr>
@@ -116,7 +118,7 @@ if ($_POST) {
                   <td width="22%" valign="top">&nbsp;</td>
                   <td width="78%"> 
                     <input name="Submit" type="submit" class="formbtn" value="Save">
-                    <?php if (isset($id) && $a_domainOverrides[$id]): ?>
+                    <?php if (isset($id) && !empty($a_domainOverrides[$id])): ?>
                     <input name="id" type="hidden" value="<?=htmlspecialchars($id);?>">
                     <?php endif; ?>
                   </td>

@@ -33,7 +33,7 @@ $pgtitle = array("Status", "Traffic graph");
 require("guiconfig.inc");
 
 $curif = "wan";
-if ($_GET['if'])
+if (!empty($_GET['if']))
 	$curif = $_GET['if'];
 	
 if ($curif == "wan")
@@ -45,12 +45,12 @@ elseif ($curif == "SixXS")
 		$ifnum = 'gif0';
 	}
 else
-	$ifnum = $config['interfaces'][$curif]['if'];
+	$ifnum = $config['interfaces'][$curif]['if'] ?? null;
 ?>
 <?php include("fbegin.inc"); ?>
 <?php
 $ifdescrs = array('wan' => 'WAN', 'lan' => 'LAN');
-if (ipv6enabled() && ($config['interfaces']['wan']['ipaddr6'] == "aiccu")) {
+if (ipv6enabled() && (($config['interfaces']['wan']['ipaddr6'] ?? null) == "aiccu")) {
 	$ifdescrs['SixXS'] = 'SixXS';
 }
 for ($j = 1; isset($config['interfaces']['opt' . $j]); $j++) {
@@ -70,8 +70,8 @@ foreach ($ifdescrs as $ifn => $ifd) {
 </select>
 </form>
 <div align="center">
-<object data="graph.php?ifnum=<?=htmlspecialchars($ifnum);?>&amp;ifname=<?=rawurlencode($ifdescrs[$curif]);?>" type="image/svg+xml" width="550" height="275">
-<embed src="graph.php?ifnum=<?=htmlspecialchars($ifnum);?>&amp;ifname=<?=rawurlencode($ifdescrs[$curif]);?>" type="image/svg+xml" width="550" height="275"/>
+<object data="graph.php?ifnum=<?=htmlspecialchars($ifnum ?? '');?>&amp;ifname=<?=rawurlencode($ifdescrs[$curif] ?? '');?>" type="image/svg+xml" width="550" height="275">
+<embed src="graph.php?ifnum=<?=htmlspecialchars($ifnum ?? '');?>&amp;ifname=<?=rawurlencode($ifdescrs[$curif] ?? '');?>" type="image/svg+xml" width="550" height="275"/>
 </object>
 </div>
 <?php include("fend.inc"); ?>

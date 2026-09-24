@@ -32,18 +32,18 @@
 $pgtitle = array("Interfaces", "Assign network ports", "Edit VLAN");
 require("guiconfig.inc");
 
-if (!is_array($config['vlans']['vlan']))
+if (!is_array($config['vlans']['vlan'] ?? null))
 	$config['vlans']['vlan'] = array();
 
 $a_vlans = &$config['vlans']['vlan'];
 
 $portlist = get_interface_list(true, false, false);
 
-$id = $_GET['id'];
+$id = $_GET['id'] ?? null;
 if (isset($_POST['id']))
 	$id = $_POST['id'];
 
-if (isset($id) && $a_vlans[$id]) {
+if (isset($id) && !empty($a_vlans[$id])) {
 	$pconfig['if'] = $a_vlans[$id]['if'];
 	$pconfig['tag'] = $a_vlans[$id]['tag'];
 	$pconfig['descr'] = $a_vlans[$id]['descr'];
@@ -60,27 +60,27 @@ if ($_POST) {
 	
 	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
-	if ($_POST['tag'] && (!is_numericint($_POST['tag']) || ($_POST['tag'] < '1') || ($_POST['tag'] > '4094'))) {
+	if (!empty($_POST['tag']) && (!is_numericint($_POST['tag']) || ($_POST['tag'] < '1') || ($_POST['tag'] > '4094'))) {
 		$input_errors[] = "The VLAN tag must be an integer between 1 and 4094.";
 	}
 
 	foreach ($a_vlans as $vlan) {
-		if (isset($id) && ($a_vlans[$id]) && ($a_vlans[$id] === $vlan))
+		if (isset($id) && (!empty($a_vlans[$id])) && ($a_vlans[$id] === $vlan))
 			continue;
 		
-		if (($vlan['if'] == $_POST['if']) && ($vlan['tag'] == $_POST['tag'])) {
+		if ((($vlan['if'] ?? null) == ($_POST['if'] ?? null)) && (($vlan['tag'] ?? null) == ($_POST['tag'] ?? null))) {
 			$input_errors[] = "A VLAN with the tag {$vlan['tag']} is already defined on this interface.";
 			break;
 		}	
 	}
 
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 		$vlan = array();
-		$vlan['if'] = $_POST['if'];
-		$vlan['tag'] = $_POST['tag'];
-		$vlan['descr'] = $_POST['descr'];
+		$vlan['if'] = $_POST['if'] ?? null;
+		$vlan['tag'] = $_POST['tag'] ?? null;
+		$vlan['descr'] = $_POST['descr'] ?? null;
 
-		if (isset($id) && $a_vlans[$id])
+		if (isset($id) && !empty($a_vlans[$id]))
 			$a_vlans[$id] = $vlan;
 		else
 			$a_vlans[] = $vlan;
@@ -93,7 +93,7 @@ if ($_POST) {
 }
 ?>
 <?php include("fbegin.inc"); ?>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
             <form action="interfaces_vlan_edit.php" method="post" name="iform" id="iform">
               <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="content pane">
 				<tr>
@@ -102,11 +102,11 @@ if ($_POST) {
                     <select name="if" class="formfld">
                       <?php
 					  foreach ($portlist as $ifn => $ifinfo): ?>
-                      <option value="<?=htmlspecialchars($ifn);?>" <?php if ($ifn == $pconfig['if']) echo "selected"; ?>> 
-					  <?php if ($ifinfo['drvname'])
-							echo htmlspecialchars($ifn . " (" . $ifinfo['drvname'] . ", " .  $ifinfo['mac'] . ")");
+                      <option value="<?=htmlspecialchars($ifn);?>" <?php if ($ifn == ($pconfig['if'] ?? null)) echo "selected"; ?>> 
+					  <?php if (!empty($ifinfo['drvname']))
+							echo htmlspecialchars($ifn . " (" . $ifinfo['drvname'] . ", " .  ($ifinfo['mac'] ?? '') . ")");
 						else
-							echo htmlspecialchars($ifn . " (" . $ifinfo['mac'] . ")");
+							echo htmlspecialchars($ifn . " (" . ($ifinfo['mac'] ?? '') . ")");
 					  ?>
                       </option>
                       <?php endforeach; ?>
@@ -115,14 +115,14 @@ if ($_POST) {
 				<tr>
                   <td valign="top" class="vncellreq">VLAN tag </td>
                   <td class="vtable">
-                    <?=$mandfldhtml;?><input name="tag" type="text" class="formfld" id="tag" size="6" value="<?=htmlspecialchars($pconfig['tag']);?>">
+                    <?=$mandfldhtml;?><input name="tag" type="text" class="formfld" id="tag" size="6" value="<?=htmlspecialchars($pconfig['tag'] ?? '');?>">
                     <br>
                     <span class="vexpl">802.1Q VLAN tag (between 1 and 4094) </span></td>
 			    </tr>
 				<tr>
                   <td width="22%" valign="top" class="vncell">Description</td>
                   <td width="78%" class="vtable"> 
-                    <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr']);?>">
+                    <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr'] ?? '');?>">
                     <br> <span class="vexpl">You may enter a description here
                     for your reference (not parsed).</span></td>
                 </tr>
@@ -130,7 +130,7 @@ if ($_POST) {
                   <td width="22%" valign="top">&nbsp;</td>
                   <td width="78%"> 
                     <input name="Submit" type="submit" class="formbtn" value="Save">
-                    <?php if (isset($id) && $a_vlans[$id]): ?>
+                    <?php if (isset($id) && !empty($a_vlans[$id])): ?>
                     <input name="id" type="hidden" value="<?=htmlspecialchars($id);?>">
                     <?php endif; ?>
                   </td>

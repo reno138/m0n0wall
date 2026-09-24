@@ -32,7 +32,7 @@
 $pgtitle = array("VPN", "IPsec/L2TP", "Users");
 require("guiconfig.inc");
 
-if (!is_array($config['l2tp']['user'])) {
+if (!is_array($config['l2tp']['user'] ?? null)) {
 	$config['l2tp']['user'] = array();
 }
 l2tp_users_sort();
@@ -42,7 +42,7 @@ if ($_POST) {
 
 	$pconfig = $_POST;
 
-	if ($_POST['apply']) {
+	if (!empty($_POST['apply'])) {
 		$retval = 0;
 		if (!file_exists($d_sysrebootreqd_path)) {
 			config_lock();
@@ -58,7 +58,7 @@ if ($_POST) {
 		foreach ($_POST as $pn => $pv) {
 			if (preg_match("/^del_(\d+)_x$/", $pn, $matches)) {
 				$id = $matches[1];
-				if ($a_secret[$id]) {
+				if (!empty($a_secret[$id])) {
 					unset($a_secret[$id]);
 					write_config();
 					touch($d_l2tpuserdirty_path);
@@ -73,7 +73,7 @@ if ($_POST) {
 ?>
 <?php include("fbegin.inc"); ?>
 <form action="vpn_l2tp_users.php" method="post">
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
 <?php if (isset($config['l2tp']['radius']['enable']))
 	print_info_box("Warning: RADIUS is enabled. The local user database will not be used."); ?>
 <?php if (file_exists($d_l2tpuserdirty_path)): ?><p>
@@ -101,10 +101,10 @@ if ($_POST) {
 			  <?php $i = 0; foreach ($a_secret as $secretent): ?>
                 <tr> 
                   <td class="listlr">
-                    <?=htmlspecialchars($secretent['name']);?>
+                    <?=htmlspecialchars($secretent['name'] ?? '');?>
                   </td>
                   <td class="listr">
-                    <?=htmlspecialchars($secretent['ip']);?>&nbsp;
+                    <?=htmlspecialchars($secretent['ip'] ?? '');?>&nbsp;
                   </td>
                   <td class="list" nowrap> <a href="vpn_l2tp_users_edit.php?id=<?=$i;?>"><img src="e.gif" title="edit user" width="17" height="17" border="0" alt="edit user"></a>
                      &nbsp;<input name="del_<?=$i;?>" type="image" src="x.gif" width="17" height="17" title="delete user" alt="delete user" onclick="return confirm('Do you really want to delete this user?')"></td>

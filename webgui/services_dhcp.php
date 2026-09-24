@@ -32,10 +32,13 @@
 $pgtitle = array("Services", "DHCP server");
 require("guiconfig.inc");
 
-list($dnsconfig['dns1'],$dnsconfig['dns2'],$dnsconfig['dns3']) = $config['system']['dnsserver'];
+$dnsservers = $config['system']['dnsserver'] ?? array();
+$dnsconfig['dns1'] = $dnsservers[0] ?? null;
+$dnsconfig['dns2'] = $dnsservers[1] ?? null;
+$dnsconfig['dns3'] = $dnsservers[2] ?? null;
 
-$if = $_GET['if'];
-if ($_POST['if'])
+$if = $_GET['if'] ?? null;
+if (!empty($_POST['if']))
 	$if = $_POST['if'];
 	
 $iflist = array("lan" => "LAN");
@@ -43,7 +46,7 @@ $iflist = array("lan" => "LAN");
 for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
 	$oc = $config['interfaces']['opt' . $i];
 	
-	if (isset($oc['enable']) && $oc['if'] && (!$oc['bridge'])) {
+	if (isset($oc['enable']) && !empty($oc['if']) && (empty($oc['bridge']))) {
 		$iflist['opt' . $i] = $oc['descr'];
 	}
 }
@@ -51,25 +54,27 @@ for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
 if (!$if || !isset($iflist[$if]))
 	$if = "lan";
 
-$pconfig['range_from'] = $config['dhcpd'][$if]['range']['from'];
-$pconfig['range_to'] = $config['dhcpd'][$if]['range']['to'];
-$pconfig['deftime'] = $config['dhcpd'][$if]['defaultleasetime'];
-$pconfig['maxtime'] = $config['dhcpd'][$if]['maxleasetime'];
-list($pconfig['wins1'],$pconfig['wins2']) = $config['dhcpd'][$if]['winsserver'];
+$pconfig['range_from'] = $config['dhcpd'][$if]['range']['from'] ?? null;
+$pconfig['range_to'] = $config['dhcpd'][$if]['range']['to'] ?? null;
+$pconfig['deftime'] = $config['dhcpd'][$if]['defaultleasetime'] ?? null;
+$pconfig['maxtime'] = $config['dhcpd'][$if]['maxleasetime'] ?? null;
+$winsservers = $config['dhcpd'][$if]['winsserver'] ?? array();
+$pconfig['wins1'] = $winsservers[0] ?? null;
+$pconfig['wins2'] = $winsservers[1] ?? null;
 $pconfig['enable'] = isset($config['dhcpd'][$if]['enable']);
 $pconfig['denyunknown'] = isset($config['dhcpd'][$if]['denyunknown']);
-$pconfig['nextserver'] = $config['dhcpd'][$if]['next-server'];
-$pconfig['filename'] = $config['dhcpd'][$if]['filename'];
+$pconfig['nextserver'] = $config['dhcpd'][$if]['next-server'] ?? null;
+$pconfig['filename'] = $config['dhcpd'][$if]['filename'] ?? null;
 
 if (ipv6enabled()) {
-	$pconfig['v6range_from'] = $config['dhcpd'][$if]['v6range']['from'];
-	$pconfig['v6range_to'] = $config['dhcpd'][$if]['v6range']['to'];
-	if (!$config['dhcpd'][$if]['v6defaultleasetime']) {
+	$pconfig['v6range_from'] = $config['dhcpd'][$if]['v6range']['from'] ?? null;
+	$pconfig['v6range_to'] = $config['dhcpd'][$if]['v6range']['to'] ?? null;
+	if (empty($config['dhcpd'][$if]['v6defaultleasetime'])) {
 		$pconfig['v6deftime'] = 7200;
 	} else {
 		$pconfig['v6deftime'] = $config['dhcpd'][$if]['v6defaultleasetime'];
 	}
-	if (!$config['dhcpd'][$if]['v6maxleasetime']) {
+	if (empty($config['dhcpd'][$if]['v6maxleasetime'])) {
 		$pconfig['v6maxtime'] = 86400;
 	} else {
 		$pconfig['v6maxtime'] = $config['dhcpd'][$if]['v6maxleasetime'];
@@ -79,7 +84,7 @@ if (ipv6enabled()) {
 
 $ifcfg = $config['interfaces'][$if];
 
-if (!is_array($config['dhcpd'][$if]['staticmap'])) {
+if (!is_array($config['dhcpd'][$if]['staticmap'] ?? null)) {
 	$config['dhcpd'][$if]['staticmap'] = array();
 }
 staticmaps_sort($if);
@@ -90,7 +95,7 @@ if ($_POST) {
 	foreach ($_POST as $pn => $pv) {
 		if (preg_match("/^del_(\d+)_x$/", $pn, $matches)) {
 			$id = $matches[1];
-			if ($a_maps[$id]) {
+			if (!empty($a_maps[$id])) {
 				unset($a_maps[$id]);
 				write_config();
 				touch($d_staticmapsdirty_path);
@@ -104,64 +109,64 @@ if ($_POST) {
 	$pconfig = $_POST;
 
 	/* input validation */
-	if ($_POST['enable']) {
+	if (!empty($_POST['enable'])) {
 		$reqdfields = explode(" ", "range_from range_to");
 		$reqdfieldsn = explode(",", "Range begin,Range end");
 		
 		do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 		
-		if (($_POST['range_from'] && !is_ipaddr($_POST['range_from']))) {
+		if ((!empty($_POST['range_from']) && !is_ipaddr($_POST['range_from']))) {
 			$input_errors[] = "A valid range must be specified.";
 		}
-		if (($_POST['range_to'] && !is_ipaddr($_POST['range_to']))) {
+		if ((!empty($_POST['range_to']) && !is_ipaddr($_POST['range_to']))) {
 			$input_errors[] = "A valid range must be specified.";
 		}
-		if (($_POST['wins1'] && !is_ipaddr($_POST['wins1'])) || ($_POST['wins2'] && !is_ipaddr($_POST['wins2']))) {
+		if ((!empty($_POST['wins1']) && !is_ipaddr($_POST['wins1'])) || (!empty($_POST['wins2']) && !is_ipaddr($_POST['wins2']))) {
 			$input_errors[] = "A valid IP address must be specified for the primary/secondary WINS server.";
 		}
-		if ($_POST['deftime'] && (!is_numericint($_POST['deftime']))) {
+		if (!empty($_POST['deftime']) && (!is_numericint($_POST['deftime']))) {
 			$input_errors[] = "The default lease time must be an integer.";
 		}
-		if ($_POST['maxtime'] && (!is_numericint($_POST['maxtime']) || ($_POST['maxtime'] <= $_POST['deftime']))) {
+		if (!empty($_POST['maxtime']) && (!is_numericint($_POST['maxtime']) || ($_POST['maxtime'] <= ($_POST['deftime'] ?? null)))) {
 			$input_errors[] = "The maximum lease time must be higher than the default lease time.";
 		}
-		if ($_POST['nextserver'] && !is_ipaddr($_POST['nextserver'])) {
+		if (!empty($_POST['nextserver']) && !is_ipaddr($_POST['nextserver'])) {
 			$input_errors[] = "A valid next server IP address must be specified.";
 		}
-		if (ipv6enabled() && $pconfig['v6enable']) {		
-			if (!is_ipaddr6($_POST['v6range_from'])) {
+		if (ipv6enabled() && !empty($pconfig['v6enable'])) {		
+			if (!is_ipaddr6($_POST['v6range_from'] ?? null)) {
 				$input_errors[] = "A valid IPv6 range must be specified.";
-			} else if (ipv6Uncompress($_POST['v6range_from']) == ipv6Uncompress(gen_subnet6($ifcfg['ipaddr6'], $ifcfg['subnet6']))) {
+			} else if (ipv6Uncompress($_POST['v6range_from'] ?? null) == ipv6Uncompress(gen_subnet6(($ifcfg['ipaddr6'] ?? null), ($ifcfg['subnet6'] ?? null)))) {
 				$input_errors[] = "You cannot use the subnet address as a 'from' address.";
 			}
-			if (!is_ipaddr6($_POST['v6range_to'])) {
+			if (!is_ipaddr6($_POST['v6range_to'] ?? null)) {
 				$input_errors[] = "A valid IPv6 range must be specified.";
-			} else if (ipv6Uncompress($_POST['v6range_to']) == ipv6Uncompress(gen_subnet_max6($ifcfg['ipaddr6'], $ifcfg['subnet6']))) {
+			} else if (ipv6Uncompress($_POST['v6range_to'] ?? null) == ipv6Uncompress(gen_subnet_max6(($ifcfg['ipaddr6'] ?? null), ($ifcfg['subnet6'] ?? null)))) {
 				$input_errors[] = "You cannot use the broadcast address as a 'to' address.";
 			}
-			if ($_POST['v6range_from'] == $_POST['v6range_to']) {
+			if (($_POST['v6range_from'] ?? null) == ($_POST['v6range_to'] ?? null)) {
 				$input_errors[] = "IPv6 from and to are the same.";
 			}
-			if ($_POST['v6deftime'] && (!is_numericint($_POST['v6deftime']))) {
+			if (!empty($_POST['v6deftime']) && (!is_numericint($_POST['v6deftime']))) {
 				$input_errors[] = "The default IPv6 lease time must be an integer.";
 			}
-			if ($_POST['v6maxtime'] && (!is_numericint($_POST['v6maxtime']) || ($_POST['v6maxtime'] <= $_POST['v6deftime']))) {
+			if (!empty($_POST['v6maxtime']) && (!is_numericint($_POST['v6maxtime']) || ($_POST['v6maxtime'] <= ($_POST['v6deftime'] ?? null)))) {
 				$input_errors[] = "The maximum IPv6 lease time must be higher than the default IPv6 lease time.";
 			}
 		}		
 		if (!isset($config['dnsmasq']['enable'])) {
-			if (ipv6enabled() && $pconfig['v6enable'] && (!is_ipaddr6($dnsconfig['dns1']) && !is_ipaddr6($dnsconfig['dns2']) && !is_ipaddr6($dnsconfig['dns3']))) {
+			if (ipv6enabled() && !empty($pconfig['v6enable']) && (!is_ipaddr6($dnsconfig['dns1']) && !is_ipaddr6($dnsconfig['dns2']) && !is_ipaddr6($dnsconfig['dns3']))) {
 				$input_errors[] = "DNS forwarder is disabled and you have no IPv6 DNS servers set, DHCPv6 may not have a valid IPv6 DNS setting to give clients.";
 			}
-			if ($pconfig['enable'] && (!is_ipaddr($dnsconfig['dns1']) && !is_ipaddr($dnsconfig['dns2']) && !is_ipaddr($dnsconfig['dns3']))) {
+			if (!empty($pconfig['enable']) && (!is_ipaddr($dnsconfig['dns1']) && !is_ipaddr($dnsconfig['dns2']) && !is_ipaddr($dnsconfig['dns3']))) {
 				$input_errors[] = "DNS forwarder is disabled and you have no IPv4 DNS servers set, DHCP may not have a valid IPv4 DNS setting to give clients.";
 			}
 		}
 		
-		if (!$input_errors) {				
+		if (empty($input_errors)) {				
 			$input_errors = array_merge($input_errors, check_dhcp_range($ifcfg['ipaddr'], $ifcfg['subnet'], $_POST['range_from'], $_POST['range_to']));
-			if (ipv6enabled() && $pconfig['v6enable'])
-				$input_errors = array_merge($input_errors, check_v6dhcp_range($ifcfg['ipaddr6'], $ifcfg['subnet6'], $_POST['v6range_from'], $_POST['v6range_to']));
+			if (ipv6enabled() && !empty($pconfig['v6enable']))
+				$input_errors = array_merge($input_errors, check_v6dhcp_range(($ifcfg['ipaddr6'] ?? null), ($ifcfg['subnet6'] ?? null), $_POST['v6range_from'], $_POST['v6range_to']));
 			
 			/* make sure that the DHCP Relay isn't enabled on this interface */
 			if (isset($config['dhcrelay'][$if]['enable']))
@@ -169,27 +174,27 @@ if ($_POST) {
 		}
 	}
 
-	if (!$input_errors) {
-		$config['dhcpd'][$if]['range']['from'] = $_POST['range_from'];
-		$config['dhcpd'][$if]['range']['to'] = $_POST['range_to'];
-		$config['dhcpd'][$if]['defaultleasetime'] = $_POST['deftime'];
-		$config['dhcpd'][$if]['maxleasetime'] = $_POST['maxtime'];
-		$config['dhcpd'][$if]['enable'] = $_POST['enable'] ? true : false;
-		$config['dhcpd'][$if]['denyunknown'] = $_POST['denyunknown'] ? true : false;
-		$config['dhcpd'][$if]['next-server'] = $_POST['nextserver'];
-		$config['dhcpd'][$if]['filename'] = $_POST['filename'];
+	if (empty($input_errors)) {
+		$config['dhcpd'][$if]['range']['from'] = $_POST['range_from'] ?? null;
+		$config['dhcpd'][$if]['range']['to'] = $_POST['range_to'] ?? null;
+		$config['dhcpd'][$if]['defaultleasetime'] = $_POST['deftime'] ?? null;
+		$config['dhcpd'][$if]['maxleasetime'] = $_POST['maxtime'] ?? null;
+		$config['dhcpd'][$if]['enable'] = !empty($_POST['enable']) ? true : false;
+		$config['dhcpd'][$if]['denyunknown'] = !empty($_POST['denyunknown']) ? true : false;
+		$config['dhcpd'][$if]['next-server'] = $_POST['nextserver'] ?? null;
+		$config['dhcpd'][$if]['filename'] = $_POST['filename'] ?? null;
 		if (ipv6enabled()) {		
-			$config['dhcpd'][$if]['v6range']['from'] = $_POST['v6range_from'];
-			$config['dhcpd'][$if]['v6range']['to'] = $_POST['v6range_to'];
-			$config['dhcpd'][$if]['v6defaultleasetime'] = $_POST['v6deftime'];
-			$config['dhcpd'][$if]['v6maxleasetime'] = $_POST['v6maxtime'];
-			$config['dhcpd'][$if]['v6enable'] = $_POST['v6enable'] ? true : false;
+			$config['dhcpd'][$if]['v6range']['from'] = $_POST['v6range_from'] ?? null;
+			$config['dhcpd'][$if]['v6range']['to'] = $_POST['v6range_to'] ?? null;
+			$config['dhcpd'][$if]['v6defaultleasetime'] = $_POST['v6deftime'] ?? null;
+			$config['dhcpd'][$if]['v6maxleasetime'] = $_POST['v6maxtime'] ?? null;
+			$config['dhcpd'][$if]['v6enable'] = !empty($_POST['v6enable']) ? true : false;
 		}
 		
 		unset($config['dhcpd'][$if]['winsserver']);
-		if ($_POST['wins1'])
+		if (!empty($_POST['wins1']))
 			$config['dhcpd'][$if]['winsserver'][] = $_POST['wins1'];
-		if ($_POST['wins2'])
+		if (!empty($_POST['wins2']))
 			$config['dhcpd'][$if]['winsserver'][] = $_POST['wins2'];
 			
 		write_config();
@@ -239,8 +244,8 @@ function enable_change(enable_over) {
 //-->
 </script>
 <form action="services_dhcp.php" method="post" name="iform" id="iform">
-<?php if ($input_errors) print_input_errors($input_errors); ?>
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
 <?php if (file_exists($d_staticmapsdirty_path)): ?><p>
 <?php print_info_box_np("The static mapping configuration has been changed.<br>You must apply the changes in order for them to take effect.");?><br>
 <input name="apply" type="submit" class="formbtn" id="apply" value="Apply changes"></p>
@@ -266,13 +271,13 @@ function enable_change(enable_over) {
 					  <tr><td class="optsect_s"><strong>Enable IPv4 DHCP server on 
                           <?=htmlspecialchars($iflist[$if]);?>
                           interface</strong></td>
-					  <td align="right" class="optsect_s"><input name="enable" type="checkbox" value="yes" <?php if ($pconfig['enable']) echo "checked"; ?> onClick="enable_change(false)"> <strong>Enable</strong></td></tr>
+					  <td align="right" class="optsect_s"><input name="enable" type="checkbox" value="yes" <?php if (!empty($pconfig['enable'])) echo "checked"; ?> onClick="enable_change(false)"> <strong>Enable</strong></td></tr>
 					  </table></td>
 					</tr>
 					<tr> 
                         <td width="22%" valign="top" class="vncellreq">Deny unknown clients</td>
                         <td width="78%" class="vtable"> 
-                          <input name="denyunknown" type="checkbox" value="yes" <?php if ($pconfig['denyunknown']) echo "checked"; ?>> Only respond to reserved clients listed below.
+                          <input name="denyunknown" type="checkbox" value="yes" <?php if (!empty($pconfig['denyunknown'])) echo "checked"; ?>> Only respond to reserved clients listed below.
                         </td>
 					</tr>
 					  
@@ -301,20 +306,20 @@ function enable_change(enable_over) {
                       <tr> 
                         <td width="22%" valign="top" class="vncellreq">Range</td>
                         <td width="78%" class="vtable"> 
-                          <?=$mandfldhtml;?><input name="range_from" type="text" class="formfld" id="range_from" size="20" value="<?=htmlspecialchars($pconfig['range_from']);?>"> 
-                          &nbsp;to&nbsp; <?=$mandfldhtmlspc;?><input name="range_to" type="text" class="formfld" id="range_to" size="20" value="<?=htmlspecialchars($pconfig['range_to']);?>"></td>
+                          <?=$mandfldhtml;?><input name="range_from" type="text" class="formfld" id="range_from" size="20" value="<?=htmlspecialchars($pconfig['range_from'] ?? '');?>"> 
+                          &nbsp;to&nbsp; <?=$mandfldhtmlspc;?><input name="range_to" type="text" class="formfld" id="range_to" size="20" value="<?=htmlspecialchars($pconfig['range_to'] ?? '');?>"></td>
                       </tr>
                       <tr> 
                         <td width="22%" valign="top" class="vncell">WINS servers</td>
                         <td width="78%" class="vtable"> 
-                          <input name="wins1" type="text" class="formfld" id="wins1" size="20" value="<?=htmlspecialchars($pconfig['wins1']);?>"><br>
-                          <input name="wins2" type="text" class="formfld" id="wins2" size="20" value="<?=htmlspecialchars($pconfig['wins2']);?>"></td>
+                          <input name="wins1" type="text" class="formfld" id="wins1" size="20" value="<?=htmlspecialchars($pconfig['wins1'] ?? '');?>"><br>
+                          <input name="wins2" type="text" class="formfld" id="wins2" size="20" value="<?=htmlspecialchars($pconfig['wins2'] ?? '');?>"></td>
                       </tr>
                       <tr> 
                         <td width="22%" valign="top" class="vncell">Default lease 
                           time</td>
                         <td width="78%" class="vtable"> 
-                          <input name="deftime" type="text" class="formfld" id="deftime" size="10" value="<?=htmlspecialchars($pconfig['deftime']);?>">
+                          <input name="deftime" type="text" class="formfld" id="deftime" size="10" value="<?=htmlspecialchars($pconfig['deftime'] ?? '');?>">
                           seconds<br>
                           This is used for clients that do not ask for a specific 
                           expiration time.<br>
@@ -324,7 +329,7 @@ function enable_change(enable_over) {
                         <td width="22%" valign="top" class="vncell">Maximum lease 
                           time</td>
                         <td width="78%" class="vtable"> 
-                          <input name="maxtime" type="text" class="formfld" id="maxtime" size="10" value="<?=htmlspecialchars($pconfig['maxtime']);?>">
+                          <input name="maxtime" type="text" class="formfld" id="maxtime" size="10" value="<?=htmlspecialchars($pconfig['maxtime'] ?? '');?>">
                           seconds<br>
                           <span class="red"><strong>Not currently applied.</strong></span>
                           DHCP is served by dnsmasq, which has a single lease time per
@@ -337,7 +342,7 @@ function enable_change(enable_over) {
                       <tr>
                         <td width="22%" valign="top" class="vncell">Next server</td>
                         <td width="78%" class="vtable"> 
-                          <input name="nextserver" type="text" class="formfld" id="nextserver" size="20" value="<?=htmlspecialchars($pconfig['nextserver']);?>"><br>
+                          <input name="nextserver" type="text" class="formfld" id="nextserver" size="20" value="<?=htmlspecialchars($pconfig['nextserver'] ?? '');?>"><br>
                           Specify the server from which clients should load the boot file. This is
                           usually only needed with PXE booting and some VoIP phones, and can usually
                           be left empty.</td>
@@ -345,7 +350,7 @@ function enable_change(enable_over) {
                       <tr>
                         <td width="22%" valign="top" class="vncell">Filename</td>
                         <td width="78%" class="vtable"> 
-                          <input name="filename" type="text" class="formfld" id="filename" size="20" value="<?=htmlspecialchars($pconfig['filename']);?>"><br>
+                          <input name="filename" type="text" class="formfld" id="filename" size="20" value="<?=htmlspecialchars($pconfig['filename'] ?? '');?>"><br>
                           Specify the name of the boot file on the server above. This is
                           usually only needed with PXE booting and some VoIP phones, and can usually
                           be left empty.</td>
@@ -358,26 +363,26 @@ function enable_change(enable_over) {
 					  <tr><td class="optsect_s"><strong>Enable IPv6 DHCP server on 
                           <?=htmlspecialchars($iflist[$if]);?>
                           interface</strong></td>
-					  <td align="right" class="optsect_s"><input name="v6enable" type="checkbox" value="yes" <?php if ($pconfig['v6enable']) echo "checked"; ?> onClick="enable_change(false)"> <strong>Enable</strong></td></tr>
+					  <td align="right" class="optsect_s"><input name="v6enable" type="checkbox" value="yes" <?php if (!empty($pconfig['v6enable'])) echo "checked"; ?> onClick="enable_change(false)"> <strong>Enable</strong></td></tr>
 					  </table></td>
 					</tr>
 						<tr> 
                         <td width="22%" valign="top" class="vncellreq">Subnet</td>
                         <td width="78%" class="vtable"> 
-                          <?=gen_subnet6($ifcfg['ipaddr6'], $ifcfg['subnet6']);?> 
+                          <?=gen_subnet6(($ifcfg['ipaddr6'] ?? null), ($ifcfg['subnet6'] ?? null));?> 
                         </td>
                       </tr>
 					  <tr>
 						<td width="22%" valign="top" class="vncellreq">IPv6 Range</td>
 						<td width="78%" class="vtable"> 
-						  <?=$mandfldhtml;?><input name="v6range_from" type="text" class="formfld" id="v6range_from" size="20" value="<?=htmlspecialchars($pconfig['v6range_from']);?>"> 
-						  &nbsp;to&nbsp; <?=$mandfldhtmlspc;?><input name="v6range_to" type="text" class="formfld" id="v6range_to" size="20" value="<?=htmlspecialchars($pconfig['v6range_to']);?>"></td>
+						  <?=$mandfldhtml;?><input name="v6range_from" type="text" class="formfld" id="v6range_from" size="20" value="<?=htmlspecialchars($pconfig['v6range_from'] ?? '');?>"> 
+						  &nbsp;to&nbsp; <?=$mandfldhtmlspc;?><input name="v6range_to" type="text" class="formfld" id="v6range_to" size="20" value="<?=htmlspecialchars($pconfig['v6range_to'] ?? '');?>"></td>
 					  </tr>
 					  <tr> 
 						<td width="22%" valign="top" class="vncell">IPv6 Default lease 
 						  time</td>
 						<td width="78%" class="vtable"> 
-						  <input name="v6deftime" type="text" class="formfld" id="v6deftime" size="10" value="<?=htmlspecialchars($pconfig['v6deftime']);?>">
+						  <input name="v6deftime" type="text" class="formfld" id="v6deftime" size="10" value="<?=htmlspecialchars($pconfig['v6deftime'] ?? '');?>">
 						  seconds<br>
 						  This is used for IPv6 clients that do not ask for a specific 
 						  expiration time.<br>
@@ -387,7 +392,7 @@ function enable_change(enable_over) {
 						<td width="22%" valign="top" class="vncell">IPv6 Maximum lease 
 						  time</td>
 						<td width="78%" class="vtable"> 
-						  <input name="v6maxtime" type="text" class="formfld" id="v6maxtime" size="10" value="<?=htmlspecialchars($pconfig['v6maxtime']);?>">
+						  <input name="v6maxtime" type="text" class="formfld" id="v6maxtime" size="10" value="<?=htmlspecialchars($pconfig['v6maxtime'] ?? '');?>">
 						  seconds<br>
 						  This is the maximum lease time for IPv6 clients that ask 
 						  for a specific expiration time.<br>
@@ -430,13 +435,13 @@ function enable_change(enable_over) {
 			  <?php $i = 0; foreach ($a_maps as $mapent): ?>
                 <tr>
                   <td class="listlr">
-                    <?=htmlspecialchars($mapent['mac']);?>
+                    <?=htmlspecialchars($mapent['mac'] ?? '');?>
                   </td>
                   <td class="listr">
-                    <?=htmlspecialchars($mapent['ipaddr']);?>&nbsp;
+                    <?=htmlspecialchars($mapent['ipaddr'] ?? '');?>&nbsp;
                   </td>
                   <td class="listbg">
-                    <?=htmlspecialchars($mapent['descr']);?>&nbsp;
+                    <?=htmlspecialchars($mapent['descr'] ?? '');?>&nbsp;
                   </td>
                   <td valign="middle" nowrap class="list"> <a href="services_dhcp_edit.php?if=<?=urlencode($if);?>&amp;id=<?=$i;?>"><img src="e.gif" title="edit mapping" width="17" height="17" border="0" alt="edit mapping"></a>
                      &nbsp;<input name="del_<?=$i;?>" type="image" src="x.gif" width="17" height="17" title="delete mapping" alt="delete mapping" onclick="return confirm('Do you really want to delete this mapping?')"></td>

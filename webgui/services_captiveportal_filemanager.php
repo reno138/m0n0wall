@@ -34,7 +34,7 @@ $pgtitle = array("Services", "Captive portal", "File Manager");
 
 require_once("guiconfig.inc");
 
-if (!is_array($config['captiveportal']['element']))
+if (!is_array($config['captiveportal']['element'] ?? null))
 	$config['captiveportal']['element'] = array();
 
 cpelements_sort();
@@ -43,13 +43,13 @@ $a_element = &$config['captiveportal']['element'];
 // Calculate total size of all files
 $total_size = 0;
 foreach ($a_element as $element) {
-	$total_size += $element['size'];
+	$total_size += $element['size'] ?? null;
 }
 
 if ($_POST) {
     unset($input_errors);
     
-    if (is_uploaded_file($_FILES['new']['tmp_name'])) {
+    if (is_uploaded_file($_FILES['new']['tmp_name'] ?? '')) {
     	
     	$name = $_FILES['new']['name'];
     	$size = filesize($_FILES['new']['tmp_name']);
@@ -68,7 +68,7 @@ if ($_POST) {
 				format_bytes($g['captiveportal_element_sizelimit']) . ".";
 		}
 		
-		if (!$input_errors) {
+		if (empty($input_errors)) {
 			$element = array();
 			$element['name'] = $name;
 			$element['size'] = $size;
@@ -98,7 +98,7 @@ if ($_POST) {
 ?>
 <?php include("fbegin.inc"); ?>
 <form action="services_captiveportal_filemanager.php" method="post" enctype="multipart/form-data" name="iform" id="iform">
-<?php if ($input_errors) print_input_errors($input_errors); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
 <table width="100%" border="0" cellpadding="0" cellspacing="0" summary="tab pane">
   <tr><td class="tabnavtbl">
   <ul id="tabnav">
@@ -139,7 +139,7 @@ if ($_POST) {
 	  </tr>
   <?php endif; ?>
   
-  <?php if ($_GET['act'] == 'add'): ?>
+  <?php if (($_GET['act'] ?? null) == 'add'): ?>
 	  <tr>
 		<td class="listlr" colspan="2"><input type="file" name="new" class="formfld" size="40" id="new"> 
 		<input name="Submit" type="submit" class="formbtn" value="Upload"></td>

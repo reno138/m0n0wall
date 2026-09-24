@@ -32,17 +32,17 @@
 $pgtitle = array("Services", "Captive portal", "Edit pass-through MAC address");
 require("guiconfig.inc");
 
-if (!is_array($config['captiveportal']['passthrumac']))
+if (!is_array($config['captiveportal']['passthrumac'] ?? null))
 	$config['captiveportal']['passthrumac'] = array();
 
 passthrumacs_sort();
 $a_passthrumacs = &$config['captiveportal']['passthrumac'];
 
-$id = $_GET['id'];
+$id = $_GET['id'] ?? null;
 if (isset($_POST['id']))
 	$id = $_POST['id'];
 
-if (isset($id) && $a_passthrumacs[$id]) {
+if (isset($id) && !empty($a_passthrumacs[$id])) {
 	$pconfig['mac'] = $a_passthrumacs[$id]['mac'];
 	$pconfig['descr'] = $a_passthrumacs[$id]['descr'];
 }
@@ -65,7 +65,7 @@ if ($_POST) {
 	}
 
 	foreach ($a_passthrumacs as $macent) {
-		if (isset($id) && ($a_passthrumacs[$id]) && ($a_passthrumacs[$id] === $macent))
+		if (isset($id) && !empty($a_passthrumacs[$id]) && ($a_passthrumacs[$id] === $macent))
 			continue;
 		
 		if ($macent['mac'] == $_POST['mac']){
@@ -79,7 +79,7 @@ if ($_POST) {
 		$mac['mac'] = $_POST['mac'];
 		$mac['descr'] = $_POST['descr'];
 
-		if (isset($id) && $a_passthrumacs[$id])
+		if (isset($id) && !empty($a_passthrumacs[$id]))
 			$a_passthrumacs[$id] = $mac;
 		else
 			$a_passthrumacs[] = $mac;
@@ -94,20 +94,20 @@ if ($_POST) {
 }
 ?>
 <?php include("fbegin.inc"); ?>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
             <form action="services_captiveportal_mac_edit.php" method="post" name="iform" id="iform">
               <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="content pane">
 				<tr>
                   <td width="22%" valign="top" class="vncellreq">MAC address</td>
                   <td width="78%" class="vtable"> 
-                    <?=$mandfldhtml;?><input name="mac" type="text" class="formfld" id="mac" size="17" value="<?=htmlspecialchars($pconfig['mac']);?>">
+                    <?=$mandfldhtml;?><input name="mac" type="text" class="formfld" id="mac" size="17" value="<?=htmlspecialchars($pconfig['mac'] ?? '');?>">
                     <br> 
                     <span class="vexpl">MAC address (6 hex octets separated by colons)</span></td>
                 </tr>
 				<tr>
                   <td width="22%" valign="top" class="vncell">Description</td>
                   <td width="78%" class="vtable"> 
-                    <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr']);?>">
+                    <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr'] ?? '');?>">
                     <br> <span class="vexpl">You may enter a description here
                     for your reference (not parsed).</span></td>
                 </tr>
@@ -115,7 +115,7 @@ if ($_POST) {
                   <td width="22%" valign="top">&nbsp;</td>
                   <td width="78%"> 
                     <input name="Submit" type="submit" class="formbtn" value="Save">
-                    <?php if (isset($id) && $a_passthrumacs[$id]): ?>
+                    <?php if (isset($id) && !empty($a_passthrumacs[$id])): ?>
                     <input name="id" type="hidden" value="<?=htmlspecialchars($id);?>">
                     <?php endif; ?>
                   </td>

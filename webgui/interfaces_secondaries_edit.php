@@ -32,28 +32,30 @@
 $pgtitle = array("Interfaces", "Add Secondary IP addresses", "Edit Address");
 require("guiconfig.inc");
 
-if (!is_array($config['secondaries']['secondary']))
+if (!is_array($config['secondaries']['secondary'] ?? null))
 	$config['secondaries']['secondary'] = array();
 
 $a_secondaries = &$config['secondaries']['secondary'] ;
 
-$id = $_GET['id'];
+$pconfig = array();
+
+$id = $_GET['id'] ?? null;
 if (isset($_POST['id']))
 	$id = $_POST['id'];
 
-$if = $_GET['if'];
+$if = $_GET['if'] ?? null;
 if (isset($_POST['if']))
 	$if = $_POST['if'];
 	
-$ifname = $_GET['ifname'];
+$ifname = $_GET['ifname'] ?? null;
 if (isset($_POST['ifname']))
 	$ifname = $_POST['ifname'];
 
-if (isset($id) && $a_secondaries[$id]) {
+if (isset($id) && !empty($a_secondaries[$id])) {
 	$pconfig['if'] = $if;
-	$pconfig['ipaddr'] = $a_secondaries[$id]['ipaddr'];
-	$pconfig['prefix'] = $a_secondaries[$id]['prefix'];
-	$pconfig['descr'] = $a_secondaries[$id]['descr'];
+	$pconfig['ipaddr'] = $a_secondaries[$id]['ipaddr'] ?? null;
+	$pconfig['prefix'] = $a_secondaries[$id]['prefix'] ?? null;
+	$pconfig['descr'] = $a_secondaries[$id]['descr'] ?? null;
 }
 
 
@@ -68,15 +70,15 @@ if ($_POST) {
 	
 	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
-	if ($_POST['prefix'] && (!is_numericint($_POST['prefix']) || ($_POST['prefix'] < '1') || ($_POST['prefix'] > '128'))) {
+	if (!empty($_POST['prefix']) && (!is_numericint($_POST['prefix']) || ($_POST['prefix'] < '1') || ($_POST['prefix'] > '128'))) {
 		$input_errors[] = "The subnet/prefix must be an integer between 1 and 128.";
 	}
 
 	foreach ($a_secondaries as $secondary) {
-		if (isset($id) && ($a_secondaries[$id]) && ($a_secondaries[$id] === $secondary))
+		if (isset($id) && !empty($a_secondaries[$id]) && ($a_secondaries[$id] === $secondary))
 			continue;
 		
-		if (($secondary['ipaddr'] == $_POST['ipaddr']) && ($secondary['prefix'] == $_POST['prefix'])) {
+		if (($secondary['ipaddr'] == ($_POST['ipaddr'] ?? null)) && ($secondary['prefix'] == ($_POST['prefix'] ?? null))) {
 			$input_errors[] = "An IP with the subnet/prefix {$secondary['prefix']} is already defined on this interface.";
 			break;
 		}	
@@ -85,11 +87,11 @@ if ($_POST) {
 	if (!$input_errors) {
 		$secondary = array();
 		$secondary['if'] = $if;
-		$secondary['ipaddr'] = $_POST['ipaddr'];
-		$secondary['prefix'] = $_POST['prefix'];
-		$secondary['descr'] = $_POST['descr'];
+		$secondary['ipaddr'] = $_POST['ipaddr'] ?? null;
+		$secondary['prefix'] = $_POST['prefix'] ?? null;
+		$secondary['descr'] = $_POST['descr'] ?? null;
 
-		if (isset($id) && $a_secondaries[$id])
+		if (isset($id) && !empty($a_secondaries[$id]))
 			$a_secondaries[$id] = $secondary;
 		else
 			$a_secondaries[] = $secondary;
@@ -102,17 +104,17 @@ if ($_POST) {
 }
 ?>
 <?php include("fbegin.inc"); ?>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
             <form action="interfaces_secondaries_edit.php" method="post" name="iform" id="iform">
               <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="content pane">
 				<tr>
                   <td width="22%" valign="top" class="vncellreq">IP address</td>
                   <td width="78%" class="vtable">     
-				<?=$mandfldhtml;?><input name="ipaddr" type="text" class="formfld" id="ipaddr" size="20" value="<?=htmlspecialchars($pconfig['ipaddr']);?>">
+				<?=$mandfldhtml;?><input name="ipaddr" type="text" class="formfld" id="ipaddr" size="20" value="<?=htmlspecialchars($pconfig['ipaddr'] ?? '');?>">
 				/ 
                 <select name="prefix" class="formfld" id="prefix">
                   <?php for ($i = (ipv6enabled() ? 128 : 32); $i > 0; $i--): ?>
-                  <option value="<?=$i;?>" <?php if ($i == $pconfig['prefix']) echo "selected"; ?>>
+                  <option value="<?=$i;?>" <?php if ($i == ($pconfig['prefix'] ?? null)) echo "selected"; ?>>
                   <?=$i;?>
                   </option>
                   <?php endfor; ?>
@@ -122,7 +124,7 @@ if ($_POST) {
 				<tr>
                   <td width="22%" valign="top" class="vncell">Description</td>
                   <td width="78%" class="vtable"> 
-                    <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr']);?>">
+                    <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr'] ?? '');?>">
                     <br> <span class="vexpl">You may enter a description here
                     for your reference (not parsed).</span></td>
                 </tr>
@@ -130,7 +132,7 @@ if ($_POST) {
                   <td width="22%" valign="top">&nbsp;</td>
                   <td width="78%"> 
                     <input name="Submit" type="submit" class="formbtn" value="Save">
-                    <?php if (isset($id) && $a_secondaries[$id]): ?>
+                    <?php if (isset($id) && !empty($a_secondaries[$id])): ?>
                     <input name="id" type="hidden" value="<?=htmlspecialchars($id);?>">
                     <?php endif; ?>
 					<?php if (isset($if)): ?>

@@ -32,11 +32,11 @@
 $pgtitle = array("Diagnostics", "Logs");
 require("guiconfig.inc");
 
-$nentries = $config['syslog']['nentries'];
+$nentries = $config['syslog']['nentries'] ?? null;
 if (!$nentries)
 	$nentries = 50;
 
-if ($_POST['clear']) {
+if (!empty($_POST['clear'])) {
 	/* Ring-buffer init removed: logs are ordinary files bounded by
 	   newsyslog(8). See build/files/newsyslog.conf. */
 	/* redirect to avoid reposting form data on refresh */
@@ -55,7 +55,7 @@ function dump_clog($logfile, $tail) {
 		$logent = preg_split("/\s+/", $logent, 6);
 		echo "<tr valign=\"top\">\n";
 		echo "<td class=\"listlr\" nowrap>" . htmlspecialchars(join(" ", array_slice($logent, 0, 3))) . "</td>\n";
-		echo "<td class=\"listr\">" . htmlspecialchars($logent[5]) . "</td>\n";
+		echo "<td class=\"listr\">" . htmlspecialchars($logent[5] ?? '') . "</td>\n";
 		echo "</tr>\n";
 	}
 }

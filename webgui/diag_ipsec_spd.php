@@ -49,7 +49,7 @@ require("guiconfig.inc");
 <?php
 
 /* delete any SPs? */
-if (isset($_POST['del_x']) && is_array($_POST['entries'])) {
+if (isset($_POST['del_x']) && is_array($_POST['entries'] ?? null)) {
 	$fd = @popen("/usr/local/sbin/setkey -c > /dev/null 2>&1", "w");
 	if ($fd) {
 		foreach ($_POST['entries'] as $entry) {
@@ -72,8 +72,8 @@ if ($fd) {
 		if ($line == "No SPD entries.")
 			break;
 		if ($line[0] != "\t") {
-			if (is_array($cursp)) {
-				$spi=$cursp['spi'];
+			if (is_array($cursp ?? null)) {
+				$spi=$cursp['spi'] ?? null;
 				$spd[$spi] = $cursp;
 			}
 			$cursp = array();
@@ -81,7 +81,7 @@ if ($fd) {
 			$cursp['src'] = $linea[0];
 			$cursp['dst'] = $linea[1];
 			$i = 0;
-		} else if (is_array($cursp)) {
+		} else if (is_array($cursp ?? null)) {
 			$linea = explode(" ", trim($line));
 			if ($i == 1) {
 				if ($linea[1] == "none")	/* don't show default anti-lockout rule */
@@ -99,9 +99,9 @@ if ($fd) {
 		}
 		$i++;
 	}
-	if (is_array($cursp) && count($cursp))
-		$spi=$cursp['spi'];
-		$spd[$spi] = $cursp;
+	if (is_array($cursp ?? null) && count($cursp))
+		$spi=$cursp['spi'] ?? null;
+		$spd[$spi ?? null] = $cursp ?? null;
 	pclose($fd);
 }
 if (count($spd)):
@@ -122,15 +122,15 @@ ksort($spd);
 foreach ($spd as $sp): ?>
 	<tr>
 		<?php
-			$args = htmlspecialchars($sp['src'] . ";" . $sp['dst'] . ";" . $sp['dir']);
+			$args = htmlspecialchars(($sp['src'] ?? '') . ";" . ($sp['dst'] ?? '') . ";" . ($sp['dir'] ?? ''));
 		?>
 		<td class="listt"><input type="checkbox" name="entries[]" value="<?=$args;?>" style="margin: 0 5px 0 0; padding: 0; width: 15px; height: 15px;"></td>
-		<td class="listlr" valign="top"><?=htmlspecialchars($sp['src']);?></td>
-		<td class="listr" valign="top"><?=htmlspecialchars($sp['dst']);?></td>
-		<td class="listr" valign="top"><img src="<?=$sp['dir'];?>.gif" width="11" height="11" style="margin-top: 2px"></td>
-		<td class="listr" valign="top"><?=htmlspecialchars(strtoupper($sp['proto']));?></td>
-		<td class="listr" valign="top"><?=htmlspecialchars($sp['ep_src']);?> - <br>
-			<?=htmlspecialchars($sp['ep_dst']);?></td>
+		<td class="listlr" valign="top"><?=htmlspecialchars($sp['src'] ?? '');?></td>
+		<td class="listr" valign="top"><?=htmlspecialchars($sp['dst'] ?? '');?></td>
+		<td class="listr" valign="top"><img src="<?=$sp['dir'] ?? '';?>.gif" width="11" height="11" style="margin-top: 2px"></td>
+		<td class="listr" valign="top"><?=htmlspecialchars(strtoupper($sp['proto'] ?? ''));?></td>
+		<td class="listr" valign="top"><?=htmlspecialchars($sp['ep_src'] ?? '');?> - <br>
+			<?=htmlspecialchars($sp['ep_dst'] ?? '');?></td>
 		<td class="list" nowrap>
 		</td>
 				

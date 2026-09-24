@@ -38,7 +38,7 @@ function get_wireless_info($wlan, $i) {
 	
 	$ifinfo = array();
 	
-	if ($wlan['mode'] != "hostap") {
+	if (($wlan['mode'] ?? null) != "hostap") {
 		/* get scan list */
 		exec("/sbin/ifconfig -v wlan$i list scan", $scanlist);
 		
@@ -56,12 +56,12 @@ function get_wireless_info($wlan, $i) {
 				
 				$remflds = preg_split("/\s+/", substr($sl, $ssid_fldwidth), 6);
 				
-				$slent['bssid'] = $remflds[0];
-				$slent['channel'] = $remflds[1];
-				$slent['rate'] = $remflds[2];
-				list($slent['sig'],$slent['noise']) = explode(":", $remflds[3]);
-				$slent['int'] = $remflds[4];
-				$slent['caps'] = preg_split("/\s+/", $remflds[5]);
+				$slent['bssid'] = $remflds[0] ?? null;
+				$slent['channel'] = $remflds[1] ?? null;
+				$slent['rate'] = $remflds[2] ?? null;
+				list($slent['sig'],$slent['noise']) = array_pad(explode(":", $remflds[3] ?? ''), 2, null);
+				$slent['int'] = $remflds[4] ?? null;
+				$slent['caps'] = preg_split("/\s+/", $remflds[5] ?? '');
 				
 				$ifinfo['scanlist'][] = $slent;
 			}
@@ -76,11 +76,11 @@ function get_wireless_info($wlan, $i) {
 			if ($as) {
 				$asa = preg_split("/\s+/", $as);
 				$aslent = array();
-				$aslent['mac'] = $asa[0];
-				$aslent['rate'] = str_replace("M", " Mbps", $asa[3]);
-				$aslent['rssi'] = $asa[4];
-				$aslent['caps'] = $asa[8];
-				$aslent['flags'] = $asa[9];
+				$aslent['mac'] = $asa[0] ?? null;
+				$aslent['rate'] = str_replace("M", " Mbps", $asa[3] ?? '');
+				$aslent['rssi'] = $asa[4] ?? null;
+				$aslent['caps'] = $asa[8] ?? null;
+				$aslent['flags'] = $asa[9] ?? null;
 				$ifinfo['aslist'][] = $aslent;
 			}
 		}
@@ -92,7 +92,7 @@ function get_wireless_info($wlan, $i) {
 ?>
 <?php include("fbegin.inc"); ?>
 <?php 		
-	if (is_array($config['wlans']['wlan']) && count($config['wlans']['wlan']) > 0): ?>
+	if (is_array($config['wlans']['wlan'] ?? null) && count($config['wlans']['wlan']) > 0): ?>
             <table width="100%" border="0" cellspacing="0" cellpadding="0" summary="wi-fi info pane">
               <?php
 			      for ($i = 0; $i < count($config['wlans']['wlan']); $i++):
@@ -106,7 +106,7 @@ function get_wireless_info($wlan, $i) {
               <?php endif; ?>
               <tr> 
                 <td colspan="2" class="listtopic"> 
-                  <?=htmlspecialchars($wlan['descr']);?> (SSID &quot;<?=htmlspecialchars($wlan['ssid']);?>&quot;)</td>
+                  <?=htmlspecialchars($wlan['descr'] ?? '');?> (SSID &quot;<?=htmlspecialchars($wlan['ssid'] ?? '');?>&quot;)</td>
               </tr>
               <?php if (isset($ifinfo['scanlist'])): ?>
               <tr> 
@@ -124,25 +124,25 @@ function get_wireless_info($wlan, $i) {
                     <?php foreach ($ifinfo['scanlist'] as $ss): ?>
                     <tr> 
                       <td class="listlr" nowrap>
-                        <?php if (!$ss['ssid']) echo "<span class=\"gray\">(hidden)</span>"; else echo htmlspecialchars($ss['ssid']);?>
-                        <?php if (strpos($ss['caps'][0], "E") !== false): ?>
+                        <?php if (empty($ss['ssid'])) echo "<span class=\"gray\">(hidden)</span>"; else echo htmlspecialchars($ss['ssid'] ?? '');?>
+                        <?php if (strpos($ss['caps'][0] ?? '', "E") !== false): ?>
                         <img src="lock.gif" width="7" height="9" alt="">
                         <?php endif; ?>
                       </td>
                       <td class="listr"> 
-                        <?=htmlspecialchars($ss['bssid']);?>
+                        <?=htmlspecialchars($ss['bssid'] ?? '');?>
                       </td>
                       <td class="listr"> 
-                        <?=htmlspecialchars($ss['channel']);?>
+                        <?=htmlspecialchars($ss['channel'] ?? '');?>
                       </td>
                       <td class="listr"> 
-                        <?=htmlspecialchars($ss['rate']);?>
+                        <?=htmlspecialchars($ss['rate'] ?? '');?>
                       </td>
                       <td class="listr"> 
-                        <?=htmlspecialchars($ss['sig']);?>
+                        <?=htmlspecialchars($ss['sig'] ?? '');?>
                       </td>
                       <td class="listr"> 
-                        <?=htmlspecialchars($ss['noise']);?>
+                        <?=htmlspecialchars($ss['noise'] ?? '');?>
                       </td>
                     </tr>
                     <?php endforeach; ?>
@@ -164,19 +164,19 @@ function get_wireless_info($wlan, $i) {
                     <?php foreach ($ifinfo['aslist'] as $as): ?>
                     <tr> 
                       <td class="listlr"> 
-                        <?=htmlspecialchars($as['mac']);?>
+                        <?=htmlspecialchars($as['mac'] ?? '');?>
                       </td>
                       <td class="listr"> 
-                        <?=htmlspecialchars($as['rate']);?>
+                        <?=htmlspecialchars($as['rate'] ?? '');?>
                       </td>
                       <td class="listr"> 
-                        <?=htmlspecialchars($as['rssi']);?>
+                        <?=htmlspecialchars($as['rssi'] ?? '');?>
                       </td>
                       <td class="listr"> 
-                        <?=htmlspecialchars($as['flags']);?>
+                        <?=htmlspecialchars($as['flags'] ?? '');?>
                       </td>
                       <td class="listr"> 
-                        <?=htmlspecialchars($as['caps']);?>
+                        <?=htmlspecialchars($as['caps'] ?? '');?>
                       </td>
                     </tr>
                     <?php endforeach; ?>

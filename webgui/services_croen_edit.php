@@ -41,7 +41,7 @@
 
 	// Sort WOL list (workaround for freeze issue)
 	// Note: Workaround that probably should have been in wol_sort in the first place
-	if (!is_array($config['wol']['wolentry'])) {
+	if (!is_array($config['wol']['wolentry'] ?? null)) {
 		$config['wol']['wolentry'] = array();
 	}
 	wol_sort();
@@ -131,7 +131,7 @@
 					$data['value'] = $pconfig[$tree.$data['name']];
 					$d = croen_vars(Array('descr')); $d = $d['descr'];
 					$fname = '';
-					foreach (explode("-", (!empty($tree) ? $tree : $pconfig['job'])) AS $v) {
+					foreach (explode("-", (!empty($tree) ? $tree : ($pconfig['job'] ?? ''))) AS $v) {
 						$fname .= (isset($d[$v]) ? $d[$v] : $v).' ';
 					}
 					$fname = trim($fname);
@@ -210,7 +210,7 @@
 				}
 			}
 		}
-	} elseif (is_array($_POST['job']) && !empty($_POST['job'])) {
+	} elseif (is_array($_POST['job'] ?? null) && !empty($_POST['job'])) {
 		// POST jobs
 		$jobs_data = $_POST['job'];
 		// Add another job if button clicked
@@ -395,11 +395,12 @@
 	include("fbegin.inc");
 	
 	// Form vars
+	$pconfig = array();
 	if (isset($_GET['id']) && isset($config['croen']['jobset'][$_GET['id']])) {
 		// Edit - no save attempt
 		$jobset_id = $_GET['id'];
 		$pconfig = $config['croen']['jobset'][$_GET['id']];
-		$pconfig['time'] = explode(":", $pconfig['time']);
+		$pconfig['time'] = explode(":", $pconfig['time'] ?? '');
 	} elseif (!empty($_POST)) {
 		if (isset($_POST['id']) && isset($config['croen']['jobset'][$_POST['id']])) {
 			// Edit - save attempt
@@ -492,11 +493,11 @@
 		</script>';
 
 	// Show errors (if any)
-	if ($input_errors) {
+	if (!empty($input_errors)) {
 		print_input_errors($input_errors);
 	}
 	// Show savemsg (if any)
-	if ($savemsg) {
+	if (!empty($savemsg)) {
 		print_info_box($savemsg);
 	}
 
@@ -563,8 +564,8 @@
 						<tr id="repeat_time">
 							<td width="22%" valign="top" class="vncellreq">Time</td>
 							<td width="78%" class="vtable">
-								<input name="time[0]" type="text" class="formfld" size="2" value="'.(is_array($pconfig['time']) ? htmlspecialchars($pconfig['time'][0]) : '').'"> :
-								<input name="time[1]" type="text" class="formfld" size="2" value="'.(is_array($pconfig['time']) ? htmlspecialchars($pconfig['time'][1]) : '').'"><br>
+								<input name="time[0]" type="text" class="formfld" size="2" value="'.(is_array($pconfig['time'] ?? null) ? htmlspecialchars($pconfig['time'][0] ?? '') : '').'"> :
+								<input name="time[1]" type="text" class="formfld" size="2" value="'.(is_array($pconfig['time'] ?? null) ? htmlspecialchars($pconfig['time'][1] ?? '') : '').'"><br>
 								<span class="vexpl">At what time should the job be executed?<br>
 								Enter the time in the following format: hh:mm (24-hour notation)</span>
 							</td>
@@ -572,7 +573,7 @@
 						<tr id="repeat_date">
 							<td width="22%" valign="top" class="vncellreq">Date</td>
 							<td width="78%" class="vtable">
-								<input name="date" type="text" class="formfld" id="oncedate" size="10" value="'.htmlspecialchars($pconfig['date']).'">
+								<input name="date" type="text" class="formfld" id="oncedate" size="10" value="'.htmlspecialchars($pconfig['date'] ?? '').'">
 								<a href="javascript:NewCal(\'oncedate\',\'mmddyyyy\')"><img src="cal.gif" width="16" height="16" border="0" alt="Pick a date"></a><br>
 								<span class="vexpl">At what date should the job be executed?<br>
 								Enter the date in the following format: mm/dd/yyyy</span>
@@ -594,21 +595,21 @@
 						<tr id="repeat_day">
 							<td width="22%" valign="top" class="vncellreq">Day of the month</td>
 							<td width="78%" class="vtable">
-								<input name="day" type="text" class="formfld" size="2" value="'.htmlspecialchars($pconfig['day']).'"><br>
+								<input name="day" type="text" class="formfld" size="2" value="'.htmlspecialchars($pconfig['day'] ?? '').'"><br>
 								<span class="vexpl">At what day of the month should the job be executed? Enter a number between 1 and 28.</span>
 							</tr>
 						</tr>
 						<tr id="repeat_interval">
 							<td width="22%" valign="top" class="vncellreq">Interval</td>
 							<td width="78%" class="vtable">
-								Every <input name="minute" type="text" class="formfld" size="2" value="'.htmlspecialchars($pconfig['minute']).'"> minute(s)<br>
+								Every <input name="minute" type="text" class="formfld" size="2" value="'.htmlspecialchars($pconfig['minute'] ?? '').'"> minute(s)<br>
 								<span class="vexpl">Enter a number between 1 and 1439</span>
 							</tr>
 						</tr>
 						<tr> 
 							<td width="22%" valign="top" class="vncell">Description</td>
 							<td width="78%" class="vtable">
-								<input name="descr" type="text" class="formfld" size="40" value="'.htmlspecialchars($pconfig['descr']).'"><br>
+								<input name="descr" type="text" class="formfld" size="40" value="'.htmlspecialchars($pconfig['descr'] ?? '').'"><br>
 								<span class="vexpl">You may enter a description here for your reference.</span>
 							</td>
 						</tr>

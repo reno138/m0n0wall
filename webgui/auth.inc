@@ -61,7 +61,7 @@ $userindex = index_users();
 
 // Once here, the user has authenticated with the web server.  
 // Now, we give them access only to the appropriate pages for their group.
-if (!($_SERVER['REMOTE_USER'] === $config['system']['username'])) {
+if (!(($_SERVER['REMOTE_USER'] ?? null) === ($config['system']['username'] ?? null))) {
 	$allowed[] = '';
 	if (isset($config['system']['group'][$groupindex[$config['system']['user'][$userindex[$_SERVER['REMOTE_USER']]]['groupname']]]['pages'])) {
         $allowed = &$config['system']['group'][$groupindex[$config['system']['user'][$userindex[$_SERVER['REMOTE_USER']]]['groupname']]]['pages'];

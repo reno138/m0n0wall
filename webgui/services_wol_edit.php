@@ -32,20 +32,22 @@
 $pgtitle = array("Services", "Wake on LAN", "Edit");
 require("guiconfig.inc");
 
-if (!is_array($config['wol']['wolentry'])) {
+if (!is_array($config['wol']['wolentry'] ?? null)) {
 	$config['wol']['wolentry'] = array();
 }
 wol_sort();
 $a_wol = &$config['wol']['wolentry'];
 
-$id = $_GET['id'];
+$pconfig = array();
+
+$id = $_GET['id'] ?? null;
 if (isset($_POST['id']))
 	$id = $_POST['id'];
 
-if (isset($id) && $a_wol[$id]) {
-	$pconfig['interface'] = $a_wol[$id]['interface'];
-	$pconfig['mac'] = $a_wol[$id]['mac'];
-	$pconfig['descr'] = $a_wol[$id]['descr'];
+if (isset($id) && !empty($a_wol[$id])) {
+	$pconfig['interface'] = $a_wol[$id]['interface'] ?? null;
+	$pconfig['mac'] = $a_wol[$id]['mac'] ?? null;
+	$pconfig['descr'] = $a_wol[$id]['descr'] ?? null;
 }
 
 if ($_POST) {
@@ -59,7 +61,7 @@ if ($_POST) {
 	
 	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
-	$_POST['mac'] = str_replace("-", ":", $_POST['mac']);
+	$_POST['mac'] = str_replace("-", ":", $_POST['mac'] ?? '');
 	
 	if (($_POST['mac'] && !is_macaddr($_POST['mac']))) {
 		$input_errors[] = "A valid MAC address must be specified.";
@@ -67,13 +69,13 @@ if ($_POST) {
 
 	if (!$input_errors) {
 		$wolent = array();
-		$wolent['interface'] = $_POST['interface'];
-		$wolent['mac'] = $_POST['mac'];
-		$wolent['descr'] = $_POST['descr'];
+		$wolent['interface'] = $_POST['interface'] ?? null;
+		$wolent['mac'] = $_POST['mac'] ?? null;
+		$wolent['descr'] = $_POST['descr'] ?? null;
 
-		if (isset($id) && $a_wol[$id]) {
+		if (isset($id) && !empty($a_wol[$id])) {
 			// Scheduler: update matching jobs
-			croen_update_job('wol', $a_wol[$id]['descr'], ($wolent['descr'] != '' ? $wolent['descr'] : FALSE));
+			croen_update_job('wol', $a_wol[$id]['descr'] ?? null, ($wolent['descr'] != '' ? $wolent['descr'] : FALSE));
 			$a_wol[$id] = $wolent;
 		} else {
 			$a_wol[] = $wolent;
@@ -87,7 +89,7 @@ if ($_POST) {
 }
 ?>
 <?php include("fbegin.inc"); ?>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
             <form action="services_wol_edit.php" method="post" name="iform" id="iform">
               <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="content pane">
 			  <tr> 
@@ -97,11 +99,11 @@ if ($_POST) {
                       <?php $interfaces = array('lan' => 'LAN');
 					  for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
 					    if (isset($config['interfaces']['opt' . $i]['enable']) &&
-							!$config['interfaces']['opt' . $i]['bridge'])
-					  		$interfaces['opt' . $i] = $config['interfaces']['opt' . $i]['descr'];
+							empty($config['interfaces']['opt' . $i]['bridge']))
+					  		$interfaces['opt' . $i] = $config['interfaces']['opt' . $i]['descr'] ?? '';
 					  }
 					  foreach ($interfaces as $iface => $ifacename): ?>
-                      <option value="<?=$iface;?>" <?php if ($iface == $pconfig['interface']) echo "selected"; ?>> 
+                      <option value="<?=$iface;?>" <?php if ($iface == ($pconfig['interface'] ?? null)) echo "selected"; ?>> 
                       <?=htmlspecialchars($ifacename);?>
                       </option>
                       <?php endforeach; ?>
@@ -111,7 +113,7 @@ if ($_POST) {
 				<tr>
                   <td width="22%" valign="top" class="vncellreq">MAC address</td>
                   <td width="78%" class="vtable"> 
-                    <?=$mandfldhtml;?><input name="mac" type="text" class="formfld" id="mac" size="20" value="<?=htmlspecialchars($pconfig['mac']);?>">
+                    <?=$mandfldhtml;?><input name="mac" type="text" class="formfld" id="mac" size="20" value="<?=htmlspecialchars($pconfig['mac'] ?? '');?>">
                     <br> 
                     <span class="vexpl">Enter a MAC address  in the following format: 
                     xx:xx:xx:xx:xx:xx<em></em></span></td>
@@ -119,7 +121,7 @@ if ($_POST) {
 				<tr>
                   <td width="22%" valign="top" class="vncell">Description</td>
                   <td width="78%" class="vtable"> 
-                    <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr']);?>">
+                    <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr'] ?? '');?>">
                     <br> <span class="vexpl">You may enter a description here
                     for your reference (not parsed).</span></td>
                 </tr>
@@ -127,7 +129,7 @@ if ($_POST) {
                   <td width="22%" valign="top">&nbsp;</td>
                   <td width="78%"> 
                     <input name="Submit" type="submit" class="formbtn" value="Save">
-                    <?php if (isset($id) && $a_wol[$id]): ?>
+                    <?php if (isset($id) && !empty($a_wol[$id])): ?>
                     <input name="id" type="hidden" value="<?=htmlspecialchars($id);?>">
                     <?php endif; ?>
                   </td>

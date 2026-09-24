@@ -32,7 +32,7 @@
 $pgtitle = array("Firewall", "NAT", "Server NAT");
 require("guiconfig.inc");
 
-if (!is_array($config['nat']['servernat'])) {
+if (!is_array($config['nat']['servernat'] ?? null)) {
 	$config['nat']['servernat'] = array();
 }
 $a_snat = &$config['nat']['servernat'];
@@ -42,7 +42,7 @@ if ($_POST) {
 
 	$pconfig = $_POST;
 
-	if ($_POST['apply']) {
+	if (!empty($_POST['apply'])) {
 		$retval = 0;
 		if (!file_exists($d_sysrebootreqd_path)) {
 			config_lock();
@@ -60,14 +60,14 @@ if ($_POST) {
 	}
 }
 
-if (isset($_POST['del_x']) && is_array($_POST['entries'])) {
+if (isset($_POST['del_x']) && is_array($_POST['entries'] ?? null)) {
 	foreach ($_POST['entries'] as $entry) {
-		if ($a_snat[$entry]) {
+		if (!empty($a_snat[$entry])) {
 			/* make sure no inbound NAT mappings reference this entry */
-			if (is_array($config['nat']['rule'])) {
+			if (is_array($config['nat']['rule'] ?? null)) {
 				foreach ($config['nat']['rule'] as $rule) {
-					if ($rule['external-address'] == $a_snat[$entry]['ipaddr']) {
-						$input_errors[] = "The entry for " . htmlspecialchars($a_snat[$entry]['ipaddr']) . " cannot be deleted because it is still referenced by at least one inbound NAT mapping.";
+					if (($rule['external-address'] ?? null) == ($a_snat[$entry]['ipaddr'] ?? null)) {
+						$input_errors[] = "The entry for " . htmlspecialchars($a_snat[$entry]['ipaddr'] ?? '') . " cannot be deleted because it is still referenced by at least one inbound NAT mapping.";
 						break;
 					}
 				}
@@ -75,7 +75,7 @@ if (isset($_POST['del_x']) && is_array($_POST['entries'])) {
 		}
 	}
 	
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 		foreach ($_POST['entries'] as $entry)
 			unset($a_snat[$entry]);
 		write_config();
@@ -88,8 +88,8 @@ if (isset($_POST['del_x']) && is_array($_POST['entries'])) {
 ?>
 <?php include("fbegin.inc"); ?>
 <form action="firewall_nat_server.php" method="post">
-<?php if ($input_errors) print_input_errors($input_errors); ?>
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
 <?php if (file_exists($d_natconfdirty_path)): ?><p>
 <?php print_info_box_np("The NAT configuration has been changed.<br>You must apply the changes in order for them to take effect.");?><br>
 <input name="apply" type="submit" class="formbtn" id="apply" value="Apply changes"></p>
@@ -119,10 +119,10 @@ if (isset($_POST['del_x']) && is_array($_POST['entries'])) {
                 <tr> 
 				  <td class="listt"><input type="checkbox" name="entries[]" value="<?=$i;?>" style="margin: 0 5px 0 0; padding: 0; width: 15px; height: 15px;"></td>
                   <td class="listlr"> 
-                    <?=$natent['ipaddr'];?>
+                    <?=$natent['ipaddr'] ?? '';?>
                   </td>
                   <td class="listbg"> 
-                    <?=htmlspecialchars($natent['descr']);?>&nbsp;
+                    <?=htmlspecialchars($natent['descr'] ?? '');?>&nbsp;
                   </td>
                   <td class="list" nowrap> <a href="firewall_nat_server_edit.php?id=<?=$i;?>"><img src="e.gif" title="edit entry" width="17" height="17" border="0" alt="edit entry"></a></td>
 				</tr>

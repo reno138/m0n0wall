@@ -34,11 +34,11 @@ require("guiconfig.inc");
 
 $a_pipes = &$config['shaper']['pipe'];
 
-$id = $_GET['id'];
+$id = $_GET['id'] ?? null;
 if (isset($_POST['id']))
 	$id = $_POST['id'];
 	
-if (isset($id) && $a_pipes[$id]) {
+if (isset($id) && !empty($a_pipes[$id])) {
 	$pconfig['bandwidth'] = $a_pipes[$id]['bandwidth'];
 	$pconfig['delay'] = $a_pipes[$id]['delay'];
 	$pconfig['plr'] = $a_pipes[$id]['plr'];
@@ -58,34 +58,34 @@ if ($_POST) {
 	
 	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
-	if (($_POST['bandwidth'] && !is_numericint($_POST['bandwidth']))) {
+	if ((!empty($_POST['bandwidth']) && !is_numericint($_POST['bandwidth']))) {
 		$input_errors[] = "The bandwidth must be an integer.";
 	}
-	if (($_POST['delay'] && !is_numericint($_POST['delay']))) {
+	if ((!empty($_POST['delay']) && !is_numericint($_POST['delay']))) {
 		$input_errors[] = "The delay must be an integer.";
 	}
-	if ($_POST['plr'] && (!is_numeric($_POST['plr']) || $_POST['plr'] < 0 || $_POST['plr'] > 1)) {
+	if (!empty($_POST['plr']) && (!is_numeric($_POST['plr']) || $_POST['plr'] < 0 || $_POST['plr'] > 1)) {
 		$input_errors[] = "The packet loss rate must be a number between 0 and 1.";
 	}
-	if ($_POST['qsize'] && (!is_numericint($_POST['qsize']) || $_POST['qsize'] < 2 || $_POST['qsize'] > 100)) {
+	if (!empty($_POST['qsize']) && (!is_numericint($_POST['qsize']) || $_POST['qsize'] < 2 || $_POST['qsize'] > 100)) {
 		$input_errors[] = "The queue size must be an integer between 2 and 100.";
 	}
 
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 		$pipe = array();
 		
-		$pipe['bandwidth'] = $_POST['bandwidth'];
-		if ($_POST['delay'])
+		$pipe['bandwidth'] = $_POST['bandwidth'] ?? null;
+		if (!empty($_POST['delay']))
 			$pipe['delay'] = $_POST['delay'];
-		if ($_POST['plr'])
+		if (!empty($_POST['plr']))
 			$pipe['plr'] = $_POST['plr'];
-		if ($_POST['qsize'])
+		if (!empty($_POST['qsize']))
 			$pipe['qsize'] = $_POST['qsize'];
-		if ($_POST['mask'])
+		if (!empty($_POST['mask']))
 			$pipe['mask'] = $_POST['mask'];
-		$pipe['descr'] = $_POST['descr'];
+		$pipe['descr'] = $_POST['descr'] ?? null;
 		
-		if (isset($id) && $a_pipes[$id]) {
+		if (isset($id) && !empty($a_pipes[$id])) {
 			// Scheduler: update matching jobs
 			croen_update_job('shaper-set_pipe_bandwidth', $a_pipes[$id]['descr'], ($pipe['descr'] != '' ? $pipe['descr'] : FALSE));
 			$a_pipes[$id] = $pipe;
@@ -100,29 +100,29 @@ if ($_POST) {
 }
 ?>
 <?php include("fbegin.inc"); ?>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
             <form action="firewall_shaper_pipes_edit.php" method="post" name="iform" id="iform">
               <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="content pane">
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">Bandwidth</td>
-                  <td width="78%" class="vtable"><?=$mandfldhtml;?><input name="bandwidth" type="text" id="bandwidth" size="5" value="<?=htmlspecialchars($pconfig['bandwidth']);?>"> 
+                  <td width="78%" class="vtable"><?=$mandfldhtml;?><input name="bandwidth" type="text" id="bandwidth" size="5" value="<?=htmlspecialchars($pconfig['bandwidth'] ?? '');?>"> 
                     &nbsp;Kbit/s</td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncell">Delay</td>
-                  <td width="78%" class="vtable"> <input name="delay" type="text" id="delay" size="5" value="<?=htmlspecialchars($pconfig['delay']);?>"> 
+                  <td width="78%" class="vtable"> <input name="delay" type="text" id="delay" size="5" value="<?=htmlspecialchars($pconfig['delay'] ?? '');?>"> 
                     &nbsp;ms<br> <span class="vexpl">Hint: in most cases, you 
                     should specify 0 here (or leave the field empty)</span></td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncell">Packet loss rate</td>
-                  <td width="78%" class="vtable"> <input name="plr" type="text" id="plr" size="5" value="<?=htmlspecialchars($pconfig['plr']);?>"> 
+                  <td width="78%" class="vtable"> <input name="plr" type="text" id="plr" size="5" value="<?=htmlspecialchars($pconfig['plr'] ?? '');?>"> 
                     <br> <span class="vexpl">Hint: in most cases, you 
                     should specify 0 here (or leave the field empty). A value of 0.001 means one packet in 1000 gets dropped.</span></td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncell">Queue size</td>
-                  <td width="78%" class="vtable"> <input name="qsize" type="text" id="qsize" size="8" value="<?=htmlspecialchars($pconfig['qsize']);?>"> 
+                  <td width="78%" class="vtable"> <input name="qsize" type="text" id="qsize" size="8" value="<?=htmlspecialchars($pconfig['qsize'] ?? '');?>"> 
                     &nbsp;slots<br> 
                     <span class="vexpl">Hint: in most cases, you 
                     should leave the field empty. All packets in this pipe are placed into a fixed-size queue first,
@@ -131,9 +131,9 @@ if ($_POST) {
                 <tr> 
                   <td width="22%" valign="top" class="vncell">Mask</td>
                   <td width="78%" class="vtable"> <select name="mask" class="formfld">
-                      <option value="" <?php if (!$pconfig['mask']) echo "selected"; ?>>none</option>
-                      <option value="source" <?php if ($pconfig['mask'] == "source") echo "selected"; ?>>source</option>
-                      <option value="destination" <?php if ($pconfig['mask'] == "destination") echo "selected"; ?>>destination</option>
+                      <option value="" <?php if (empty($pconfig['mask'])) echo "selected"; ?>>none</option>
+                      <option value="source" <?php if (($pconfig['mask'] ?? null) == "source") echo "selected"; ?>>source</option>
+                      <option value="destination" <?php if (($pconfig['mask'] ?? null) == "destination") echo "selected"; ?>>destination</option>
                     </select> <br>
                     <span class="vexpl">If 'source' or 'destination' is chosen, 
                     a dynamic pipe with the bandwidth, delay, packet loss and queue size given above will 
@@ -143,14 +143,14 @@ if ($_POST) {
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncell">Description</td>
-                  <td width="78%" class="vtable"> <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr']);?>"> 
+                  <td width="78%" class="vtable"> <input name="descr" type="text" class="formfld" id="descr" size="40" value="<?=htmlspecialchars($pconfig['descr'] ?? '');?>"> 
                     <br> <span class="vexpl">You may enter a description here 
                     for your reference (not parsed).</span></td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top">&nbsp;</td>
                   <td width="78%"> <input name="Submit" type="submit" class="formbtn" value="Save"> 
-                    <?php if (isset($id) && $a_pipes[$id]): ?>
+                    <?php if (isset($id) && !empty($a_pipes[$id])): ?>
                     <input name="id" type="hidden" value="<?=htmlspecialchars($id);?>">
                     <?php endif; ?>
                   </td>

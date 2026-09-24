@@ -39,7 +39,7 @@ unset($hwcrypto);
 $hwcrypto = hwcrypto_descr();
 
 $specplatform = system_identify_specific_platform();
-if (preg_match("/^CPU.*/m", $dmesg, $matches) )
+if (preg_match("/^CPU.*/m", $dmesg ?? '', $matches) )
 	$cpudetail = " - " . $matches[0];
 
 if ($_POST) {
@@ -49,12 +49,12 @@ if ($_POST) {
 	exit;
 }
 	exec("export QUERY_STRING=cpu;export REQUEST_METHOD=GET;/usr/local/www/stats.cgi" ,$cpuutil);
-    $cpuu = $cpuutil[2];
+    $cpuu = $cpuutil[2] ?? null;
 
 	exec("/sbin/sysctl -n vm.stats.vm.v_active_count vm.stats.vm.v_inactive_count " .
     	"vm.stats.vm.v_wire_count vm.stats.vm.v_cache_count vm.stats.vm.v_free_count", $memory);
-    $totalMem = $memory[0] + $memory[1] + $memory[2] + $memory[3] + $memory[4];
-    $freeMem = $memory[4];
+    $totalMem = ($memory[0] ?? null) + ($memory[1] ?? null) + ($memory[2] ?? null) + ($memory[3] ?? null) + ($memory[4] ?? null);
+    $freeMem = $memory[4] ?? null;
     $usedMem = $totalMem - $freeMem;
     $memUsage = round(($usedMem * 100) / $totalMem, 0);
 
@@ -89,7 +89,7 @@ if ($_POST) {
               <tr> 
                 <td width="25%" class="vncellt">Platform</td>
                 <td width="75%" class="listr"> 
-                  <?=htmlspecialchars($specplatform['descr']); ?> <?=htmlspecialchars($cpudetail); ?> 
+                  <?=htmlspecialchars($specplatform['descr']); ?> <?=htmlspecialchars($cpudetail ?? ''); ?> 
                 </td>
               </tr><?php if ($hwcrypto): ?>
               <tr> 
@@ -109,8 +109,8 @@ if ($_POST) {
                 <td width="75%" class="listr"> 
                   <?php
 				  	exec("/sbin/sysctl -n kern.boottime", $boottime);
-					preg_match("/sec = (\d+)/", $boottime[0], $matches);
-					$boottime = $matches[1];
+					preg_match("/sec = (\d+)/", $boottime[0] ?? '', $matches);
+					$boottime = $matches[1] ?? null;
 					$uptime = time() - $boottime;
 					
 					if ($uptime > 60)
@@ -131,7 +131,7 @@ if ($_POST) {
 				  ?>
                 </td>
               </tr>
-              <?php if ($config['lastchange']): ?>
+              <?php if (!empty($config['lastchange'])): ?>
               <tr> 
                 <td width="25%" class="vncellt">Last config change</td>
                 <td width="75%" class="listr"> 
@@ -153,7 +153,7 @@ if ($_POST) {
               </tr>
 			  <?php
 					if ( isset($config['system']['webgui']['mbmon']['enable']) ) {
-								if ($config['system']['webgui']['mbmon']['type'] == 'F') {
+								if (($config['system']['webgui']['mbmon']['type'] ?? null) == 'F') {
                                 exec("/usr/local/bin/mbmon -f -c1 -r 2>/dev/null ", $mbmonop, $error);
 								} else {
 								exec("/usr/local/bin/mbmon -c1 -r 2>/dev/null ", $mbmonop, $error);
@@ -178,7 +178,7 @@ if ($_POST) {
 				<td align="left" width="85%" class="listsensorval">
 																<?php
 																echo htmlspecialchars($mbmonp[1]);
-																if ($config['system']['webgui']['mbmon']['type'] == 'F') {
+																if (($config['system']['webgui']['mbmon']['type'] ?? null) == 'F') {
                                                                 echo '&deg;F</td></tr>';
 																} else {
 																echo '&deg;C</td></tr>';
@@ -268,7 +268,7 @@ if ($_POST) {
               <tr> 
                 <td width="25%" class="vncellt" valign="top">Notes</td>
                 <td width="75%" class="listr">
-                  <textarea name="notes" cols="75" rows="7" id="notes" class="notes"><?=htmlspecialchars(base64_decode($config['system']['notes']));?></textarea><br>
+                  <textarea name="notes" cols="75" rows="7" id="notes" class="notes"><?=htmlspecialchars(base64_decode($config['system']['notes'] ?? ''));?></textarea><br>
                   <input name="Submit" type="submit" class="formbtns" value="Save">
                 </td>
               </tr>

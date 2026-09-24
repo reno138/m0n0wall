@@ -30,29 +30,29 @@
 $pgtitle = array("Services", "Captive portal", "Edit Voucher Rolls");
 require("guiconfig.inc");
 
-if (!is_array($config['voucher'])) {
+if (!is_array($config['voucher'] ?? null)) {
     $config['voucher'] = array();
 }
 
-if (!is_array($config['voucher']['roll'])) {
+if (!is_array($config['voucher']['roll'] ?? null)) {
 	$config['voucher']['roll'] = array();
 }
 // captiveportal_users_sort();
 $a_roll = &$config['voucher']['roll'];
 
-$id = $_GET['id'];
+$id = $_GET['id'] ?? null;
 if (isset($_POST['id']))
 	$id = $_POST['id'];
 
-if (isset($id) && $a_roll[$id]) {
-	$pconfig['number'] = $a_roll[$id]['number'];
-	$pconfig['count'] = $a_roll[$id]['count'];
-	$pconfig['minutes'] = $a_roll[$id]['minutes'];
-	$pconfig['comment'] = $a_roll[$id]['comment'];
+if (isset($id) && !empty($a_roll[$id])) {
+	$pconfig['number'] = $a_roll[$id]['number'] ?? null;
+	$pconfig['count'] = $a_roll[$id]['count'] ?? null;
+	$pconfig['minutes'] = $a_roll[$id]['minutes'] ?? null;
+	$pconfig['comment'] = $a_roll[$id]['comment'] ?? null;
 }
 
-$maxnumber = (1<<$config['voucher']['rollbits']) -1;    // Highest Roll#
-$maxcount = (1<<$config['voucher']['ticketbits']) -1;   // Highest Ticket#
+$maxnumber = (1<<($config['voucher']['rollbits'] ?? null)) -1;    // Highest Roll#
+$maxcount = (1<<($config['voucher']['ticketbits'] ?? null)) -1;   // Highest Ticket#
 
 if ($_POST) {
 	
@@ -65,27 +65,27 @@ if ($_POST) {
 
     do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 
-    if (!is_numeric($_POST['number']) || $_POST['number'] >= $maxnumber) 
+    if (!is_numeric($_POST['number'] ?? null) || $_POST['number'] >= $maxnumber) 
         $input_errors[] = "Roll number must be numeric and less than $maxnumber";
 
-    if (!is_numeric($_POST['count']) || $_POST['count'] < 1 || $_POST['count'] > $maxcount)
+    if (!is_numeric($_POST['count'] ?? null) || $_POST['count'] < 1 || $_POST['count'] > $maxcount)
         $input_errors[] = "A roll has at least one voucher and less than $maxcount.";
 
-    if (!is_numeric($_POST['minutes']) || $_POST['minutes'] < 1)
+    if (!is_numeric($_POST['minutes'] ?? null) || $_POST['minutes'] < 1)
         $input_errors[] = "Each voucher must be good for at least 1 minute.";
 
-    if (!$input_errors) {
+    if (empty($input_errors)) {
 
-        if (isset($id) && $a_roll[$id])
+        if (isset($id) && !empty($a_roll[$id]))
             $rollent = $a_roll[$id];
 
         $rollent['number']  = $_POST['number'];
         $rollent['minutes'] = $_POST['minutes'];
-        $rollent['comment'] = $_POST['comment'];
+        $rollent['comment'] = $_POST['comment'] ?? null;
 
         /* New Roll or modified voucher count: create bitmask */
         voucher_lock();
-        if ($_POST['count'] != $rollent['count']) {
+        if ($_POST['count'] != ($rollent['count'] ?? null)) {
             $rollent['count'] = $_POST['count'];
             $len = ($rollent['count']>>3) + 1;   // count / 8 +1
             $rollent['used'] = base64_encode(str_repeat("\000",$len)); // 4 bitmask
@@ -110,7 +110,7 @@ if ($_POST) {
             $rollent['active'] = $db;
         }
         voucher_unlock();
-        if (isset($id) && $a_roll[$id])
+        if (isset($id) && !empty($a_roll[$id]))
             $a_roll[$id] = $rollent;
         else
             $a_roll[] = $rollent;
@@ -124,14 +124,14 @@ if ($_POST) {
 
 ?>
 <?php include("fbegin.inc"); ?>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
-<?php if ($savemsg) print_info_box($savemsg); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg); ?>
 <form action="services_captiveportal_vouchers_edit.php" method="post" name="iform" id="iform">
   <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="content pane">
 	<tr> 
 	  <td width="22%" valign="top" class="vncellreq">Roll#</td>
 	  <td width="78%" class="vtable"> 
-		<?=$mandfldhtml;?><input name="number" type="text" class="formfld" id="number" size="10" value="<?=htmlspecialchars($pconfig['number']);?>"> 
+		<?=$mandfldhtml;?><input name="number" type="text" class="formfld" id="number" size="10" value="<?=htmlspecialchars($pconfig['number'] ?? '');?>"> 
         <br>
         <span class="vexpl">Enter the Roll# (0..<?=htmlspecialchars($maxnumber);?>) found on top of the generated/printed vouchers.</span>
 		</td>
@@ -139,7 +139,7 @@ if ($_POST) {
 	<tr> 
 	  <td width="22%" valign="top" class="vncellreq">Minutes per Ticket</td>
 	  <td width="78%" class="vtable"> 
-		<?=$mandfldhtml;?><input name="minutes" type="text" class="formfld" id="minutes" size="10" value="<?=htmlspecialchars($pconfig['minutes']);?>"> 
+		<?=$mandfldhtml;?><input name="minutes" type="text" class="formfld" id="minutes" size="10" value="<?=htmlspecialchars($pconfig['minutes'] ?? '');?>"> 
         <br>
         <span class="vexpl">Defines the time in minutes that a user is allowed access. The clock starts ticking the first time a voucher is used for authentication.</span>
 	   </td>
@@ -147,7 +147,7 @@ if ($_POST) {
 	<tr> 
 	  <td width="22%" valign="top" class="vncellreq">Count</td>
 	  <td width="78%" class="vtable"> 
-		<?=$mandfldhtml;?><input name="count" type="text" class="formfld" id="count" size="10" value="<?=htmlspecialchars($pconfig['count']);?>"> 
+		<?=$mandfldhtml;?><input name="count" type="text" class="formfld" id="count" size="10" value="<?=htmlspecialchars($pconfig['count'] ?? '');?>"> 
         <br>
         <span class="vexpl">Enter the number of vouchers (1..<?=htmlspecialchars($maxcount);?>) found on top of the generated/printed vouchers. WARNING: Changing this number for an existing Roll will mark all vouchers as unused again.</span>
 		</td>
@@ -155,7 +155,7 @@ if ($_POST) {
 	<tr> 
 	  <td width="22%" valign="top" class="vncell">Comment</td>
 	  <td width="78%" class="vtable"> 
-		<?=$mandfldhtml;?><input name="comment" type="text" class="formfld" id="comment" size="60" value="<?=htmlspecialchars($pconfig['comment']);?>"> 
+		<?=$mandfldhtml;?><input name="comment" type="text" class="formfld" id="comment" size="60" value="<?=htmlspecialchars($pconfig['comment'] ?? '');?>"> 
         <br>
         <span class="vexpl">Can be used to further identify this roll. Ignored by the system.</span>
 		</td>
@@ -164,7 +164,7 @@ if ($_POST) {
 	  <td width="22%" valign="top">&nbsp;</td>
 	  <td width="78%"> 
 		<input name="Submit" type="submit" class="formbtn" value="Save"> 
-		<?php if (isset($id) && $a_roll[$id]): ?>
+		<?php if (isset($id) && !empty($a_roll[$id])): ?>
 		<input name="id" type="hidden" value="<?=htmlspecialchars($id);?>">
 		<?php endif; ?>
 	  </td>

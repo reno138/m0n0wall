@@ -36,6 +36,7 @@ require_once("functions.inc");
 	
 function hwcrypto_descr() {
 	$dmesg = system_get_dmesg_boot();
+	$hwcrypto = "";
 	if (preg_match("/^hifn.: (.*?),/m", $dmesg, $matches))
 		$hwcrypto = "Hifn (enabled) ";
 	if (preg_match("/^ *VIA Padlock Features=.*/m", $dmesg)) {
@@ -58,11 +59,11 @@ function enable_cpuhwcrypto() {
 	$dmesg = system_get_dmesg_boot();
 	global $config, $g;
 
-        $l2tpdcfg = $config['l2tp'];
+        $l2tpdcfg = $config['l2tp'] ?? null;
 	
 	if (preg_match("/^ *VIA Padlock Features=.*/m", $dmesg))
 		mwexec("/sbin/kldload padlock.ko");
-	if (preg_match("/^CPU: Geode/m", $dmesg) && ($l2tpdcfg['mode'] != "server"))
+	if (preg_match("/^CPU: Geode/m", $dmesg) && (($l2tpdcfg['mode'] ?? null) != "server"))
 		mwexec("/sbin/kldload glxsb.ko");
 	if (preg_match("/^ *Features2=.*AESNI/m", $dmesg))
 		mwexec("/sbin/kldload aesni.ko");
@@ -148,9 +149,9 @@ function system_hosts_generate() {
 	
 	$syscfg = $config['system'];
 	$lancfg = $config['interfaces']['lan'];
-	$dnsmasqcfg = $config['dnsmasq'];
+	$dnsmasqcfg = $config['dnsmasq'] ?? null;
 
-	if (!is_array($dnsmasqcfg['hosts'])) {
+	if (!is_array($dnsmasqcfg['hosts'] ?? null)) {
 		$dnsmasqcfg['hosts'] = array();
 	}
 	$hostscfg = $dnsmasqcfg['hosts'];
@@ -213,7 +214,7 @@ function system_routing_configure() {
 			unlink($routes_db);
 		}
 	
-		if ((!$ipv6 && is_array($config['staticroutes']['route'])) || ($ipv6 && ipv6enabled())) {
+		if ((!$ipv6 && is_array($config['staticroutes']['route'] ?? null)) || ($ipv6 && ipv6enabled())) {
 		
 			$fd = fopen($routes_db, "w");
 			if (!$fd) {
@@ -221,7 +222,7 @@ function system_routing_configure() {
 				return 1;		
 			}
 			
-			$routes = $config['staticroutes'][$strtconf];
+			$routes = $config['staticroutes'][$strtconf] ?? null;
 			if (!is_array($routes))
 				$routes = array();
 			
@@ -399,7 +400,7 @@ function system_webgui_start() {
 	chdir($g['www_path']);
 	
 	/* non-standard port? */
-	if ($config['system']['webgui']['port'])
+	if (!empty($config['system']['webgui']['port']))
 		$portarg = "-p {$config['system']['webgui']['port']}";
 	else
 		$portarg = "";
@@ -503,17 +504,17 @@ function system_password_configure() {
 		return 1;
 	}
 	
-	if ($config['system']['username'])
+	if (!empty($config['system']['username']))
 		$username = $config['system']['username'];
 	else
 		$username = "admin";
 	
-	fwrite($fd, $username . ":" . $config['system']['password'] . "\n");
+	fwrite($fd, $username . ":" . ($config['system']['password'] ?? '') . "\n");
 
-	if (is_array($config['system']['user'])) {
+	if (is_array($config['system']['user'] ?? null)) {
 		foreach ($config['system']['user'] as $userent) {
-			    fwrite($fd, $userent['name'] . ":" 
-		              . $userent['password'] . "\n");
+			    fwrite($fd, ($userent['name'] ?? '') . ":" 
+		              . ($userent['password'] ?? '') . "\n");
 		}
 	}
 	
@@ -606,7 +607,7 @@ function system_do_shell_commands($early = 0) {
 	else
 		$cmdn = "shellcmd";
 	
-	if (is_array($config['system'][$cmdn])) {
+	if (is_array($config['system'][$cmdn] ?? null)) {
 		
 		foreach ($config['system'][$cmdn] as $cmd) {
 			exec($cmd);

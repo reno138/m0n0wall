@@ -34,7 +34,7 @@ require("guiconfig.inc");
 <?php include("fbegin.inc"); ?>
 <?php
 
-if (!is_array($config['voucher']['roll'])) {
+if (!is_array($config['voucher']['roll'] ?? null)) {
     $config['voucher']['roll'] = array();
 }
 $a_roll = &$config['voucher']['roll'];

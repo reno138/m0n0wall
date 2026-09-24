@@ -34,7 +34,7 @@
 $pgtitle = array("Services", "Captive portal", "Users");
 require("guiconfig.inc");
 
-if (!is_array($config['captiveportal']['user'])) {
+if (!is_array($config['captiveportal']['user'] ?? null)) {
 	$config['captiveportal']['user'] = array();
 }
 captiveportal_users_sort();
@@ -44,7 +44,7 @@ if ($_POST) {
 	foreach ($_POST as $pn => $pv) {
 		if (preg_match("/^del_(\d+)_x$/", $pn, $matches)) {
 			$id = $matches[1];
-			if ($a_user[$id]) {
+			if (!empty($a_user[$id])) {
 				unset($a_user[$id]);
 				write_config();
 				header("Location: services_captiveportal_users.php");
@@ -57,7 +57,7 @@ if ($_POST) {
 //erase expired accounts
 $changed = false;
 for ($i = 0; $i < count($a_user); $i++) {
-	if ($a_user[$i]['expirationdate'] && (strtotime("-1 day") > strtotime($a_user[$i]['expirationdate']))) {
+	if (!empty($a_user[$i]['expirationdate']) && (strtotime("-1 day") > strtotime($a_user[$i]['expirationdate']))) {
 		unset($a_user[$i]);
 		$changed = true;
 	}
@@ -97,13 +97,13 @@ if ($changed) {
 	<?php $i = 0; foreach($a_user as $userent): ?>
 		<tr>
                   <td class="listlr">
-                    <?=htmlspecialchars($userent['name']); ?>&nbsp;
+                    <?=htmlspecialchars($userent['name'] ?? ''); ?>&nbsp;
                   </td>
                   <td class="listr">
-                    <?=htmlspecialchars($userent['fullname']);?>&nbsp;
+                    <?=htmlspecialchars($userent['fullname'] ?? '');?>&nbsp;
                   </td>
                   <td class="listbg">
-                    <?=$userent['expirationdate']; ?>&nbsp;
+                    <?=$userent['expirationdate'] ?? ''; ?>&nbsp;
                   </td>
                   <td valign="middle" nowrap class="list"> <a href="services_captiveportal_users_edit.php?id=<?=$i; ?>"><img src="e.gif" title="edit user" width="17" height="17" border="0" alt="edit user"></a>
                      &nbsp;<input name="del_<?=$i;?>" type="image" src="x.gif" width="17" height="17" title="delete user" alt="delete user" onclick="return confirm('Do you really want to delete this user?')"></td>

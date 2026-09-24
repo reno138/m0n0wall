@@ -81,7 +81,7 @@ for ($j = 1; isset($config['interfaces']['opt' . $j]); $j++) {
 }
 
 foreach ($ifdescrs as $key =>$interface) {
-	$hwif[$config['interfaces'][$key]['if']] = $interface;
+	$hwif[$config['interfaces'][$key]['if'] ?? ''] = $interface;
 }
 
 $data = array();
@@ -91,11 +91,11 @@ exec("/usr/sbin/arp -an",$rawdata);
 foreach ($rawdata as $line) {
 	$elements = explode(' ',$line);
 	
-	if ($elements[3] != "(incomplete)") {
+	if (($elements[3] ?? null) != "(incomplete)") {
 		$arpent = array();
-		$arpent['ip'] = trim(str_replace(array('(',')'),'',$elements[1]));
-		$arpent['mac'] = trim($elements[3]);
-		$arpent['interface'] = trim($elements[5]);
+		$arpent['ip'] = trim(str_replace(array('(',')'),'',$elements[1] ?? ''));
+		$arpent['mac'] = trim($elements[3] ?? '');
+		$arpent['interface'] = trim($elements[5] ?? '');
 		$data[] = $arpent;
 	}
 }
@@ -109,13 +109,13 @@ if (ipv6enabled()){
 	foreach ($ndprawdata as $line) {
 		$elements = explode(" ", preg_replace("/ +/", " ",$line));
 		//check if linklocal and remove %if		
-		$ip6element = explode("%", $elements[0]);
+		$ip6element = explode("%", $elements[0] ?? '');
 		
-		if ($elements[1] != "(incomplete)") {
+		if (($elements[1] ?? null) != "(incomplete)") {
 			$ndpent = array();
 			$ndpent['ip'] = trim($ip6element[0]);
-			$ndpent['mac'] = "0" . trim($elements[1]);
-			$ndpent['interface'] = trim($elements[2]);
+			$ndpent['mac'] = "0" . trim($elements[1] ?? '');
+			$ndpent['interface'] = trim($elements[2] ?? '');
 			$data[] = $ndpent;
 		}
 	}
@@ -125,9 +125,9 @@ function arp_get_hostname($mac,$ip)
 {
 	global $dhcpmac, $dhcpip, $resolve;
 	
-	if ($dhcpmac[$mac])
+	if (!empty($dhcpmac[$mac]))
 		return $dhcpmac[$mac];
-	else if ($dhcpip[$ip])
+	else if (!empty($dhcpip[$ip]))
 		return $dhcpip[$ip];
 	else if ($resolve && is_ipaddr4or6($ip)) 
 		return gethostbyaddr($ip);
@@ -153,7 +153,7 @@ function arp_get_hostname($mac,$ip)
     <td class="listlr"><?=$entry['ip'];?></td>
     <td class="listr"><?=$entry['mac'];?></td>
     <td class="listr"><?=arp_get_hostname($entry['mac'], $entry['ip']);?></td>
-    <td class="listr"><?=$hwif[$entry['interface']];?></td>
+    <td class="listr"><?=$hwif[$entry['interface']] ?? '';?></td>
   </tr>
 <?php $i++; endforeach; ?>
   <tr> 

@@ -34,20 +34,20 @@
 $pgtitle = array("Services", "Captive portal", "Edit user");
 require("guiconfig.inc");
 
-if (!is_array($config['captiveportal']['user'])) {
+if (!is_array($config['captiveportal']['user'] ?? null)) {
 	$config['captiveportal']['user'] = array();
 }
 captiveportal_users_sort();
 $a_user = &$config['captiveportal']['user'];
 
-$id = $_GET['id'];
+$id = $_GET['id'] ?? null;
 if (isset($_POST['id']))
 	$id = $_POST['id'];
 
-if (isset($id) && $a_user[$id]) {
-	$pconfig['username'] = $a_user[$id]['name'];
-	$pconfig['fullname'] = $a_user[$id]['fullname'];
-	$pconfig['expirationdate'] = $a_user[$id]['expirationdate'];
+if (isset($id) && !empty($a_user[$id])) {
+	$pconfig['username'] = $a_user[$id]['name'] ?? null;
+	$pconfig['fullname'] = $a_user[$id]['fullname'] ?? null;
+	$pconfig['expirationdate'] = $a_user[$id]['expirationdate'] ?? null;
 }
 
 if ($_POST) {
@@ -56,7 +56,7 @@ if ($_POST) {
 	$pconfig = $_POST;
 
 	/* input validation */
-	if (isset($id) && ($a_user[$id])) {
+	if (isset($id) && (!empty($a_user[$id]))) {
 		$reqdfields = explode(" ", "username");
 		$reqdfieldsn = explode(",", "Username");
 	} else {
@@ -66,17 +66,17 @@ if ($_POST) {
 	
 	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
-	if (preg_match("/[^a-zA-Z0-9\.\-_]/", $_POST['username']))
+	if (preg_match("/[^a-zA-Z0-9\.\-_]/", $_POST['username'] ?? ''))
 		$input_errors[] = "The username contains invalid characters.";
 		
-	if (($_POST['password']) && ($_POST['password'] != $_POST['password2']))
+	if ((!empty($_POST['password'])) && ($_POST['password'] != ($_POST['password2'] ?? null)))
 		$input_errors[] = "The passwords do not match.";
 
 	//check for a valid expirationdate if one is set at all (valid means, strtotime() puts out a time stamp
 	//so any strtotime compatible time format may be used. to keep it simple for the enduser, we only claim 
 	//to accept MM/DD/YYYY as inputs. advanced users may use inputs like "+1 day", which will be converted to 
 	//MM/DD/YYYY based on "now" since otherwhise such an entry would lead to a never expiring expirationdate
-	if ($_POST['expirationdate']){
+	if (!empty($_POST['expirationdate'])){
 		if(strtotime($_POST['expirationdate']) > 0){
 			if (strtotime("-1 day") > strtotime(date("m/d/Y",strtotime($_POST['expirationdate'])))){
 				$input_errors[] = "The expiration date lies in the past.";			
@@ -90,7 +90,7 @@ if ($_POST) {
 		}
 	}
 	
-	if (!$input_errors && !(isset($id) && $a_user[$id])) {
+	if (empty($input_errors) && !(isset($id) && !empty($a_user[$id]))) {
 		/* make sure there are no dupes */
 		foreach ($a_user as $userent) {
 			if ($userent['name'] == $_POST['username']) {
@@ -100,19 +100,19 @@ if ($_POST) {
 		}
 	}
 	
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 	
-		if (isset($id) && $a_user[$id])
+		if (isset($id) && !empty($a_user[$id]))
 			$userent = $a_user[$id];
 		
 		$userent['name'] = $_POST['username'];
-		$userent['fullname'] = $_POST['fullname'];
-		$userent['expirationdate'] = $_POST['expirationdate'];
+		$userent['fullname'] = $_POST['fullname'] ?? null;
+		$userent['expirationdate'] = $_POST['expirationdate'] ?? null;
 		
-		if ($_POST['password'])
+		if (!empty($_POST['password']))
 			$userent['password'] = md5($_POST['password']);
 		
-		if (isset($id) && $a_user[$id])
+		if (isset($id) && !empty($a_user[$id]))
 			$a_user[$id] = $userent;
 		else
 			$a_user[] = $userent;
@@ -133,13 +133,13 @@ if ($_POST) {
 //For this script, visit http://www.javascriptkit.com
 // -->
 </script>
-<?php if ($input_errors) print_input_errors($input_errors); ?>
+<?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
 <form action="services_captiveportal_users_edit.php" method="post" name="iform" id="iform">
   <table width="100%" border="0" cellpadding="6" cellspacing="0" summary="content pane">
 	<tr> 
 	  <td width="22%" valign="top" class="vncellreq">Username</td>
 	  <td width="78%" class="vtable"> 
-		<?=$mandfldhtml;?><input name="username" type="text" class="formfld" id="username" size="20" value="<?=htmlspecialchars($pconfig['username']);?>"> 
+		<?=$mandfldhtml;?><input name="username" type="text" class="formfld" id="username" size="20" value="<?=htmlspecialchars($pconfig['username'] ?? '');?>"> 
 		</td>
 	</tr>
 	<tr> 
@@ -147,7 +147,7 @@ if ($_POST) {
 	  <td width="78%" class="vtable"> 
 		<?=$mandfldhtml;?><input name="password" type="password" class="formfld" id="password" size="20"><br>
 		<?=$mandfldhtml;?><input name="password2" type="password" class="formfld" id="password2" size="20">
-		&nbsp;(confirmation)<?php if (isset($id) && $a_user[$id]): ?><br>
+		&nbsp;(confirmation)<?php if (isset($id) && !empty($a_user[$id])): ?><br>
         <span class="vexpl">If you want to change the users' password, 
         enter it here twice.</span><?php endif; ?>
 		</td>
@@ -155,14 +155,14 @@ if ($_POST) {
 	<tr> 
 	  <td width="22%" valign="top" class="vncell">Full name</td>
 	  <td width="78%" class="vtable"> 
-		<input name="fullname" type="text" class="formfld" id="fullname" size="20" value="<?=htmlspecialchars($pconfig['fullname']);?>">
+		<input name="fullname" type="text" class="formfld" id="fullname" size="20" value="<?=htmlspecialchars($pconfig['fullname'] ?? '');?>">
 		<br>
 		<span class="vexpl">User's full name, for your own information only</span></td>
 	</tr>
 	<tr> 
 	  <td width="22%" valign="top" class="vncell">Expiration date</td>
 	  <td width="78%" class="vtable"> 
-		<input name="expirationdate" type="text" class="formfld" id="expirationdate" size="10" value="<?=htmlspecialchars($pconfig['expirationdate']);?>">
+		<input name="expirationdate" type="text" class="formfld" id="expirationdate" size="10" value="<?=htmlspecialchars($pconfig['expirationdate'] ?? '');?>">
 		<a href="javascript:NewCal('expirationdate','mmddyyyy')"><img src="cal.gif" width="16" height="16" border="0" alt="Pick a date"></a> 
 		<br> 
 		<span class="vexpl">Leave blank if the account shouldn't expire, otherwise enter the expiration date in the following format: mm/dd/yyyy</span></td>
@@ -171,7 +171,7 @@ if ($_POST) {
 	  <td width="22%" valign="top">&nbsp;</td>
 	  <td width="78%"> 
 		<input name="Submit" type="submit" class="formbtn" value="Save"> 
-		<?php if (isset($id) && $a_user[$id]): ?>
+		<?php if (isset($id) && !empty($a_user[$id])): ?>
 		<input name="id" type="hidden" value="<?=htmlspecialchars($id);?>">
 		<?php endif; ?>
 	  </td>

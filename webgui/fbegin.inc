@@ -46,7 +46,7 @@ function dynamic_menu(&$menu, $menu_title) {
 	global $allowed, $config;
 
 	// Make sure the admin can see everything
-	if ($_SERVER['REMOTE_USER'] === $config['system']['username']) {
+	if (($_SERVER['REMOTE_USER'] ?? null) === $config['system']['username']) {
 		unset($allowed);
    		foreach ($menu as $item) {
         			$allowed[] = $item[0];
@@ -54,13 +54,13 @@ function dynamic_menu(&$menu, $menu_title) {
 	}
 
 	// Workaround for IPv6 pages
-	if (ipv6enabled() && in_array('firewall_rules.php', $allowed))
+	if (ipv6enabled() && in_array('firewall_rules.php', $allowed ?? array()))
 		$allowed[] = 'firewall_rules.php?type=ipv6';
-	if (ipv6enabled() && in_array('system_routes.php', $allowed))
+	if (ipv6enabled() && in_array('system_routes.php', $allowed ?? array()))
 		$allowed[] = 'system_routes.php?type=ipv6';
 	
 	foreach ($menu as $desc => $links) {
-		if ($intersect = array_intersect($menu[$desc],$allowed)) {
+		if ($intersect = array_intersect($menu[$desc],$allowed ?? array())) {
 			if (!isset($header_displayed) && !($menu_title=='Diagnostics')) {
 				echo "\n			<strong>".$menu_title.'</strong><br>';
 				$header_displayed = true;
@@ -96,8 +96,8 @@ function dynamic_menu(&$menu, $menu_title) {
 // $allowed is set in auth.inc *IF* the user is not the webGUI admin
 // so, if it's not set here, they were the admin user when they submited the admin username change.
 if ((!isset($allowed) || !is_array($allowed)) and 
-    ($_SERVER['PHP_SELF'] == '/system.php') and 
-    ($_SERVER['REMOTE_USER'] != $config['system']['username'])) {
+    (($_SERVER['PHP_SELF'] ?? null) == '/system.php') and 
+    (($_SERVER['REMOTE_USER'] ?? null) != $config['system']['username'])) {
 	// webGUI username was just changed, let us change what PHP sees the remote user as so
 	// the menu will build properly.  When user hits next link, they will be prompted to reauthenticate.
 	$_SERVER['REMOTE_USER'] = $config['system']['username'];	
@@ -113,7 +113,7 @@ if (ipv6enabled()) {
 }
 $menu['System']['Firmware']      = array('system_firmware.php');
 $menu['System']['Advanced']      = array('system_advanced.php');
-if ($_SERVER['REMOTE_USER'] === $config['system']['username']) {
+if (($_SERVER['REMOTE_USER'] ?? null) === $config['system']['username']) {
 	$menu['System']['User manager']  = array('system_usermanager.php');
 }
 else {
@@ -277,23 +277,23 @@ $if_menu = array('(assign)' => 'interfaces_assign.php',
     			 'LAN' => 'interfaces_lan.php',
 			  	 'WAN' => 'interfaces_wan.php',
 			     'OPTx' => 'interfaces_opt.php');
-if ($_SERVER['REMOTE_USER'] === $config['system']['username']) {
+if (($_SERVER['REMOTE_USER'] ?? null) === $config['system']['username']) {
 	$allowed = $if_menu;
 }
-if (array_intersect($if_menu,$allowed)) {
+if (array_intersect($if_menu,$allowed ?? array())) {
 	echo '<strong>Interfaces</strong>';
 	if ((!isset($config['system']['webgui']['noassigninterfaces'])) && 
-	    (in_array('interfaces_assign.php',$allowed))) {
+	    (in_array('interfaces_assign.php',$allowed ?? array()))) {
 		echo '<a href="/interfaces_assign.php" class="navlnks"> (assign)</a>';
 	}
     echo '<br>';
-    if (in_array('interfaces_lan.php',$allowed)) {
+    if (in_array('interfaces_lan.php',$allowed ?? array())) {
     	echo '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="/interfaces_lan.php" class="navlnk">LAN</a><br>';
     }
-    if (in_array('interfaces_wan.php',$allowed)) {
+    if (in_array('interfaces_wan.php',$allowed ?? array())) {
     	echo '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="/interfaces_wan.php" class="navlnk">WAN</a><br>';
     }
-    if (in_array('interfaces_opt.php',$allowed)) {
+    if (in_array('interfaces_opt.php',$allowed ?? array())) {
     	for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
 			echo '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="/interfaces_opt.php?index=' .$i.
 			     '" class="navlnk">'.htmlspecialchars($config['interfaces']['opt' . $i]['descr']).'</a><br>';
