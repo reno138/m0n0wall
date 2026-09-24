@@ -225,11 +225,44 @@ function wg_peer_config_generate($tunnel, $peer, $privatekey = '', $server_endpo
 function wg_configure() {
 	global $config, $g;
 
-	if (!isset($config['wireguard']['tunnel']) || !is_array($config['wireguard']['tunnel']))
+	/* Tear down first, from the kernel's own list rather than from the config:
+	   a tunnel that has just been deleted or disabled is not in the config any
+	   more, so anything driven off the config alone would leave its interface
+	   up and carrying traffic. wg interfaces are all in the "wg" group. */
+	$existing = array();
+	exec("/sbin/ifconfig -g wg 2>/dev/null", $existing);
+	$wanted = array();
+
+	$master = isset($config['wireguard']['enable']);
+	$tunnels = (isset($config['wireguard']['tunnel']) && is_array($config['wireguard']['tunnel']))
+	           ? $config['wireguard']['tunnel'] : array();
+
+	if ($master) {
+		foreach ($tunnels as $tunnel) {
+			/* 'disabled', not 'enable'. Every page here writes 'disabled' --
+			   the edit form, the list page and the peer list all do -- and no
+			   page has ever written 'enable', so testing for it skipped every
+			   tunnel and WireGuard configured precisely nothing. The master
+			   switch on the WireGuard page ($config['wireguard']['enable'])
+			   was also never read; it is honoured above. */
+			if (isset($tunnel['disabled']) || empty($tunnel['if']))
+				continue;
+			$wanted[$tunnel['if']] = true;
+		}
+	}
+
+	foreach ($existing as $ifline) {
+		foreach (preg_split('/\s+/', trim($ifline)) as $eif) {
+			if ($eif !== '' && !isset($wanted[$eif]))
+				mwexec("/sbin/ifconfig " . escapeshellarg($eif) . " destroy");
+		}
+	}
+
+	if (!$master)
 		return 0;
 
-	foreach ($config['wireguard']['tunnel'] as $tunnel) {
-		if (!isset($tunnel['enable']))
+	foreach ($tunnels as $tunnel) {
+		if (isset($tunnel['disabled']) || empty($tunnel['if']))
 			continue;
 
 		$if = $tunnel['if'];
