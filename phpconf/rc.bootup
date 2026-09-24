@@ -164,6 +164,13 @@
 	/* start IPsec tunnels */
 	vpn_ipsec_configure();
 	
+	/* bring up WireGuard tunnels
+	   
+	   This was missing entirely: wg_configure() was reachable only from the
+	   Apply button on the WireGuard page, so every tunnel disappeared on
+	   reboot and had to be re-applied by hand. */
+	wg_configure();
+	
 	/* start the captive portal */
 	captiveportal_configure();
 	
