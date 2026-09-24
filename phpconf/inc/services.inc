@@ -218,14 +218,16 @@ EOD;
 		}
 			
 		if (is_array($dhcpifconf['dnsserver'] ?? null) && (!empty($dhcpifconf['dnsserver'][0]))) {
-			list($dnsconfig['dns1'],$dnsconfig['dns2'],$dnsconfig['dns3']) = $dhcpifconf['dnsserver'];
+			/* array_pad: fewer than three servers is normal, and list() warns for
+			   every target it cannot fill */
+			list($dnsconfig['dns1'],$dnsconfig['dns2'],$dnsconfig['dns3']) = array_pad($dhcpifconf['dnsserver'], 3, null);
 			if (is_ipaddr6($dnsconfig['dns1']))	$dnscfg .= "option domain-name-servers " . $dnsconfig['dns1'] . ";\n";
 			if (is_ipaddr6($dnsconfig['dns2']))	$dnscfg .= "option domain-name-servers " . $dnsconfig['dns2'] . ";\n";
 			if (is_ipaddr6($dnsconfig['dns3']))	$dnscfg .= "option domain-name-servers " . $dnsconfig['dns3'] . ";\n";
 		} else if (isset($config['dnsmasq']['enable'])) {
 			$dnscfg .= "option domain-name-servers " . ($ifcfg['ipaddr6'] ?? '') . ";\n";
 		} else if (is_array($syscfg['dnsserver'] ?? null) && (!empty($syscfg['dnsserver'][0]))) {
-			list($dnsconfig['dns1'],$dnsconfig['dns2'],$dnsconfig['dns3']) = $syscfg['dnsserver'];
+			list($dnsconfig['dns1'],$dnsconfig['dns2'],$dnsconfig['dns3']) = array_pad($syscfg['dnsserver'], 3, null);
 			if (is_ipaddr6($dnsconfig['dns1']))	$dnscfg .= "option domain-name-servers " . $dnsconfig['dns1'] . ";\n";
 			if (is_ipaddr6($dnsconfig['dns2']))	$dnscfg .= "option domain-name-servers " . $dnsconfig['dns2'] . ";\n";
 			if (is_ipaddr6($dnsconfig['dns3']))	$dnscfg .= "option domain-name-servers " . $dnsconfig['dns3'] . ";\n";

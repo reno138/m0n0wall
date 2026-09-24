@@ -60,8 +60,19 @@ if ($_POST || !empty($_GET['mac'])) {
 	unset($input_errors);
 	
 	if (!empty($_GET['mac'])) {
-		$mac = $_GET['mac'];
-		$if = $_GET['if'] ?? '';
+		/* csrf-magic only guards POST (it returns early for any other method),
+		   so a bare GET here meant any page anywhere could make this firewall
+		   send a magic packet just by referencing the URL -- an <img src> was
+		   enough. The wake links now carry a token and it is checked here. */
+		/* check_tokenS: csrf_get_tokens() can return several joined by ';', and the
+		   singular form would reject a perfectly good one. */
+		if (empty($_GET['csrf']) || !csrf_check_tokens($_GET['csrf'])) {
+			$input_errors[] = "Request could not be verified. Use the wake link on this page.";
+			$mac = $if = '';
+		} else {
+			$mac = $_GET['mac'];
+			$if = $_GET['if'] ?? '';
+		}
 	} else {
 		$mac = $_POST['mac_input'] ?? '';
 		$if = $_POST['interface'] ?? '';
@@ -72,7 +83,9 @@ if ($_POST || !empty($_GET['mac'])) {
 	/* input validation */
 	if (!$mac || !is_macaddr($mac))
 		$input_errors[] = "A valid MAC address must be specified.";
-	if (!$if)
+	/* $if indexes $config['interfaces'] two lines below, so an arbitrary
+	   string got there from the URL and simply produced an empty broadcast. */
+	if (!$if || !isset($config['interfaces'][$if]) || !is_array($config['interfaces'][$if]))
 		$input_errors[] = "A valid interface must be specified.";
 
 	if (empty($input_errors)) {		
@@ -141,7 +154,7 @@ Click the MAC address to wake up a computer. <br>
 					?>&nbsp;
                   </td>
                   <td class="listr">
-                    <a href="?mac=<?=$wolent['mac'] ?? '';?>&if=<?=$wolent['interface'] ?? '';?>"><?=strtolower($wolent['mac'] ?? '');?></a>&nbsp;
+                    <a href="?mac=<?=urlencode($wolent['mac'] ?? '');?>&amp;if=<?=urlencode($wolent['interface'] ?? '');?>&amp;csrf=<?=urlencode(csrf_get_tokens());?>"><?=strtolower($wolent['mac'] ?? '');?></a>&nbsp;
                   </td>
                   <td class="listbg">
                     <?=htmlspecialchars($wolent['descr'] ?? '');?>&nbsp;

@@ -66,7 +66,8 @@ foreach($a_roll as $rollent) {
     }
 }
 
-if (!empty($_GET['order'])) { 
+/* not !empty(): the Voucher column is order=0, which empty() discards */
+if (isset($_GET['order']) && $_GET['order'] !== '') { 
     $order = $_GET['order'];
     usort($db, "clientcmp");
 }

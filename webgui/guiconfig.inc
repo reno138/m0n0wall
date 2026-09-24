@@ -131,6 +131,14 @@ $pptpd_subnet_sizes = array(16 => 28, 32 => 27, 64 => 26, 128 => 25, 256 => 24);
 $ipsec_l2tp_subnet_sizes = array(16 => 28, 32 => 27, 64 => 26, 128 => 25, 256 => 24);
 
 function do_input_validation($postdata, $reqdfields, $reqdfieldsn, &$input_errors) {
+
+	/* Callers unset() this before calling and then array_merge() into it -- and
+	   this function only ever assigned to it when something was wrong, so on a
+	   clean form it stayed null and the merge was a TypeError in PHP 8. Always
+	   leave an array behind; an empty one is falsy, so every
+	   "if ($input_errors)" still behaves as before. */
+	if (!is_array($input_errors))
+		$input_errors = array();
 	
 	/* check for bad control characters */	
 	foreach ($postdata as $pn => $pd) {

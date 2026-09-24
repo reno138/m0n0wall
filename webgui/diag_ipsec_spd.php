@@ -99,9 +99,10 @@ if ($fd) {
 		}
 		$i++;
 	}
-	if (is_array($cursp ?? null) && count($cursp))
-		$spi=$cursp['spi'] ?? null;
-		$spd[$spi ?? null] = $cursp ?? null;
+	if (is_array($cursp ?? null) && count($cursp)) {
+		$spi = $cursp['spi'] ?? null;
+		$spd[$spi] = $cursp;
+	}	/* braces: the second line always ran, storing $spd[""] = null */
 	pclose($fd);
 }
 if (count($spd)):

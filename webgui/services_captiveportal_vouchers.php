@@ -150,7 +150,7 @@ if ($_POST) {
 		do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	}
 	
-	if (!empty($_POST['charset']) && (strlen($_POST['charset'] < 2))) {
+	if (!empty($_POST['charset']) && (strlen($_POST['charset']) < 2)) {	/* the ) was inside strlen() */
 		$input_errors[] = "Need at least 2 characters to create vouchers.";
 	}
 	if (!empty($_POST['charset']) && (strpos($_POST['charset'],"\"")>0)) {

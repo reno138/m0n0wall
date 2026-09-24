@@ -598,14 +598,12 @@
 								<input name="day" type="text" class="formfld" size="2" value="'.htmlspecialchars($pconfig['day'] ?? '').'"><br>
 								<span class="vexpl">At what day of the month should the job be executed? Enter a number between 1 and 28.</span>
 							</tr>
-						</tr>
 						<tr id="repeat_interval">
 							<td width="22%" valign="top" class="vncellreq">Interval</td>
 							<td width="78%" class="vtable">
 								Every <input name="minute" type="text" class="formfld" size="2" value="'.htmlspecialchars($pconfig['minute'] ?? '').'"> minute(s)<br>
 								<span class="vexpl">Enter a number between 1 and 1439</span>
 							</tr>
-						</tr>
 						<tr> 
 							<td width="22%" valign="top" class="vncell">Description</td>
 							<td width="78%" class="vtable">

@@ -37,8 +37,12 @@ if (!$nentries)
 	$nentries = 50;
 
 if (!empty($_POST['clear'])) {
-	/* Ring-buffer init removed: logs are ordinary files bounded by
-	   newsyslog(8). See build/files/newsyslog.conf. */
+	/* Truncate to zero. The ring-buffer (clog) init this used to do is gone --
+	   these are ordinary files written by syslogd and rotated by newsyslog(8),
+	   see build/files/newsyslog.conf -- but nothing replaced it, so the button
+	   redirected and left the log untouched. syslogd holds the file open with
+	   O_APPEND, so it keeps writing correctly from zero without a restart. */
+	@file_put_contents("{$g['varlog_path']}/portalauth.log", "");
 	/* redirect to avoid reposting form data on refresh */
 	header("Location: diag_logs_portal.php");
 	exit;

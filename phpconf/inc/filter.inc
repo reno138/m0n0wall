@@ -369,6 +369,14 @@ EOD;
 	}
 }
 
+/* SUPERSEDED by pf_rules_generate() in filter_pf.inc, which is what
+   filter_configure() calls. Nothing reaches this any more -- status.php used
+   to dump its output and now dumps pfctl's instead.
+   Left in place as the reference for the translation, NOT maintained. It
+   carries at least one known bug: the final else branch resets $ispptp and
+   $isipsec per iteration but not $isl2tp, so in the ipfilter era any rule
+   following an l2tp rule inherited $isl2tp === true. Do not revive this
+   without fixing that. */
 function filter_rules_generate($ipv6 = false) {
 	global $config, $g;
 	

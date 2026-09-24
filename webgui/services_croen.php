@@ -193,7 +193,9 @@
 		
 	// Jobsets
 	$arrow = ' <img src="in.gif" width="8" height="8" border="0"> ';
-	foreach ($pconfig['jobset'] AS $job_id => $jobset) {
+	/* null until croen_set_default_config() populates it; foreach on null is a
+	   TypeError in PHP 8, not a silent no-op */
+	foreach ((array)($pconfig['jobset'] ?? array()) AS $job_id => $jobset) {
 		echo '
 						<tr>
 							<td><input name="toggle_'.$job_id.'" type="image" src="enable'.(isset($jobset['disabled']) ? '_d' : '').'.gif" width="11" height="11" title="click to toggle enabled/disabled status">&nbsp;&nbsp;'.(isset($jobset['syslog']) ? '<img src="log'.(isset($jobset['disabled']) ? '_d' : '').'.gif" width="11" height="11" border="0">' : '&nbsp;').'</td>

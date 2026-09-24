@@ -29,7 +29,10 @@ $g['booting'] = false;
 set_include_path(__DIR__ . '/../phpconf/inc' . PATH_SEPARATOR .
                  __DIR__ . '/../captiveportal' . PATH_SEPARATOR . get_include_path());
 require __DIR__ . '/../phpconf/inc/functions.inc';
-require __DIR__ . '/../phpconf/inc/filter_pf.inc';
+/* require_once: functions.inc above already pulled this in, and a second
+   plain require redeclares every function in it -- the harness died with
+   "Cannot redeclare pf_port_spec()" before it compared anything. */
+require_once __DIR__ . '/../phpconf/inc/filter_pf.inc';
 
 $config = parse_xml_config($cfgfile, 'm0n0wall');
 /* deterministic NIC names, so the report does not depend on the host */
