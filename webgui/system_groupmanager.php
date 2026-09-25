@@ -73,6 +73,11 @@ function getAdminPageList() {
         // Sets Interfaces:Optional page that didn't read in properly with the above method,
         // and pages that don't have descriptions.
         $tmp['interfaces_opt.php'] = "Interfaces: Optional";
+        /* interfaces_vlan.php shares its $pgtitle with interfaces_assign.php,
+           because it is a tab of that page -- which left two identical
+           "Interfaces: Assign network ports" entries in this permission list. */
+        $tmp['interfaces_vlan.php'] = "Interfaces: VLANs";
+        $tmp['interfaces_vlan_edit.php'] = "Interfaces: VLANs (edit)";
         $tmp['graph.php'] = "Diagnostics: Interface Traffic";
         $tmp['graph_cpu.php'] = "Diagnostics: CPU Utilization";
         $tmp['exec.php'] = "Hidden: Exec";

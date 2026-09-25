@@ -37,7 +37,9 @@ if (!is_array($config['vlans']['vlan'] ?? null))
 
 $a_vlans = &$config['vlans']['vlan'];
 
-$portlist = get_interface_list(true, false, false);
+/* Not get_interface_list(): that also offers wg(4) tunnels, which cannot carry
+   802.1Q tags. See vlan_parent_list() in interfaces.inc. */
+$portlist = vlan_parent_list();
 
 $id = $_GET['id'] ?? null;
 if (isset($_POST['id']))
@@ -60,12 +62,37 @@ if ($_POST) {
 	
 	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
-	if (!empty($_POST['tag']) && (!is_numericint($_POST['tag']) || ($_POST['tag'] < '1') || ($_POST['tag'] > '4094'))) {
+	/* isset(), not !empty(): empty("0") is TRUE, so a tag of 0 skipped this
+	   range test entirely and do_input_validation only rejects unset and "".
+	   That used to put a bogus 0 in config.xml; now it would also be handed to
+	   "ifconfig vlanN create vlan 0", which is not a valid tag. */
+	$vtag = $_POST['tag'] ?? '';
+	if (is_string($vtag) && $vtag !== '' &&
+	    (!is_numericint($vtag) || ((int) $vtag < 1) || ((int) $vtag > 4094))) {
+		$input_errors[] = "The VLAN tag must be an integer between 1 and 4094.";
+	} else if (!is_string($vtag) && $vtag !== null) {
 		$input_errors[] = "The VLAN tag must be an integer between 1 and 4094.";
 	}
 
-	foreach ($a_vlans as $vlan) {
-		if (isset($id) && (!empty($a_vlans[$id])) && ($a_vlans[$id] === $vlan))
+	/* The parent was never checked: whatever was posted went into config.xml,
+	   and only the dropdown kept it sensible. It now also goes straight into an
+	   "ifconfig ... vlandev" command line on the add path, so check it against
+	   the list the dropdown was built from. */
+	$vparent = $_POST['if'] ?? '';
+	if (!is_string($vparent)) {
+		/* isset() with an ARRAY offset is itself a TypeError in PHP 8
+		   ("Cannot access offset of type array in isset or empty"), so the
+		   type has to be settled before the lookup rather than inside it. */
+		$input_errors[] = "The parent interface is not a network port that can carry VLAN tags.";
+	} else if ($vparent !== '' && !isset($portlist[$vparent])) {
+		$input_errors[] = "The parent interface is not a network port that can carry VLAN tags.";
+	}
+
+	foreach ($a_vlans as $i => $vlan) {
+		/* skip the entry being edited -- by KEY. This compared the whole entry
+		   by value, which also skipped any other entry that happened to be
+		   identical. */
+		if (isset($id) && (!empty($a_vlans[$id])) && ((string)$i === (string)$id))
 			continue;
 		
 		if ((($vlan['if'] ?? null) == ($_POST['if'] ?? null)) && (($vlan['tag'] ?? null) == ($_POST['tag'] ?? null))) {
@@ -80,14 +107,126 @@ if ($_POST) {
 		$vlan['tag'] = $_POST['tag'] ?? null;
 		$vlan['descr'] = $_POST['descr'] ?? null;
 
-		if (isset($id) && !empty($a_vlans[$id]))
-			$a_vlans[$id] = $vlan;
-		else
-			$a_vlans[] = $vlan;
+		$isnew = !(isset($id) && !empty($a_vlans[$id]));
+
+		/* Does this edit change anything the RUNNING SYSTEM cares about?
 		
-		write_config();		
-		touch($d_sysrebootreqd_path);
-		header("Location: interfaces_vlan.php");
+		   Only 'if' and 'tag' are on the wire -- 'descr' is a label this page
+		   and the list page show and nothing else reads. So a description-only
+		   edit, or a Save with nothing altered at all, leaves the live
+		   interfaces already correct and must NOT demand a reboot. It used to:
+		   the flag was touched unconditionally, which both told the admin a lie
+		   and, because exec_rc_script() returns early while that flag exists,
+		   quietly put the rest of the webGUI into save-only mode until they
+		   rebooted. */
+		$wirechanged = $isnew
+		    || (($a_vlans[$id]['if'] ?? null) !== $vlan['if'])
+		    || (($a_vlans[$id]['tag'] ?? null) !== $vlan['tag']);
+
+		if ($isnew) {
+			$a_vlans[] = $vlan;
+			/* The kernel name of a VLAN is its position in this list, and an
+			   add only ever appends -- so this is the next free name, nothing
+			   refers to it yet, and no existing vlanN changes meaning.
+			   
+			   Captured HERE, before write_config(): write_config() re-reads
+			   config.xml and reassigns $config, which leaves $a_vlans pointing
+			   at the pre-write copy. Nothing below reads it again. */
+			$newidx = count($a_vlans) - 1;
+		} else {
+			$a_vlans[$id] = $vlan;
+		}
+
+		/* Written to disk BEFORE anything is done to the running system: if the
+		   ifconfig below fails, or the admin's browser never sees the redirect,
+		   config.xml is already correct and the VLAN comes up at the next boot.
+		   There is no half-applied state to recover from. */
+		write_config();
+
+		if (!$isnew && $wirechanged) {
+			/* An edit still requires a reboot, and the notice is now literally
+			   true: no ifconfig runs here at all.
+			   
+			   Applying an edit means "ifconfig vlanN destroy" followed by a
+			   recreate -- "create" on its own is a no-op on an interface that
+			   already exists, which is why an edited tag never used to reach the
+			   wire either. That destroy takes the interface's addresses, IPv6
+			   configuration, pf states and DHCP leases with it, and vlanN may be
+			   assigned to LAN, WAN or an OPT -- possibly the very interface this
+			   request arrived on, in which case the connection dies before the
+			   redirect. So the change is saved and the reboot, which rebuilds
+			   every vlan interface from an empty slate, applies it. */
+			touch($d_sysrebootreqd_path);
+			header("Location: interfaces_vlan.php");
+			exit;
+		}
+
+		if (!$isnew) {
+			/* A description-only edit, or a Save with nothing altered. The live
+			   interfaces already match, so there is nothing to apply and nothing
+			   to reboot for. Returns here rather than falling through, because
+			   the create path below is reachable only for an add -- $newidx is
+			   set only in that branch. */
+			header("Location: interfaces_vlan.php?status=saved");
+			exit;
+		}
+
+		/* Create the new interface now.
+		
+		   Skipped while a reboot is already pending, exactly as every other page
+		   skips its apply step (services_dhcp.php, interfaces_opt.php, the
+		   firewall pages, and exec_rc_script() itself all gate on this file).
+		   Here it is also the correctness gate: the only ways the live vlanN
+		   interfaces can stop matching the config positions are a VLAN edit or a
+		   VLAN delete, and both set this flag -- so while it is absent,
+		   vlan{$newidx} is guaranteed to be a free name. While it is present,
+		   vlan{$newidx} may well be an existing interface carrying another
+		   VLAN's tag, and reconciling that is what the reboot is for.
+		   
+		   Note what is NOT here: no destroy, on any branch. A vlan interface
+		   that is already up may be carrying the session this request arrived
+		   on, and this page has no business tearing one down -- so when the name
+		   is not free, or the create fails, it defers to the reboot and says so
+		   instead. */
+		$status = "applied";
+
+		if (file_exists($d_sysrebootreqd_path)) {
+			$status = "held";
+		} else {
+			$newif = "vlan{$newidx}";
+
+			if (interface_is_present($newif)) {
+				/* Something already owns that name, so the running system does
+				   not line up with the config positions after all -- a vlan
+				   created by hand on the console, say. Leave it strictly alone:
+				   it could be carrying anything, including this session. */
+				log_error("VLAN: {$newif} already exists, so the new VLAN " .
+					"(tag {$vlan['tag']} on {$vlan['if']}) was saved but not " .
+					"created; a reboot will rebuild the VLAN interfaces.");
+				touch($d_sysrebootreqd_path);
+				$status = "exists";
+			} else {
+				config_lock();
+				$retval = interfaces_vlan_configure_if($newidx, $vlan);
+				config_unlock();
+
+				if ($retval != 0) {
+					/* No cleanup destroy: interface_is_present() said the name
+					   was free, but if that was wrong -- "ifconfig -l" failing,
+					   for instance -- then destroying it would tear down
+					   somebody else's interface with config.xml already written.
+					   A half-created interface is harmless by comparison: it is
+					   assigned to nothing, and the next boot rebuilds it. */
+					log_error("VLAN: could not create {$newif} (tag " .
+						"{$vlan['tag']} on {$vlan['if']}): ifconfig returned " .
+						"{$retval}");
+					touch($d_sysrebootreqd_path);
+					$status = "failed";
+				}
+			}
+		}
+
+		header("Location: interfaces_vlan.php?status=" . $status);
 		exit;
 	}
 }
@@ -101,6 +240,16 @@ if ($_POST) {
                   <td width="78%" class="vtable"> 
                     <select name="if" class="formfld">
                       <?php
+					  /* Keep the entry's CURRENTLY STORED parent in the list even
+					     if it is no longer an offerable one -- this page used to
+					     offer wg0, and any VLAN saved against it would otherwise
+					     have no <option> marked selected. The browser then submits
+					     whatever is first in the list, so simply opening such an
+					     entry and pressing Save would silently re-parent it. */
+					  $vlan_cur = $pconfig['if'] ?? '';
+					  if (is_string($vlan_cur) && $vlan_cur !== '' && !isset($portlist[$vlan_cur]))
+						  $portlist[$vlan_cur] = array('drvname' => 'no longer available', 'mac' => '');
+
 					  foreach ($portlist as $ifn => $ifinfo): ?>
                       <option value="<?=htmlspecialchars($ifn);?>" <?php if ($ifn == ($pconfig['if'] ?? null)) echo "selected"; ?>> 
 					  <?php if (!empty($ifinfo['drvname']))

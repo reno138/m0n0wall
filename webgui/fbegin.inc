@@ -277,7 +277,8 @@ dynamic_menu($menu['System'], 'System');
 $if_menu = array('(assign)' => 'interfaces_assign.php',
     			 'LAN' => 'interfaces_lan.php',
 			  	 'WAN' => 'interfaces_wan.php',
-			     'OPTx' => 'interfaces_opt.php');
+			     'OPTx' => 'interfaces_opt.php',
+			     'VLANs' => 'interfaces_vlan.php');
 if (($_SERVER['REMOTE_USER'] ?? null) === $config['system']['username']) {
 	$allowed = $if_menu;
 }
@@ -299,6 +300,16 @@ if (array_intersect($if_menu,$allowed ?? array())) {
 			echo '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="/interfaces_opt.php?index=' .$i.
 			     '" class="navlnk">'.htmlspecialchars($config['interfaces']['opt' . $i]['descr']).'</a><br>';
     	}
+    }
+    /* VLANs.
+    
+       The pages have always existed and worked, but the only route to them was
+       Interfaces > (assign) and then noticing the "VLANs" tab -- so anyone
+       looking down the menu for VLAN configuration concluded there was none.
+       A tab is not navigation. Listed here as its own entry, and gated on the
+       same group permission as every other link in this block. */
+    if (in_array('interfaces_vlan.php',$allowed ?? array())) {
+    	echo '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="/interfaces_vlan.php" class="navlnk">VLANs</a><br>';
     }
 }             
 

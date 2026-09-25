@@ -85,29 +85,157 @@ function interfaces_loopback_configure() {
 	return 0;
 }
 
+/* ---------------------------------------------------------------------------
+ * VLANs.
+ *
+ * A VLAN's kernel interface name is its POSITION in $config['vlans']['vlan']:
+ * the third entry is always vlan2, because that is the string an interface
+ * assignment stores ($config['interfaces']['opt1']['if'] = "vlan1") and
+ * interfaces_assign.php builds its port list with the same running counter.
+ *
+ * This code only ever CREATES vlan interfaces, and nothing anywhere in the
+ * tree destroys one. That is exactly why editing or deleting a VLAN still
+ * requires a reboot: "ifconfig vlan0 create" fails when vlan0 already exists,
+ * so an edited tag never reaches the running interface, a deleted VLAN keeps
+ * tagging, and after a delete the config's positional names have shifted while
+ * the live interfaces have not. Only a reboot, which starts from no vlan
+ * interfaces at all, can reconcile that.
+ *
+ * ADDING a VLAN is the one case that does not need any of it, and
+ * interfaces_vlan_edit.php now applies an add immediately without setting the
+ * reboot flag. An add is a pure append: the name the new entry gets is the next
+ * position, which nothing refers to yet, no existing vlanN changes meaning, and
+ * nothing that is already carrying traffic -- including the interface the
+ * admin's webGUI session arrived on -- is destroyed or reconfigured. Editing
+ * and deleting keep the reboot because making them live means destroying an
+ * interface that may be carrying LAN, WAN or an OPT (a delete additionally
+ * renumbers the names of OTHER, possibly assigned, VLANs), and destroying the
+ * one the request arrived on would cut the admin off mid-change.
+ *
+ * INVARIANT the add path relies on: while $d_sysrebootreqd_path does not
+ * exist, the live vlanN interfaces match the config positions. That holds
+ * today because nothing destroys a vlan interface and both mutating webGUI
+ * paths -- edit in interfaces_vlan_edit.php, delete in interfaces_vlan.php --
+ * set that flag. Any future code that creates or destroys a vlan interface
+ * outside this file, or that clears the flag without a reboot, has to preserve
+ * it or the add path can retag an interface that is already in use.
+ * ------------------------------------------------------------------------ */
+
 function interfaces_vlan_configure() {
 	global $config, $g;
 	
-	if (is_array($config['vlans']['vlan'] ?? null) && count($config['vlans']['vlan'])) {
-		
-		$i = 0;
-		
-		foreach ($config['vlans']['vlan'] as $vlan) {
-			
-			$cmd = "/sbin/ifconfig vlan{$i} create vlan " . 
-				escapeshellarg($vlan['tag'] ?? '') . " vlandev " . 
-				escapeshellarg($vlan['if'] ?? '');
-			
-			mwexec($cmd);
-			
-			/* make sure the parent interface is up */
-			mwexec("/sbin/ifconfig " . escapeshellarg($vlan['if'] ?? '') . " up");
-			
-			$i++;
+	if (!is_array($config['vlans']['vlan'] ?? null))
+		return 0;
+	
+	/* array_values(): the interface name is the POSITION in this list, not the
+	   array key. unset() leaves a hole behind until write_config() has
+	   round-tripped the array through XML, and reindexing here keeps position
+	   and name in step meanwhile -- the alternative is silently skipping an
+	   entry, or naming it after a key nothing else uses. */
+	$vlans = array_values($config['vlans']['vlan']);
+	
+	$retval = 0;
+	for ($i = 0; $i < count($vlans); $i++) {
+		/* Report a failure rather than swallowing it. This used to discard every
+		   per-VLAN status and return 0 unconditionally, so a VLAN that failed to
+		   come up at boot was silent: rc.bootup went straight on to
+		   interfaces_lan_configure(), which then addressed an interface that does
+		   not exist, and the admin had nothing to go on. */
+		if (interfaces_vlan_configure_if($i, $vlans[$i]) != 0) {
+			log_error("VLAN: could not create vlan{$i} (tag " .
+			          ($vlans[$i]['tag'] ?? '?') . " on " .
+			          ($vlans[$i]['if'] ?? '?') . ")");
+			$retval = 1;
 		}
 	}
 	
-	return 0;
+	return $retval;
+}
+
+/* Create ONE vlan interface. $i is the entry's position in
+   $config['vlans']['vlan'], which is also the interface name. Split out of the
+   loop above so that the boot path and interfaces_vlan_edit.php's add path run
+   the same commands in the same order, and so that the position-is-the-name
+   rule lives in one place. Returns the ifconfig exit status, so the webGUI can
+   say whether the add it just applied actually worked. */
+function interfaces_vlan_configure_if($i, $vlan) {
+	global $config, $g;
+	
+	/* (int): the name comes from a loop counter or an array index, and it goes
+	   into a command line unquoted. */
+	$vlanif = "vlan" . (int)$i;
+	
+	$cmd = "/sbin/ifconfig {$vlanif} create vlan " . 
+		escapeshellarg($vlan['tag'] ?? '') . " vlandev " . 
+		escapeshellarg($vlan['if'] ?? '');
+	
+	$retval = mwexec($cmd);
+
+	/* Nothing further if the interface was not created. The two commands below
+	   used to run regardless of the create's status, so a failed add still
+	   reported the parent being upped as success and tried to up an interface
+	   that does not exist. */
+	if ($retval != 0)
+		return $retval;
+	
+	/* make sure the parent interface is up */
+	mwexec("/sbin/ifconfig " . escapeshellarg($vlan['if'] ?? '') . " up");
+	
+	/* Same IPv6 hardening every other interface gets -- see the identical line
+	   in interfaces_lan_configure(), interfaces_wan_configure() and the enabled
+	   OPT path. A VLAN created at boot inherits it when it is later assigned and
+	   configured, but one added from the webGUI is assigned to nothing yet, so
+	   without this it would sit there accepting router advertisements from
+	   whatever is on that tag. */
+	mwexec("/sbin/ifconfig {$vlanif} inet6 -accept_rtadv no_radr");
+	
+	/* "ifconfig create" does not set IFF_UP. At boot that was invisible,
+	   because interfaces_lan/wan/opt_configure assigns an address immediately
+	   afterwards and that brings the interface up. A VLAN added from the webGUI
+	   is not assigned to anything yet, so nothing else would ever up it: it
+	   would sit there DOWN, invisible to tcpdump, and the admin could not check
+	   it against the switch before assigning it. */
+	mwexec("/sbin/ifconfig {$vlanif} up");
+	
+	return $retval;
+}
+
+/* Does $if exist in the kernel right now? This asks the running system, not the
+   configuration: after a VLAN edit or delete the two disagree until the next
+   reboot, and an interface created by hand on the console is in neither.
+   
+   NOT called interface_exists() -- that is a PHP built-in (for interfaces in
+   the OO sense), and redeclaring it would be a fatal error on every page
+   load. */
+function interface_is_present($if) {
+	$iflist = array();
+	exec("/sbin/ifconfig -l 2>/dev/null", $iflist);
+	
+	return in_array($if, preg_split("/\s+/", trim(implode(" ", $iflist))), true);
+}
+
+/* The interfaces that can be a VLAN parent, for the dropdown on
+   interfaces_vlan_edit.php.
+   
+   get_interface_list() already drops the virtual interfaces it knows about, but
+   not wg(4), so wg0 was offered as a parent: a WireGuard tunnel is
+   point-to-point with no Ethernet header to tag, and
+   "ifconfig vlan0 create vlan 10 vlandev wg0" cannot work.
+   
+   Filtered here rather than in get_interface_list() because
+   interfaces_assign.php builds its port list from that same function: removing
+   wg there would drop the option out of a <select> that an existing config may
+   have set to it, the browser would preselect whatever came first, and the next
+   save of that page would silently reassign the interface. */
+function vlan_parent_list() {
+	$portlist = get_interface_list(true, false, false);
+	
+	foreach (array_keys($portlist) as $ifn) {
+		if (preg_match("/^wg\d/", $ifn))
+			unset($portlist[$ifn]);
+	}
+	
+	return $portlist;
 }
 
 function interfaces_lan_configure() {
