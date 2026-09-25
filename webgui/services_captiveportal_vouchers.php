@@ -132,7 +132,7 @@ if (($_GET['act'] ?? null) == "csv") {
 
             header("Content-Type: application/octet-stream");
             header("Content-Disposition: attachment; filename=vouchers_roll$number.csv");
-            system("/usr/local/bin/voucher -c {$g['varetc_path']}/voucher.cfg -K {$g['varetc_path']}/voucher.key -p $number $count");
+            system(VOUCHER_BIN . " -c {$g['varetc_path']}/voucher.cfg -K {$g['varetc_path']}/voucher.key -p $number $count");
             /* DO NOT unlink the key here.
                The RSA version wrote voucher.private, printed, then unlinked it,
                because a gateway that only validates needed nothing but the
@@ -156,9 +156,27 @@ $pconfig['magic'] = $config['voucher']['magic'] ?? null;
 /* The secret itself is never shown or accepted through the form: both printing
    and validating are local, so there is nothing to paste in and nothing to
    copy out. A fingerprint is enough for an admin to see whether it changed. */
-$pconfig['keyfp'] = !empty($config['voucher']['fpekey'])
-    ? substr(hash('sha256', base64_decode($config['voucher']['fpekey'], true) ?: ''), 0, 16)
-    : '';
+/* A helper, not an inline expression, for two reasons: the value has to be
+   re-derived after $pconfig is replaced by $_POST on a POST, and a secret that
+   fails to decode must NOT render as a healthy-looking fingerprint.
+   
+   The inline version passed `base64_decode(..., true) ?: ''` to hash(), so a
+   corrupted or truncated secret displayed the SHA-256 of the empty string
+   (e3b0c44298fc1c14) on the one page whose job is to show whether the key is
+   good -- while voucher_write_keyfile() was separately refusing that same value
+   as malformed. */
+function voucher_key_fingerprint() {
+    global $config;
+
+    if (empty($config['voucher']['fpekey']))
+        return '';
+    $raw = base64_decode($config['voucher']['fpekey'], true);
+    if ($raw === false || strlen($raw) != 32)
+        return false;           /* present but unusable -- distinct from absent */
+    return substr(hash('sha256', $raw), 0, 16);
+}
+
+$pconfig['keyfp'] = voucher_key_fingerprint();
 $pconfig['msgnoaccess'] = $config['voucher']['msgnoaccess'] ?? null;
 $pconfig['msgexpired'] = $config['voucher']['msgexpired'] ?? null;
 
@@ -166,6 +184,11 @@ if ($_POST) {
 
 	unset($input_errors);
 	$pconfig = $_POST;
+	/* keyfp is not a form field, so replacing $pconfig wholesale above loses it.
+	   Without this the page reported "not yet generated" after EVERY Save, with a
+	   perfectly good secret sitting in config.xml, plus an undefined-key warning
+	   into the system log. */
+	$pconfig['keyfp'] = voucher_key_fingerprint();
 
 	/* input validation */
 	if (!empty($_POST['enable'])) {
@@ -185,11 +208,47 @@ if ($_POST) {
 	   code_parse() treats a space as the end of the code (the CSV prints each
 	   code as " %s"), so a space in the charset would silently truncate every
 	   voucher at that character. */
-	$badchars = array('"' => "Double quotes", ',' => "Commas", ' ' => "Spaces");
+	$badchars = array('"' => "Double quotes", ',' => "Commas");
 	foreach ($badchars as $bc => $bcname) {
 		if (!empty($_POST['charset']) && (strpos($_POST['charset'], $bc) !== false)) {
 			$input_errors[] = "$bcname aren't allowed in the character set.";
 		}
+	}
+	if (!empty($_POST['charset'])) {
+		/* ANY whitespace, not just a space.
+		
+		   The tool reads the charset with "%255s" in its five-field fscanf, and
+		   %s ends the field at any whitespace byte -- so a tab or a newline
+		   truncates the alphabet to whatever precedes it just as a space does,
+		   while this page goes on displaying the whole thing. Tab, CR and LF get
+		   through do_input_validation()'s control-character check, which
+		   deliberately permits them. */
+		if (preg_match('/\s/', $_POST['charset']))
+			$input_errors[] = "Spaces, tabs and line breaks aren't allowed in the " .
+				"character set: the configuration file format ends the field at the " .
+				"first whitespace, so everything after it would be silently dropped.";
+
+		/* A REPEATED character breaks the encoding both ways.
+		
+		   Rendering maps digit d to charset[d]; parsing maps a character back
+		   with strchr(), which finds the FIRST occurrence. With any duplicate,
+		   every digit that renders to a later copy parses back as the earlier
+		   one, so the voucher decodes to a different number than it encoded.
+		   It is completely silent -- the roll prints without complaint, the
+		   tickets are handed out, and the majority of guests are told their
+		   voucher is invalid with nothing anywhere pointing at the alphabet. */
+		$dupes = array();
+		foreach (count_chars($_POST['charset'], 1) as $byte => $count)
+			if ($count > 1)
+				$dupes[] = chr($byte);
+		if ($dupes)
+			$input_errors[] = "The character set must not repeat a character. " .
+				"Repeated: " . htmlspecialchars(implode(' ', $dupes)) . ". A voucher is " .
+				"a number written in this alphabet, so a repeated character makes it " .
+				"impossible to read back and most vouchers would be rejected.";
+
+		if (strlen($_POST['charset']) > 255)
+			$input_errors[] = "The character set must be 255 characters or fewer.";
 	}
 	if (!empty($_POST['rollbits']) && (!is_numeric($_POST['rollbits']) || ($_POST['rollbits'] < 1) || ($_POST['rollbits'] > 31))) {
 		$input_errors[] = "# of Bits to store Roll Id needs to be between 1..31.";
@@ -222,8 +281,15 @@ if ($_POST) {
 	/* 'magic' is free text and is interpolated straight into voucher.cfg. If it
 	   is blanked or non-numeric the %llu in the tool's five-field fscanf eats
 	   the charset instead and the config line silently mis-parses. */
-	if (!is_numeric($_POST['magic'] ?? null) || ($_POST['magic'] < 0)) {
-		$input_errors[] = "The magic number must be a positive integer.";
+	if (isset($_POST['magic']) && ($_POST['magic'] !== "") &&
+	    !preg_match('/^\d+$/', (string) $_POST['magic'])) {
+		/* Digits only, not is_numeric(). is_numeric() is true for "1.5", "1e5"
+		   and "5 " -- all of which pass a "> 0" test and are then written
+		   verbatim into voucher.cfg, where the tool's %llu stops at the '.',
+		   'e' or space and the rest of the line mis-parses. The result is a
+		   total, silent outage of the feature reached from a validated form
+		   field: every print fails and every guest login fails. */
+		$input_errors[] = "The magic number must be a whole number, digits only.";
 	}
 	if (!empty($_POST['saveinterval']) && (!is_numeric($_POST['saveinterval']) || ($_POST['saveinterval'] < 1))) {
 		$input_errors[] = "Save interval in minutes cant be negative.";
@@ -237,19 +303,56 @@ if ($_POST) {
         $config['voucher']['checksumbits'] = $_POST['checksumbits'] ?? null;
         $config['voucher']['magic'] = $_POST['magic'] ?? null;
         $config['voucher']['saveinterval'] = $_POST['saveinterval'] ?? null;
-        $config['voucher']['publickey'] = base64_encode($_POST['publickey'] ?? '');
-        $config['voucher']['privatekey'] = base64_encode($_POST['privatekey'] ?? '');
         $config['voucher']['msgnoaccess'] = $_POST['msgnoaccess'] ?? null;
         $config['voucher']['msgexpired'] = $_POST['msgexpired'] ?? null;
-        voucher_lock();
-		write_config();
-        voucher_configure();
-        voucher_unlock();
-        if (isset($config['voucher']['enable']) && !isset($config['captiveportal']['enable'])) {
-            $savemsg = "Don't forget to configure and enable Captive Portal.";
+        /* A config restored from an older image still carries these. They are
+           dead weight -- nothing reads them any more -- and leaving them would
+           suggest the RSA scheme is still in play. */
+        unset($config['voucher']['publickey']);
+        unset($config['voucher']['privatekey']);
+
+        if (!empty($_POST['regenkey'])) {
+            /* Count what is about to be orphaned before replacing the secret:
+               the confirm() dialog on the checkbox is the only other guard and
+               it never fires with JavaScript off. */
+            $orphaned = 0;
+            voucher_lock();
+            foreach ($config['voucher']['roll'] as $rollent)
+                $orphaned += count(voucher_read_active_db($rollent['number'] ?? 0));
+            voucher_unlock();
+            if (voucher_new_key()) {
+                $savemsg = "A new voucher secret was generated. Every voucher " .
+                    "printed before now is now invalid";
+                $savemsg .= $orphaned
+                    ? ", including $orphaned currently active voucher(s)." : ".";
+                voucher_log(LOG_NOTICE, "voucher secret regenerated by an " .
+                    "administrator; $orphaned active voucher(s) orphaned");
+            } else {
+                $input_errors[] = "Could not generate a new voucher secret. " .
+                    "The existing one is unchanged.";
+            }
+        }
+
+        if (empty($input_errors)) {
+            voucher_lock();
+            write_config();
+            voucher_configure();
+            voucher_unlock();
+            /* After write_config() above, so $config has been re-read from disk
+               and a cleared checkbox is absent rather than false -- but tested
+               the same way as voucher_configure() so the two cannot disagree. */
+            if (isset($config['voucher']['enable']) && $config['voucher']['enable'] !== false
+                && !isset($config['captiveportal']['enable'])) {
+                $savemsg = trim(($savemsg ?? '') . " Don't forget to configure and enable Captive Portal.");
+            }
         }
 	}
 }
+
+/* Reported here, after the POST handler's unset($input_errors), so a failed
+   secret bootstrap is shown on both a GET and a POST. */
+if ($keygen_error !== "")
+	$input_errors[] = $keygen_error;
 ?>
 <?php include("fbegin.inc"); ?>
 <script type="text/javascript">
@@ -264,8 +367,11 @@ function enable_change(enable_change) {
 	document.iform.saveinterval.disabled = endis;
 	document.iform.checksumbits.disabled = endis;
 	document.iform.magic.disabled = endis;
-	document.iform.publickey.disabled = endis;
-	document.iform.privatekey.disabled = endis;
+	/* The publickey/privatekey textareas are gone. Leaving their names here
+	   would throw a TypeError on the undefined element and every statement
+	   BELOW it -- msgnoaccess, msgexpired -- would stop running, so those
+	   fields would stay disabled and Save would post nothing. */
+	document.iform.regenkey.disabled = endis;
 	document.iform.msgnoaccess.disabled = endis;
 	document.iform.msgexpired.disabled = endis;
 }
@@ -350,18 +456,27 @@ Enable Voucher support first using the checkbox above and hit Save at the bottom
 <?php endif;?>
 	</tr>
 	<tr>
-      <td valign="top" class="vncellreq">Voucher public key</td>
+      <td valign="top" class="vncell">Voucher key</td>
       <td class="vtable">
-        <textarea name="publickey" cols="65" rows="4" id="publickey" class="formpre"><?=htmlspecialchars($pconfig['publickey'] ?? '');?></textarea>
+        <?php if ($pconfig['keyfp'] === false): ?>
+          <span class="red"><strong>present but unusable</strong></span> &ndash; the stored
+          secret is not 32 bytes of base64. Tick the box below and save to replace it.
+          Vouchers already printed will stop working.
+        <?php elseif ($pconfig['keyfp'] === ''): ?>
+          not yet generated
+        <?php else: ?>
+          fingerprint <?=htmlspecialchars($pconfig['keyfp']);?>
+        <?php endif; ?>
         <br>
-    Paste an RSA public key (64 Bit or smaller) in PEM format here. This key is used to decrypt vouchers.</td>
-	</tr>
-	<tr>
-      <td valign="top" class="vncell">Voucher private key</td>
-      <td class="vtable">
-        <textarea name="privatekey" cols="65" rows="5" id="privatekey" class="formpre"><?=htmlspecialchars($pconfig['privatekey'] ?? '');?></textarea>
+        <input name="regenkey" type="checkbox" value="yes" id="regenkey"
+               onclick="return !this.checked || confirm('Generating a new voucher key makes every already-printed voucher invalid. Continue?')">
+        Generate a new voucher key
         <br>
-    Paste an RSA private key (64 Bit or smaller) in PEM format here. This key is only used to generate encrypted vouchers and doesn't need to be available if the vouchers have been generated offline.</td>
+        A single 256-bit secret, generated on this firewall, used both to print and to
+        validate vouchers. There is no key to paste in and none to copy out; only its
+        fingerprint is shown, so you can see at a glance whether it changed. It is stored
+        in the configuration file, so anyone holding a configuration backup can print
+        valid vouchers.</td>
 	</tr>
 	<tr> 
        <td width="22%" valign="top" class="vncellreq">Character set</td>
@@ -375,7 +490,7 @@ Enable Voucher support first using the checkbox above and hit Save at the bottom
        <td width="78%" class="vtable">
          <input name="rollbits" type="text" class="formfld" id="rollbits" size="2" value="<?=htmlspecialchars($pconfig['rollbits'] ?? '');?>">
          <br>
-         Reserves a range in each voucher to store the Roll# it belongs to. Allowed range: 1..31. Sum of Roll+Ticket+Checksum bits must be one Bit less than the RSA key size.</td>
+         Reserves a range in each voucher to store the Roll# it belongs to. Allowed range: 1..31. Roll Bits plus Ticket Bits must not exceed 32: whatever those two and the Checksum leave of each voucher's 64 bits holds the magic number, and that is what lets the firewall reject a made-up code.</td>
     </tr>
 	<tr> 
        <td width="22%" valign="top" class="vncellreq"># of Ticket Bits</td>
@@ -389,14 +504,14 @@ Enable Voucher support first using the checkbox above and hit Save at the bottom
        <td width="78%" class="vtable">
          <input name="checksumbits" type="text" class="formfld" id="checksumbits" size="2" value="<?=htmlspecialchars($pconfig['checksumbits'] ?? '');?>">
          <br>
-         Reserves a range in each voucher to store a simple checksum over Roll# and Ticket#. Allowed range is 0..31.</td>
+         Reserves a range in each voucher to store a simple checksum over Roll# and Ticket#. Allowed range is 0..31. It does not change how hard a voucher is to forge -- the magic number grows by whatever the checksum gives up -- it just makes a mistyped code report a checksum error rather than a wrong Roll#.</td>
     </tr>
 	<tr> 
        <td width="22%" valign="top" class="vncellreq">Magic Number</td>
        <td width="78%" class="vtable">
          <input name="magic" type="text" class="formfld" id="magic" size="20" value="<?=htmlspecialchars($pconfig['magic'] ?? '');?>">
          <br>
-         Magic number stored in every voucher. Verified during voucher check. Size depends on how many bits are left by Roll+Ticket+Checksum bits. If all bits are used, no magic number will be used and checked.</td>
+         Magic number stored in and verified in every voucher. It is 64 minus Roll minus Ticket minus Checksum bits wide -- 33 bits with the defaults. Its WIDTH is what makes a made-up code fail (width plus Checksum Bits is the number of bits a forger would have to guess); its value does not need to be secret and does not make this firewall's vouchers unique -- the voucher key does that. Must be a positive integer.</td>
     </tr>
 	<tr> 
        <td width="22%" valign="top" class="vncellreq">Save Interval</td>
@@ -426,7 +541,7 @@ Enable Voucher support first using the checkbox above and hit Save at the bottom
     <tr>
      <td colspan="2" class="list"><p class="vexpl">
      <span class="red"><strong> Note:<br>   </strong></span>
-      Changing any Voucher parameter (apart from managing the list of Rolls) on this page will render existing vouchers useless if they were generated with different settings.
+      Changing any Voucher parameter (apart from managing the list of Rolls) on this page will render existing vouchers useless if they were generated with different settings. That includes generating a new voucher key.
       </p>
      </td>
     </tr>

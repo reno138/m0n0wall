@@ -51,8 +51,11 @@ if (isset($id) && !empty($a_roll[$id])) {
 	$pconfig['comment'] = $a_roll[$id]['comment'] ?? null;
 }
 
-$maxnumber = (1<<($config['voucher']['rollbits'] ?? null)) -1;    // Highest Roll#
-$maxcount = (1<<($config['voucher']['ticketbits'] ?? null)) -1;   // Highest Ticket#
+/* ?? 16 / ?? 10, not ?? null: 1 << null is 1, so $maxnumber came out 0 and
+   EVERY roll number was rejected whenever the Vouchers page had not been
+   visited yet. These are the same defaults that page applies. */
+$maxnumber = (1 << ($config['voucher']['rollbits'] ?? 16)) - 1;    // Highest Roll#
+$maxcount = (1 << ($config['voucher']['ticketbits'] ?? 10)) - 1;   // Highest Ticket#
 
 if ($_POST) {
 	
@@ -65,13 +68,22 @@ if ($_POST) {
 
     do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 
-    if (!is_numeric($_POST['number'] ?? null) || $_POST['number'] >= $maxnumber) 
-        $input_errors[] = "Roll number must be numeric and less than $maxnumber";
+    /* ">" not ">=": $maxnumber is itself a legal roll number -- with 16 roll
+       bits the voucher tool encodes rolls 0..65535 -- so the highest roll on
+       the range the page advertises was being refused. */
+    /* Digits only, not is_numeric(). is_numeric() accepts "04", " 4", "4.0"
+       and "4e0", and the value used to be stored verbatim -- while the CSV
+       printer casts to (int). So a roll registered as "04" printed tickets for
+       roll 4, and the lookup that matches a redeemed voucher's roll against this
+       string then failed for every one of them: the guest is refused and the
+       message points at the roll rather than at the typo. */
+    if (!preg_match('/^\d+$/', (string) ($_POST['number'] ?? '')) || $_POST['number'] > $maxnumber)
+        $input_errors[] = "Roll number must be a whole number between 0 and $maxnumber.";
 
-    if (!is_numeric($_POST['count'] ?? null) || $_POST['count'] < 1 || $_POST['count'] > $maxcount)
-        $input_errors[] = "A roll has at least one voucher and less than $maxcount.";
+    if (!preg_match('/^\d+$/', (string) ($_POST['count'] ?? '')) || $_POST['count'] < 1 || $_POST['count'] > $maxcount)
+        $input_errors[] = "A roll has at least one voucher and at most $maxcount.";
 
-    if (!is_numeric($_POST['minutes'] ?? null) || $_POST['minutes'] < 1)
+    if (!preg_match('/^\d+$/', (string) ($_POST['minutes'] ?? '')) || $_POST['minutes'] < 1)
         $input_errors[] = "Each voucher must be good for at least 1 minute.";
 
     if (empty($input_errors)) {
@@ -79,14 +91,16 @@ if ($_POST) {
         if (isset($id) && !empty($a_roll[$id]))
             $rollent = $a_roll[$id];
 
-        $rollent['number']  = $_POST['number'];
-        $rollent['minutes'] = $_POST['minutes'];
+        /* Stored as ints, so nothing downstream has to agree about spelling
+           with the (int) cast the CSV printer applies. */
+        $rollent['number']  = (int) $_POST['number'];
+        $rollent['minutes'] = (int) $_POST['minutes'];
         $rollent['comment'] = $_POST['comment'] ?? null;
 
         /* New Roll or modified voucher count: create bitmask */
         voucher_lock();
-        if ($_POST['count'] != ($rollent['count'] ?? null)) {
-            $rollent['count'] = $_POST['count'];
+        if ((int) $_POST['count'] != (int) ($rollent['count'] ?? 0)) {
+            $rollent['count'] = (int) $_POST['count'];
             $len = ($rollent['count']>>3) + 1;   // count / 8 +1
             $rollent['used'] = base64_encode(str_repeat("\000",$len)); // 4 bitmask
             $rollent['active'] = array();
@@ -99,7 +113,9 @@ if ($_POST) {
             $rollent['used'] = base64_encode(voucher_read_used_db($rollent['number']));
             $activent = array();
             $db = array();
-            $active_vouchers = voucher_read_active_db($rollent['number'], $rollent['minutes']);
+            /* voucher_read_active_db() takes ONE argument (the roll); the
+               second was silently discarded. */
+            $active_vouchers = voucher_read_active_db($rollent['number']);
             foreach($active_vouchers as $voucher => $line) {
                 list($timestamp, $minutes) = explode(",", $line);
                 $activent['voucher'] = $voucher;

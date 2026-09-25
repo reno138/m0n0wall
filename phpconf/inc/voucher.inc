@@ -31,6 +31,18 @@
 /* include all configuration functions */
 require_once("functions.inc");
 
+/* The voucher tool, as a constant like SWANCTL_BIN and WG_BIN elsewhere.
+ *
+ * Not only for tidiness: the path was written out at three call sites, so a
+ * unit test could not point the code at a locally built copy and had to settle
+ * for asserting around the tool's absence. With this, tests/t_voucher.php can
+ * exercise the real binary. checkbins.php still finds the literal path here, so
+ * the build gate that requires it to be in the image keeps working.
+ *
+ * Overridable for that reason, and for that reason only. */
+if (!defined('VOUCHER_BIN'))
+    define('VOUCHER_BIN', '/usr/local/bin/voucher');
+
 $lockfile = "{$g['varrun_path']}/voucher.lock";
 $dirtyfile = "{$g['varrun_path']}/voucher.dirty";
 
@@ -95,9 +107,34 @@ function voucher_auth($voucher_received, $test = 0) {
        RSA public/private pair it replaces could not be generated at all under
        OpenSSL 3. See build/tools/voucher.c. */
     $checkme = array();
-    foreach ($a_vouchers_received as $voucher)
-        if (strlen($voucher) >= 3)      // else it seems too short to be a voucher
-            $checkme[] = $voucher;
+    foreach ($a_vouchers_received as $voucher) {
+        if (strlen($voucher) < 3)       // else it seems too short to be a voucher
+            continue;
+        /* Reject anything that is not printable ASCII before it reaches
+           escapeshellarg().
+        
+           A voucher is by definition a string of characters from the configured
+           charset, so this cannot turn away a real one. It has to be checked
+           because escapeshellarg() THROWS a ValueError on a NUL byte in PHP 8,
+           and nothing above here removes one: trim() strips NUL only from the
+           ends, and the preg_split does not split on it. So POSTing
+           auth_voucher=aaa%00bbb to the captive portal was an uncaught fatal --
+           remote, pre-authentication, from any guest on the portal network, and
+           repeatable. Worse, voucher_lock() has already been taken by the time
+           it fires, so every poisoned request left a stale lock and the next
+           genuine voucher login waited out its timeout. */
+        if (preg_match('/[^\x21-\x7e]/', $voucher)) {
+            voucher_log(LOG_WARNING, "ignoring a submitted voucher containing " .
+                        "characters that cannot appear in one");
+            continue;
+        }
+        if (strlen($voucher) > 64) {    // no charset makes a code this long
+            voucher_log(LOG_WARNING, "ignoring an over-long submitted voucher (" .
+                        strlen($voucher) . " characters)");
+            continue;
+        }
+        $checkme[] = $voucher;
+    }
 
     $results = array();
     if (!empty($checkme)) {
@@ -105,7 +142,7 @@ function voucher_auth($voucher_received, $test = 0) {
         foreach ($checkme as $voucher)
             $args .= " " . escapeshellarg($voucher);
         $lines = array();
-        exec("/usr/local/bin/voucher -c {$g['varetc_path']}/voucher.cfg " .
+        exec(VOUCHER_BIN . " -c {$g['varetc_path']}/voucher.cfg " .
              "-K {$g['varetc_path']}/voucher.key -k --{$args}", $lines);
         if (count($lines) == count($checkme)) {
             $results = $lines;
@@ -207,6 +244,16 @@ function voucher_auth($voucher_received, $test = 0) {
         return $total_minutes;       // well, at least one voucher had errors. Say NO ACCESS
     }
 
+    /* Nothing was recognised as a voucher at all -- e.g. every token was
+       shorter than 3 characters and got skipped above. Stop here: falling
+       through would write an active-DB entry keyed on the empty string with a
+       0 minute credit, and voucher_save_db_to_config() would then persist that
+       into config.xml. */
+    if ($first_voucher === "") {
+        voucher_unlock();
+        return 0;
+    }
+
     // All given vouchers were valid and this isn't simply a test.
     // Write back the used DB's
 
@@ -249,7 +296,15 @@ function voucher_configure() {
     /* kill any running minicron */
     killbypid("{$g['varrun_path']}/vouchercron.pid");
 
-    if (isset($config['voucher']['enable'])) {
+    /* 'isset() && !== false' rather than plain isset().
+    
+       A webGUI page writes a cleared checkbox as boolean FALSE, and isset() is
+       true for false. Both live callers -- rc.bootup and the Vouchers page --
+       happen to run this only after write_config(), which re-reads config.xml
+       and drops false values, so plain isset() is not wrong today. This makes
+       the function correct for any caller, rather than correct by virtue of
+       where it is called from. */
+    if (isset($config['voucher']['enable']) && $config['voucher']['enable'] !== false) {
 
         if ($g['booting']) {
             echo "Enabling voucher support... ";
@@ -257,7 +312,12 @@ function voucher_configure() {
 
         // start cron if we're asked to save runtime DB periodically
         // to XML config if it changed
-        $croninterval = $config['voucher']['saveinterval'] * 60; // need seconds. Config has minutes
+        /* (int) before the multiply. A config restored or upgraded with
+           <saveinterval></saveinterval> gives "" here, and "" * 60 is a
+           TypeError in PHP 8 -- not 0 as it was in PHP 5. This runs from
+           rc.bootup, so that killed the BOOT, on a value the Vouchers page only
+           validates while vouchers are being enabled. */
+        $croninterval = ((int) ($config['voucher']['saveinterval'] ?? 0)) * 60; // need seconds. Config has minutes
         if ($croninterval) {
             /* start pruning process (interval defaults to 60 seconds) */
             mwexec("/usr/local/bin/minicron $croninterval {$g['varrun_path']}/vouchercron.pid " .
@@ -333,6 +393,17 @@ function voucher_write_keyfile() {
 
     $keyfile = "{$g['varetc_path']}/voucher.key";
 
+    /* Remove any previous key FIRST, before either of the early returns below.
+    
+       They used to return with the old file still in place, so a firewall whose
+       secret had gone missing or become malformed carried on validating vouchers
+       minted under the PREVIOUS secret -- the exact opposite of what the log
+       message says ("Until then no voucher can be printed or validated"). Since
+       /var/etc is a ramdisk the file only survives within a boot, but that is
+       precisely the window in which an admin clears or replaces the secret and
+       expects the old tickets to stop working. */
+    @unlink($keyfile);
+
     if (empty($config['voucher']['fpekey'])) {
         /* A config upgraded from an older image carries the old RSA
            publickey/privatekey and no fpekey, and the secret is only created
@@ -354,8 +425,9 @@ function voucher_write_keyfile() {
     }
 
     /* Create empty, chmod, THEN write. The old fopen("w")-then-chmod() order
-       left the key world-readable with its content already in it. */
-    @unlink($keyfile);
+       left the key world-readable with its content already in it. (The unlink
+       that used to be here has moved to the top of the function, so that the
+       early returns above cannot leave a stale key behind.) */
     if (@touch($keyfile) === false) {
         printf("Error: cannot write voucher.key\n");
         return 1;
@@ -390,7 +462,42 @@ function voucher_write_cfgfile() {
         return 1;
     }
     chmod("{$g['varetc_path']}/voucher.cfg", 0600);
-    fwrite($fd, "{$config['voucher']['rollbits']},{$config['voucher']['ticketbits']},{$config['voucher']['checksumbits']},{$config['voucher']['magic']},{$config['voucher']['charset']}\n");
+
+    /* Refuse to write a line the tool cannot parse.
+    
+       The five fields are read by the tool with "%d,%d,%d,%llu,%255s", and a
+       blank or non-numeric one makes that fscanf consume the wrong field and
+       mis-parse the rest of the line -- printing and validating then both fail,
+       silently, for every voucher. The page validates these, but only while
+       vouchers are being ENABLED: saving with the box unchecked skips validation
+       entirely, and a restored or upgraded config never passed through the page
+       at all. Better to leave the previous cfg in place and say why. */
+    $v = $config['voucher'];
+    $fields = array('rollbits' => '/^\d+$/', 'ticketbits' => '/^\d+$/',
+                    'checksumbits' => '/^\d+$/', 'magic' => '/^\d+$/',
+                    'charset' => '/^\S{2,255}$/');
+    foreach ($fields as $f => $re) {
+        if (!isset($v[$f]) || !preg_match($re, (string) $v[$f])) {
+            voucher_log(LOG_ERR, "not writing voucher.cfg: '$f' is missing or not " .
+                        "usable (" . var_export($v[$f] ?? null, true) . "). Open " .
+                        "Services: Captive portal: Vouchers and save valid settings.");
+            printf("Error: voucher setting '%s' is missing or invalid\n", $f);
+            fclose($fd);
+            return 1;
+        }
+    }
+    /* A repeated character makes code_render() and code_parse() stop being
+       inverses, so most of a printed roll would be rejected. The tool refuses
+       this too; catching it here keeps a bad cfg from being written at all. */
+    if (strlen(count_chars($v['charset'], 3)) != strlen($v['charset'])) {
+        voucher_log(LOG_ERR, "not writing voucher.cfg: the character set repeats a " .
+                    "character, which makes vouchers impossible to read back.");
+        printf("Error: the voucher character set repeats a character\n");
+        fclose($fd);
+        return 1;
+    }
+
+    fwrite($fd, "{$v['rollbits']},{$v['ticketbits']},{$v['checksumbits']},{$v['magic']},{$v['charset']}\n");
     fclose($fd);
     return 0;
 }
@@ -414,7 +521,7 @@ function voucher_new_key() {
     global $config;
 
     $hex = "";
-    $fd = popen("/usr/local/bin/voucher -g", "r");
+    $fd = popen(VOUCHER_BIN . " -g", "r");
     if ($fd !== false) {
         $hex = trim(fread($fd, 256));
         pclose($fd);

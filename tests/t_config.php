@@ -7,7 +7,14 @@ require MW_ROOT . '/phpconf/inc/xmlparse.inc';
 $cfg = parse_xml_config(MW_ROOT . '/phpconf/config.xml', 'm0n0wall');
 
 is_true ('parses to array',  is_array($cfg));
-is_same('schema version',    $cfg['version'] ?? null, '2.0');
+/* The INVARIANT, not a literal: the shipped config must be at the version
+   convert_config() considers current. Pinning the number meant that bumping
+   latest_config -- which any breaking config change has to do -- failed here
+   with nothing to say which of the two was wrong. If they disagree, a freshly
+   installed firewall runs convert_config() against its own default config on
+   every boot. */
+is_same('shipped config is at the current schema version',
+        $cfg['version'] ?? null, $g['latest_config']);
 is_same('default hostname',  $cfg['system']['hostname'] ?? null, 'm0n0wall');
 is_same('default LAN ip',    $cfg['interfaces']['lan']['ipaddr'] ?? null, '192.168.1.1');
 is_same('default LAN mask',  $cfg['interfaces']['lan']['subnet'] ?? null, '24');

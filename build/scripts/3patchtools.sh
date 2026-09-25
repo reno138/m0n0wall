@@ -95,4 +95,23 @@ done
 echo "Stripping..."
 find "$FS" -type f 2>/dev/null | xargs strip -s 2>/dev/null || true
 
+# ---------------------------------------------------------------------------
+# Gate: every external binary the shipped PHP tries to run must be IN the image.
+#
+# A missing binary is completely silent -- mwexec() gets 127, exec() fills
+# nothing in, and the feature just does not happen. Two menu pages (Diagnostics
+# > IPsec) listed nothing for exactly this reason, and a System: Advanced
+# checkbox configured nothing. See the header of checkbins.php.
+#
+# THIS RUNS IN STAGE 3, not stage 2, because stage 3 is where m0n0wall's own
+# tools are compiled and installed -- voucher, minicron, croen, dnswatch,
+# verifysig, stats, choparp. Placed at the end of stage 2 it failed the build on
+# all seven of them: they are referenced by the shipped PHP but do not exist yet
+# at that point. (It passed when run by hand only because the build tree still
+# held stage 3's output from a previous run.) Stage 3 is the first point at which
+# everything that will be in the image is in it.
+# ---------------------------------------------------------------------------
+echo "Verifying every binary the image's PHP invokes is present..."
+php "$SRC/build/scripts/checkbins.php" "$FS" "$SRC" || exit 1
+
 echo "Finished Stage 3"

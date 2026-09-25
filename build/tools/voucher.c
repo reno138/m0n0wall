@@ -603,6 +603,7 @@ static int code_parse(const char *s, const char *charset, uint64_t *out)
     uint64_t    base = (uint64_t)strlen(charset);
     uint64_t    v = 0;
     size_t      digits = 0;
+    int         msd = -1;                     /* most significant digit seen */
     const char *p = s + strlen(s);
 
     if (strlen(s) > MAX_VOUCHER_LEN)
@@ -620,10 +621,38 @@ static int code_parse(const char *s, const char *charset, uint64_t *out)
         if (v > (UINT64_MAX - d) / base)
             return -1;                        /* too long to be one of ours */
         v = v * base + d;
+        if (msd < 0)
+            msd = (int)d;                     /* first one scanned is the highest */
         digits++;
     }
     if (digits == 0)
         return -1;
+
+    /*
+     * Reject a code that is not in the form code_render() produces.
+     *
+     * This scan runs right to left, so the FIRST character it reads is the most
+     * significant digit -- and code_render() never emits a most significant
+     * digit of 0 except for the single-character rendering of v == 0. Without
+     * this test, appending charset[0] to a genuine code gives another spelling
+     * of the same 64-bit word, and so does appending it twice, and so on
+     * without limit:
+     *
+     *     ihur8vARSPX    -> OK 7 1
+     *     ihur8vARSPX2   -> OK 7 1      (charset[0] is '2' in the default set)
+     *     ihur8vARSPX22  -> OK 7 1
+     *
+     * That matters beyond tidiness. voucher.inc keys the ACTIVE voucher
+     * database on the code STRING while the used-ticket bitmask is keyed on
+     * (roll, ticket), so a guest who pads their code presents a string the
+     * active database has never seen for a ticket the bitmask may already have
+     * accounted for. Making the encoding injective removes the mismatch at its
+     * source, which is better than teaching two databases to agree about
+     * spelling.
+     */
+    if (digits > 1 && msd == 0)
+        return -1;
+
     *out = v;
     return 0;
 }
@@ -771,6 +800,36 @@ int main(int argc, char *argv[]) {
     {
         printf(ERR_CFG " charset too short '%s'\n", charset);
         exit(1);
+    }
+
+    /*
+     * The charset must not repeat a character.
+     *
+     * code_render() maps digit d to charset[d]; code_parse() maps a character
+     * back with strchr(), which finds the FIRST occurrence. With any duplicate
+     * the two stop being inverses: every digit that renders to a later copy
+     * parses back as the earlier one, so the voucher decodes to a different
+     * number than it encoded and most of a roll is rejected.
+     *
+     * Refused here and not only on the Vouchers page, because voucher.cfg is
+     * hand-editable and is also rewritten from a restored config.xml that never
+     * passed through that page. Failing loudly at this point is much kinder than
+     * printing a roll of tickets that cannot be redeemed.
+     */
+    {
+        unsigned char seen[256];
+        const char   *c;
+
+        memset(seen, 0, sizeof(seen));
+        for (c = charset; *c != '\0'; c++)
+        {
+            if (seen[(unsigned char)*c])
+            {
+                printf(ERR_CFG " charset repeats the character '%c'\n", *c);
+                exit(1);
+            }
+            seen[(unsigned char)*c] = 1;
+        }
     }
 
     /* Same ranges the Vouchers page enforces. Checked here as well because

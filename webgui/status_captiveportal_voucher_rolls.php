@@ -70,25 +70,28 @@ $tabs = array('Users' => 'status_captiveportal.php',
 <?php 
     voucher_lock();
     $i = 0; foreach($a_roll as $rollent): 
-    $used = voucher_used_count($rollent['number']);
+    $used = voucher_used_count($rollent['number'] ?? 0);
     /* count()'s second argument is its MODE, not a value to pass through --
        the roll's minutes landed there, and PHP 8 throws ValueError for any
        mode that is not COUNT_NORMAL or COUNT_RECURSIVE. */
-    $active = count(voucher_read_active_db($rollent['number']));
-    $ready = $rollent['count'] - $used;
+    $active = count(voucher_read_active_db($rollent['number'] ?? 0));
+    /* ?? 0: a roll entry written before 'count' existed, or a hand-edited
+       config, otherwise makes this an "Undefined array key" warning and then
+       arithmetic on null. */
+    $ready = ($rollent['count'] ?? 0) - $used;
 ?>
   <tr>
     <td class="listlr">
-    <?=htmlspecialchars($rollent['number']); ?>&nbsp;
+    <?=htmlspecialchars($rollent['number'] ?? ''); ?>&nbsp;
     </td>
     <td class="listr">
-    <?=htmlspecialchars($rollent['minutes']);?>&nbsp;
+    <?=htmlspecialchars($rollent['minutes'] ?? '');?>&nbsp;
     </td>
     <td class="listr">
-    <?=htmlspecialchars($rollent['count']);?>&nbsp;
+    <?=htmlspecialchars($rollent['count'] ?? '');?>&nbsp;
     </td>
     <td class="listr">
-    <?=htmlspecialchars($rollent['comment']); ?>&nbsp;
+    <?=htmlspecialchars($rollent['comment'] ?? ''); ?>&nbsp;
     </td>
     <td class="listr">
     <?=htmlspecialchars($used); ?>&nbsp;

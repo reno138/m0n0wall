@@ -753,6 +753,47 @@ function convert_config() {
 		$config['version'] = "2.0";
 	}
 
+	/* 2.0 -> 2.1: the voucher scheme no longer uses RSA.
+	
+	   build/tools/voucher.c used to encrypt each voucher with a 64-bit RSA key,
+	   which OpenSSL 3 refuses to generate at all ("key size too small"), so the
+	   feature could not work on this platform. It is a keyed 64-bit permutation
+	   under one 256-bit secret now, stored as $config['voucher']['fpekey'].
+	
+	   Without this step an upgraded config with vouchers enabled booted with the
+	   dead RSA keys and NO fpekey: the secret is otherwise only minted when an
+	   admin opens the Vouchers page, so until they did, every guest was told
+	   their voucher was invalid with nothing but a syslog line to say why. */
+	if ($config['version'] == "2.0") {
+		if (isset($config['voucher']) && is_array($config['voucher'])) {
+			$had_rsa = !empty($config['voucher']['publickey'])
+			           || !empty($config['voucher']['privatekey']);
+			unset($config['voucher']['publickey'], $config['voucher']['privatekey']);
+
+			if (empty($config['voucher']['fpekey'])) {
+				require_once("voucher.inc");
+				if (voucher_new_key()) {
+					if ($had_rsa)
+						echo "\nNote: the captive portal voucher scheme changed. A new " .
+						     "secret was generated, so any voucher printed before this " .
+						     "upgrade is no longer valid.";
+				} else {
+					/* The tool is missing or failed. Do not leave vouchers
+					   enabled with no secret -- guests would simply be refused.
+					   Say so on the console and in the log, and let the admin
+					   re-enable it once a secret exists. */
+					if (isset($config['voucher']['enable'])) {
+						unset($config['voucher']['enable']);
+						echo "\nWarning: captive portal vouchers have been DISABLED: a new " .
+						     "voucher secret could not be generated. Open Services: " .
+						     "Captive portal: Vouchers and save to generate one.";
+					}
+				}
+			}
+		}
+		$config['version'] = "2.1";
+	}
+
 	/* choose a random NTP server (first time startup)? */
 	if (isset($config['system']['timeservers-randomize'])) {
 		$config['system']['timeservers'] = rand(0, 3) . ".m0n0wall.pool.ntp.org";

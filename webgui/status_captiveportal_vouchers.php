@@ -49,8 +49,10 @@ $a_roll = &$config['voucher']['roll'];
 $db = array();
 
 foreach($a_roll as $rollent) {
-    $roll = $rollent['number'];
-    $minutes = $rollent['minutes'];
+    /* ?? guards: a hand-edited or partially written roll entry otherwise makes
+       these "Undefined array key" warnings, printed into the page body. */
+    $roll = $rollent['number'] ?? 0;
+    $minutes = $rollent['minutes'] ?? 0;
     $active_vouchers = voucher_read_active_db($roll);
     foreach($active_vouchers as $voucher => $line) {
         list($timestamp, $minutes) = array_pad(explode(",", $line), 2, null);
@@ -101,10 +103,14 @@ $tabs = array('Users' => 'status_captiveportal.php',
   </tr>
 <?php foreach ($db as $dbent): ?>
   <tr>
-    <td class="listlr"><?=$dbent[0];?></td>
-    <td class="listr"><?=$dbent[1];?></td>
+    <?php /* Escaped: the voucher code (column 0) is built from the admin-set
+             character set, and the roll number and remaining minutes come out
+             of a ramdisk DB whose lines are keyed on that code. Only the two
+             date() columns were escaped before. */ ?>
+    <td class="listlr"><?=htmlspecialchars($dbent[0]);?></td>
+    <td class="listr"><?=htmlspecialchars($dbent[1]);?></td>
     <td class="listr"><?=htmlspecialchars(date("m/d/Y H:i:s", $dbent[2]));?></td>
-    <td class="listr"><?=$dbent[3];?> min</td>
+    <td class="listr"><?=htmlspecialchars($dbent[3]);?> min</td>
     <td class="listr"><?=htmlspecialchars(date("m/d/Y H:i:s", $dbent[4]));?></td>
     <td class="list"></td>
   </tr>
