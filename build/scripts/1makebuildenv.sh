@@ -13,7 +13,7 @@
 #   $MW_BUILDPATH/freebsd8  -> $MW_BUILDPATH/freebsd15
 #   sbin/atacontrol         -> sbin/camcontrol    (ATA driver replaced by CAM)
 #   usr/sbin/ancontrol      -> dropped            (Aironet driver removed)
-#   usr/bin/nsupdate        -> supplied by stage 2 from bind-tools, not base
+#   usr/local/bin/nsupdate  -> supplied by stage 2 from bind-tools, not base
 #
 # The manifest itself held up remarkably well: 65 of its 68 entries still
 # exist unchanged on FreeBSD 15.1.

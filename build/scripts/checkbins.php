@@ -12,7 +12,6 @@
  *                            belonged to ipsec-tools, which went with racoon.
  *   /usr/local/bin/mbmon     the "Enable Motherboard Monitoring" option on
  *                            System: Advanced configured nothing.
- *   /usr/bin/nsupdate        RFC 2136 dynamic DNS could never update anything.
  *   /sbin/ipf /sbin/ipmon    left over from ipfilter, in dead code and in the
  *   /sbin/ipnat              two L2TP link scripts.
  *
@@ -84,9 +83,6 @@ $allowed_missing = array(
     '/usr/local/sbin/setkey' => 'belonged to ipsec-tools with racoon; only in '
                               . 'vpn_ipsec_configure_racoon_superseded(). The two Diagnostics '
                               . 'IPsec pages that used it were rewritten for swanctl.',
-    '/usr/bin/nsupdate' => 'RFC 2136 dynamic DNS is unavailable: bind-tools is 8.5MB plus seven '
-                         . 'dependencies, which is not a reasonable cost for this one feature. '
-                         . 'services_dnsupdate_process() is guarded and the page says so.',
 );
 
 $missing = array(); $ok = 0; $acknowledged = array();

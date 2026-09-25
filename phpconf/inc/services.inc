@@ -709,26 +709,28 @@ EOD;
 			
 			/* invoke nsupdate.
 			
-			   nsupdate is NOT in the image. It comes from bind-tools, which is
-			   8.5MB plus seven dependencies -- too much to carry for this one
-			   feature on an image chosen for being small. So RFC 2136 updating
-			   is currently unavailable, and this says so once per attempt
-			   instead of running a missing binary and reporting success.
+			   /usr/local/bin, which is where the bind-tools package puts it --
+			   NOT /usr/bin, where base's nsupdate used to live and where this
+			   looked for years after the switch. The build has been shipping it
+			   all along (build/scripts/2makebinaries.sh names
+			   usr/local/bin/nsupdate), so the image carried bind-tools' ~8MB
+			   AND reported the feature unavailable, while services_dyndns.php
+			   went on offering the settings. The referenced-binary gate would
+			   have caught the mismatch on the first build, except that
+			   /usr/bin/nsupdate had been added to its known-dead list -- which
+			   is the hazard of that list, and why this one is now gone from it.
 			
-			   The alternatives, if it is wanted: ship bind-tools and accept the
-			   size, or implement DNS UPDATE with TSIG directly in PHP (the
-			   sockets extension is already in the image, so it needs no new
-			   dependency -- roughly 150 lines for the wire format and the HMAC).
-			   The HTTP-API providers above are unaffected; they need no helper
-			   at all. */
-			if (!file_exists("/usr/bin/nsupdate")) {
+			   The guard stays: a build that chooses to drop bind-tools should
+			   say so once per attempt rather than run a missing binary and
+			   report success. */
+			if (!file_exists("/usr/local/bin/nsupdate")) {
 				log_error("Dynamic DNS: RFC 2136 updating is not available in this " .
 				          "build (nsupdate is not installed), so {$hostname} was not " .
 				          "updated. The HTTP-based providers on the same page do work.");
 				return 1;
 			}
 
-			$cmd = "/usr/bin/nsupdate -k {$g['varetc_path']}/K{$keyname}+157+00000.private";
+			$cmd = "/usr/local/bin/nsupdate -k {$g['varetc_path']}/K{$keyname}+157+00000.private";
 			if (isset($config['dnsupdate']['usetcp']))
 				$cmd .= " -v";
 			$cmd .= " {$g['varetc_path']}/nsupdatecmds";

@@ -94,7 +94,7 @@ usr/bin/id
 usr/bin/killall
 usr/bin/logger
 usr/bin/netstat
-# usr/bin/nsupdate -- now from the bind-tools package, see stage 2
+# usr/local/bin/nsupdate -- now from the bind-tools package, see stage 2
 usr/bin/nohup
 usr/bin/sed
 usr/bin/sort
