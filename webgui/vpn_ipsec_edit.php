@@ -170,13 +170,15 @@ if ($_POST) {
 	else {
 		$reqdfields = explode(" ", "localnet remotenet remotebits remotegw p2ealgos p2halgos");
 		$reqdfieldsn = explode(",", "Local network,Remote network,Remote network bits,Remote gateway,P2 Encryption Algorithms,P2 Hash Algorithms");	
-		if (!strstr($_POST['p1cert'] ?? '', "BEGIN CERTIFICATE") || !strstr($_POST['p1cert'] ?? '', "END CERTIFICATE"))
-			$input_errors[] = "This certificate does not appear to be valid.";
-		/* see the note in system_advanced.php: PKCS#1 is not the only form */
-		if (!is_pem_private_key($_POST['p1privatekey'] ?? ''))
-			$input_errors[] = "This key does not appear to be valid.";	
-		if (($_POST['p1peercert'] ?? null)!="" && (!strstr($_POST['p1peercert'], "BEGIN CERTIFICATE") || !strstr($_POST['p1peercert'], "END CERTIFICATE")))
-			$input_errors[] = "This peer certificate does not appear to be valid.";	
+		/* Shared validator -- see pem_validate_keypair() in util.inc. */
+		$input_errors = array_merge($input_errors,
+			pem_validate_keypair($_POST['p1cert'] ?? '', $_POST['p1privatekey'] ?? '',
+			                     'charon'));
+		/* The peer's certificate has no key of ours to match, so only its shape
+		   is checked -- and only when one was supplied. */
+		if (($_POST['p1peercert'] ?? '') !== '' && !is_pem_certificate($_POST['p1peercert']))
+			$input_errors[] = "This peer certificate does not appear to be valid. It " .
+			    "should be PEM, beginning with \"-----BEGIN CERTIFICATE-----\".";
 	}
 	
 	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);

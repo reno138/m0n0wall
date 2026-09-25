@@ -59,12 +59,14 @@ if ($_POST) {
 	/* input validation */
 	$reqdfields = explode(" ", "ident cert");
 	$reqdfieldsn = explode(",", "Identifier,CA Certificate");
-	if (!strstr($_POST['cert'], "BEGIN CERTIFICATE") || !strstr($_POST['cert'], "END CERTIFICATE"))
-			$input_errors[] = "This certificate does not appear to be valid.";
-	
-	if ((isset($_POST['crl'])) and ($_POST['crl']!=""))
-		if (!strstr($_POST['crl'], "BEGIN X509 CRL") || !strstr($_POST['crl'], "END X509 CRL"))
-				$input_errors[] = "This CRL does not appear to be valid.";
+	/* A CA certificate has no private key here, so only the certificate half is
+	   asked for -- see pem_validate_keypair() in util.inc. */
+	$input_errors = array_merge($input_errors,
+		pem_validate_keypair($_POST['cert'] ?? '', '', 'charon', 'cert'));
+
+	if (($_POST['crl'] ?? '') !== '' && !is_pem_crl($_POST['crl']))
+		$input_errors[] = "This CRL does not appear to be valid. It should be PEM, " .
+		    "beginning with \"-----BEGIN X509 CRL-----\".";
 	
 	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	

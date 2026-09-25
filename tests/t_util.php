@@ -125,4 +125,55 @@ if (function_exists('openssl_pkey_new')) {
     }
 }
 
+/* --- the shared certificate/key validator --------------------------------
+ *
+ * One entry point for the five pages that accept certificate material, because
+ * they had already drifted apart in what they accept AND in what they say. */
+if (function_exists('openssl_pkey_new')) {
+    $A = generate_self_signed_cert('m0n0wall', 'a.example.com');
+    $B = generate_self_signed_cert('m0n0wall', 'b.example.com');
+
+    is_same('a matching pair passes',
+            pem_validate_keypair($A['cert'], $A['key'], 'charon'), array());
+
+    /* A mismatched pair passes every shape test and then fails at the daemon,
+       where the error is far harder to trace back to the form. */
+    $mm = pem_validate_keypair($A['cert'], $B['key'], 'charon');
+    is_same('a mismatched pair is caught', count($mm), 1);
+    is_true ('and says they do not match', strpos($mm[0], 'do not match') !== false);
+
+    is_same('cert-only mode ignores the key',
+            pem_validate_keypair($A['cert'], '', 'charon', 'cert'), array());
+    is_same('key-only mode ignores the cert',
+            pem_validate_keypair('', $A['key'], 'charon', 'key'), array());
+}
+
+/* An encrypted key must be named as such: these daemons start with no console,
+   so "not valid" would send someone hunting for a format problem. */
+$enc = pem_validate_keypair('', "-----BEGIN ENCRYPTED PRIVATE KEY-----\nx\n-----END ENCRYPTED PRIVATE KEY-----\n",
+                            'The web server', 'key');
+is_same('an encrypted key is reported once', count($enc), 1);
+is_true ('and is named as passphrase-protected', strpos($enc[0], 'passphrase-protected') !== false);
+is_true ('and names the daemon that cannot prompt', strpos($enc[0], 'The web server') !== false);
+
+/* An OpenSSH key is a common paste mistake and worth naming. */
+$ssh = pem_validate_keypair('', "-----BEGIN OPENSSH PRIVATE KEY-----\nx\n-----END OPENSSH PRIVATE KEY-----\n",
+                            'charon', 'key');
+is_same('an OpenSSH key is reported once', count($ssh), 1);
+is_true ('and is identified as OpenSSH', strpos($ssh[0], 'OpenSSH') !== false);
+is_true ('is_openssh_private_key agrees',
+         is_openssh_private_key("-----BEGIN OPENSSH PRIVATE KEY-----\nx\n-----END OPENSSH PRIVATE KEY-----\n"));
+is_false('and a PEM key is not OpenSSH',
+         is_openssh_private_key("-----BEGIN PRIVATE KEY-----\nx\n-----END PRIVATE KEY-----\n"));
+
+/* Garbage in both fields reports both, not just the first. */
+is_same('both halves are reported', count(pem_validate_keypair('nope', 'nope', 'charon')), 2);
+
+/* CRLs, for the IPsec CA page. */
+is_true ('a CRL is recognised',
+         is_pem_crl("-----BEGIN X509 CRL-----\nMIIB\n-----END X509 CRL-----\n"));
+is_false('a certificate is not a CRL',
+         is_pem_crl("-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n"));
+is_false('a truncated CRL is refused', is_pem_crl("-----BEGIN X509 CRL-----\nMIIB\n"));
+
 exit(mw_report('util.inc'));

@@ -111,20 +111,13 @@ if ($_POST) {
 		 	if (empty($_POST['cert']) || empty($_POST['key'])) {
 				$input_errors[] = "Certificate and key must be specified for HTTPS login.";
 			} else {
-				if (!is_pem_certificate($_POST['cert']))
-					$input_errors[] = "This certificate does not appear to be valid.";
-				/* Shared validator in util.inc, so this page cannot drift
-				   from the other four that accept a key. It used to insist on
-				   "BEGIN RSA PRIVATE KEY" (PKCS#1) while every current openssl
-				   writes PKCS#8 by default, so a key generated today was
-				   rejected and HTTPS login could not be configured at all. */
-				if (is_pem_encrypted_private_key($_POST['key']))
-					$input_errors[] = "This key is passphrase-protected. lighttpd is " .
-					    "started without a console, so it cannot prompt for one -- " .
-					    "decrypt the key before uploading it.";
-				else if (!is_pem_private_key($_POST['key']))
-					$input_errors[] = "This key does not appear to be valid. It should be " .
-					    "a PEM private key, beginning with \"-----BEGIN PRIVATE KEY-----\".";
+				/* Shared validator -- see pem_validate_keypair() in util.inc.
+				   This page used to insist on "BEGIN RSA PRIVATE KEY", so a key
+				   from any current openssl was rejected and HTTPS login could
+				   not be configured at all. */
+				$input_errors = array_merge($input_errors,
+					pem_validate_keypair($_POST['cert'], $_POST['key'],
+					                     'The captive portal web server'));
 			}
 			
 			if (empty($_POST['httpsname']) || !is_domain($_POST['httpsname'])) {

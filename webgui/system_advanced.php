@@ -83,18 +83,12 @@ if ($_POST) {
 	if ((!empty($_POST['cert']) && empty($_POST['key'])) || (!empty($_POST['key']) && empty($_POST['cert']))) {
 		$input_errors[] = "Certificate and key must always be specified together.";
 	} else if (!empty($_POST['cert']) && !empty($_POST['key'])) {
-		if (!is_pem_certificate($_POST['cert']))
-			$input_errors[] = "This certificate does not appear to be valid.";
-		/* is_pem_private_key(), not a test for "BEGIN RSA PRIVATE KEY": that is
-		   PKCS#1 only, and every current openssl writes PKCS#8 by default, so a
-		   key generated today was rejected here even though lighttpd reads it. */
-		if (is_pem_encrypted_private_key($_POST['key']))
-			$input_errors[] = "This key is passphrase-protected. The web server is " .
-			    "started without a console, so it cannot prompt for one -- decrypt " .
-			    "the key before uploading it.";
-		else if (!is_pem_private_key($_POST['key']))
-			$input_errors[] = "This key does not appear to be valid. It should be a " .
-			    "PEM private key, beginning with \"-----BEGIN PRIVATE KEY-----\".";
+		/* One shared validator -- see pem_validate_keypair() in util.inc. The
+		   literal "BEGIN RSA PRIVATE KEY" test this replaces is PKCS#1 only,
+		   and every current openssl writes PKCS#8 by default, so a key made
+		   today was rejected here even though lighttpd reads it happily. */
+		$input_errors = array_merge($input_errors,
+			pem_validate_keypair($_POST['cert'], $_POST['key'], 'The web server'));
 	}
 	if ((!empty($_POST['portrangelow']) || !empty($_POST['portrangehigh'])) &&
 		(!is_port($_POST['portrangelow'] ?? '') || !is_port($_POST['portrangehigh'] ?? '')))

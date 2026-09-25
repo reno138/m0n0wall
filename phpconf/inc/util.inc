@@ -812,6 +812,80 @@ function is_pem_encrypted_private_key($key) {
 	    || strpos($key, 'Proc-Type: 4,ENCRYPTED') !== false;
 }
 
+/* Is this an OpenSSH private key? A common paste mistake, and worth naming:
+ * the generic "does not appear to be valid" sends people looking for a
+ * corruption they do not have. */
+function is_openssh_private_key($key) {
+	return is_string($key) && strpos($key, 'BEGIN OPENSSH PRIVATE KEY') !== false;
+}
+
+/* Is this a PEM X.509 CRL? */
+function is_pem_crl($crl) {
+	if (!is_string($crl) || $crl === '')
+		return false;
+	return strpos($crl, '-----BEGIN X509 CRL-----') !== false
+	    && strpos($crl, '-----END X509 CRL-----') !== false;
+}
+
+/* Validate certificate and key material from a form.
+ *
+ * ONE entry point, because the pages that accept a certificate had already
+ * drifted apart in both what they accept and what they say -- the
+ * "BEGIN RSA PRIVATE KEY" test was copied into five of them independently, and
+ * each produced its own wording for the same failure.
+ *
+ *   $cert    PEM certificate ('' when $want is 'key')
+ *   $key     PEM private key ('' when $want is 'cert')
+ *   $daemon  who will read it, for the passphrase message -- "The web server",
+ *            "The captive portal", "charon"
+ *   $want    'both' (default) | 'cert' | 'key'
+ *
+ * Returns an array of error strings, empty when the material is usable, so a
+ * caller writes:
+ *
+ *   $input_errors = array_merge($input_errors, pem_validate_keypair($c, $k, 'charon'));
+ *
+ * The order of the checks is the part that matters: the ENCRYPTED test has to
+ * come before the general one, because is_pem_private_key() deliberately
+ * returns false for an encrypted key and would otherwise swallow the specific
+ * message in the generic one.
+ */
+function pem_validate_keypair($cert, $key, $daemon = 'This service', $want = 'both') {
+	$errors = array();
+
+	if ($want != 'key') {
+		if (!is_pem_certificate($cert))
+			$errors[] = "This certificate does not appear to be valid. It should be " .
+			    "PEM, beginning with \"-----BEGIN CERTIFICATE-----\".";
+	}
+
+	if ($want != 'cert') {
+		if (is_pem_encrypted_private_key($key)) {
+			$errors[] = "This key is passphrase-protected. {$daemon} is started " .
+			    "without a console, so it cannot prompt for one -- decrypt the key " .
+			    "first, with: openssl pkey -in key.pem -out key-decrypted.pem";
+		} else if (is_openssh_private_key($key)) {
+			$errors[] = "That is an OpenSSH private key, not a PEM one. Convert it " .
+			    "with: ssh-keygen -p -m PEM -f key";
+		} else if (!is_pem_private_key($key)) {
+			$errors[] = "This key does not appear to be valid. It should be a PEM " .
+			    "private key, beginning with \"-----BEGIN PRIVATE KEY-----\".";
+		}
+	}
+
+	/* Do they belong together? A mismatched pair is accepted by every check
+	   above and then fails at the daemon, where the error is much harder to
+	   connect back to this form. Only asked when both look well-formed, and
+	   skipped if openssl is unavailable rather than guessing. */
+	if (!$errors && $want == 'both' && function_exists('openssl_x509_check_private_key')) {
+		if (@openssl_x509_check_private_key($cert, $key) !== true)
+			$errors[] = "This certificate and key do not match each other. Check that " .
+			    "both came from the same keypair.";
+	}
+
+	return $errors;
+}
+
 /* Does this look like a PEM certificate? */
 function is_pem_certificate($cert) {
 	if (!is_string($cert) || $cert === '')

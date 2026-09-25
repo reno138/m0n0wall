@@ -100,11 +100,10 @@ if ($_POST) {
 	}
 	
 	if (($_POST['p1authentication_method'] ?? null)== "rsasig") {
-		if (!strstr($_POST['p1cert'] ?? '', "BEGIN CERTIFICATE") || !strstr($_POST['p1cert'] ?? '', "END CERTIFICATE"))
-			$input_errors[] = "This certificate does not appear to be valid.";
-		/* see the note in system_advanced.php: PKCS#1 is not the only form */
-		if (!is_pem_private_key($_POST['p1privatekey'] ?? ''))
-			$input_errors[] = "This key does not appear to be valid.";	
+		/* Shared validator -- see pem_validate_keypair() in util.inc. */
+		$input_errors = array_merge($input_errors,
+			pem_validate_keypair($_POST['p1cert'] ?? '', $_POST['p1privatekey'] ?? '',
+			                     'charon'));
 	}
 	
 	if ((!empty($_POST['p1lifetime']) && !is_numeric($_POST['p1lifetime']))) {
