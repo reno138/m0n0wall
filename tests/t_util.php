@@ -59,4 +59,70 @@ is_same('duration days',     format_duration(86400),  '1 day');
 is_same('duration days+',    format_duration(259200), '3 days');
 is_same('duration negative', format_duration(-5),     'in the future');
 
+/* --- REGRESSION: PEM key validation accepted only PKCS#1 ------------------
+ *
+ * Five separate pages tested for the literal string "BEGIN RSA PRIVATE KEY" --
+ * the webGUI's own HTTPS certificate, the captive portal's HTTPS login, both
+ * IPsec certificate pages, and generate_self_signed_cert()'s own sanity check.
+ * That is PKCS#1, and every current openssl writes PKCS#8 ("BEGIN PRIVATE KEY")
+ * by default, so a key generated today was rejected even though the OpenSSL 3
+ * that lighttpd and charon link against reads it happily.
+ *
+ * Worst of all, generate_self_signed_cert() checked its OWN output that way, so
+ * it always returned false and the caller reported "your system's clock is not
+ * set" while falling back to the insecure certificate shared by every install.
+ *
+ * These use fixed PEM headers rather than shelling out to openssl, so the suite
+ * still runs on a machine without it. */
+$pkcs8 = "-----BEGIN PRIVATE KEY-----\nMIIBVAIBADANBgkq\n-----END PRIVATE KEY-----\n";
+$pkcs1 = "-----BEGIN RSA PRIVATE KEY-----\nMIIBOgIBAAJBAL\n-----END RSA PRIVATE KEY-----\n";
+$ec    = "-----BEGIN EC PRIVATE KEY-----\nMHcCAQEEIAxq\n-----END EC PRIVATE KEY-----\n";
+$dsa   = "-----BEGIN DSA PRIVATE KEY-----\nMIIBuwIBAAKB\n-----END DSA PRIVATE KEY-----\n";
+$enc8  = "-----BEGIN ENCRYPTED PRIVATE KEY-----\nMIIFDjA=\n-----END ENCRYPTED PRIVATE KEY-----\n";
+$enc1  = "-----BEGIN RSA PRIVATE KEY-----\nProc-Type: 4,ENCRYPTED\nDEK-Info: AES-256-CBC,AB\n\nxyz\n-----END RSA PRIVATE KEY-----\n";
+
+is_true ('PKCS#8 is accepted (openssl default)', is_pem_private_key($pkcs8));
+is_true ('PKCS#1 is still accepted',             is_pem_private_key($pkcs1));
+is_true ('an EC key is accepted',                is_pem_private_key($ec));
+is_true ('a DSA key is accepted',                is_pem_private_key($dsa));
+
+/* Rejected on purpose: lighttpd, charon and mpd5 start with no console, so
+   nothing can prompt for the passphrase and the daemon just fails to start.
+   The pages report this specifically rather than "not valid". */
+is_false('an encrypted PKCS#8 key is refused',   is_pem_private_key($enc8));
+is_true ('and is identified as encrypted',       is_pem_encrypted_private_key($enc8));
+is_false('an encrypted PKCS#1 key is refused',   is_pem_private_key($enc1));
+is_true ('and is identified as encrypted',       is_pem_encrypted_private_key($enc1));
+
+is_false('garbage is refused',                   is_pem_private_key('hello'));
+is_false('an empty string is refused',           is_pem_private_key(''));
+is_false('a certificate is not a private key',   is_pem_private_key(
+         "-----BEGIN CERTIFICATE-----\nMIIC\n-----END CERTIFICATE-----\n"));
+/* a header with no matching footer is a truncated paste, which must not pass */
+is_false('a truncated key is refused',           is_pem_private_key(
+         "-----BEGIN PRIVATE KEY-----\nMIIBVAIBADANBgkq\n"));
+
+is_true ('a certificate is recognised',          is_pem_certificate(
+         "-----BEGIN CERTIFICATE-----\nMIIC\n-----END CERTIFICATE-----\n"));
+is_false('a private key is not a certificate',   is_pem_certificate($pkcs8));
+is_false('garbage is not a certificate',         is_pem_certificate('hello'));
+
+/* --- REGRESSION: the firewall could not make its own HTTPS certificate ---
+ *
+ * Only run where openssl is compiled into PHP; the image has it. */
+if (function_exists('openssl_pkey_new')) {
+    $ck = generate_self_signed_cert('m0n0wall', 'fw.example.com');
+    is_true ('a self-signed certificate is generated', is_array($ck));
+    if (is_array($ck)) {
+        is_true ('its certificate is valid PEM',   is_pem_certificate($ck['cert']));
+        is_true ('its key passes our own check',   is_pem_private_key($ck['key']));
+        $parsed = openssl_x509_parse($ck['cert']);
+        /* SHA-1 signatures are rejected by every current browser, so a
+           certificate signed that way was useless even when it was produced. */
+        is_true ('it is signed with SHA-256',
+                 isset($parsed['signatureTypeSN']) && stripos($parsed['signatureTypeSN'], 'sha256') !== false);
+        is_same('the common name is the one asked for', $parsed['subject']['CN'] ?? null, 'fw.example.com');
+    }
+}
+
 exit(mw_report('util.inc'));

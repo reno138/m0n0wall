@@ -714,15 +714,40 @@ function convert_to_6to4_nibbles($ipaddr) {
 	return sprintf('%02x%02x:%02x%02x',	$octets[0], $octets[1], $octets[2], $octets[3]);
 }
 
-/* generate a self-signed SSL cert/key (1024-bit, valid for 2 years) and return it in PEM format */
+/* Generate a self-signed 2048-bit SSL cert/key valid for 3 years, in PEM format.
+ *
+ * Returns false only if the clock is implausible, which is a real possibility on
+ * a firewall that has not reached an NTP server yet: a certificate whose notBefore
+ * is in the future is rejected by every client.
+ *
+ * Two things here were broken and both failed CLOSED, which is how they went
+ * unnoticed -- the caller's message on failure is "your system's clock is not
+ * set", so a firewall that fell back to the insecure shared default certificate
+ * blamed the clock:
+ *
+ *   - the sanity check required "BEGIN RSA PRIVATE KEY" (PKCS#1), but
+ *     openssl_pkey_export() on OpenSSL 3 writes PKCS#8 ("BEGIN PRIVATE KEY").
+ *     So the check could never pass and this function ALWAYS returned false.
+ *   - digest_alg was sha1. Every current browser rejects a SHA-1 signature, so
+ *     even a certificate that had been generated would have been refused.
+ *
+ * The comment also claimed 1024-bit and 2 years while the code said 2048 and
+ * 3*365 days.
+ */
 function generate_self_signed_cert($orgname, $cn) {
 	global $g;
 	
-	/* check local clock first - must be set to something after the release date
-	  (subtract a day to avoid TZ problems with early adopters) */
-	$buildtime = trim(file_get_contents("{$g['etc_path']}/version.buildtime.unix")) - 86400;
-	if (time() < $buildtime)
-		return false;
+	/* Check local clock first - must be set to something after the release date
+	   (subtract a day to avoid TZ problems with early adopters).
+	   
+	   Read defensively: file_get_contents() returns false if the file is
+	   missing, and "" - 86400 is a TypeError in PHP 8 rather than 0 - 86400. */
+	$btraw = @file_get_contents("{$g['etc_path']}/version.buildtime.unix");
+	if ($btraw !== false && is_numeric(trim($btraw))) {
+		$buildtime = (int) trim($btraw) - 86400;
+		if (time() < $buildtime)
+			return false;
+	}
 	
 	$dn = array(
 	    "organizationName" => $orgname,
@@ -730,22 +755,69 @@ function generate_self_signed_cert($orgname, $cn) {
 	);
 
 	$config = array(
-		"digest_alg" => "sha1",
+		"digest_alg" => "sha256",
 		"private_key_bits" => 2048
 	);
 
 	$privkey = openssl_pkey_new($config);
+	if ($privkey === false)
+		return false;
 	$csr = openssl_csr_new($dn, $privkey, $config);
+	if ($csr === false)
+		return false;
 	$sscert = openssl_csr_sign($csr, null, $privkey, 3*365, $config, time());
+	if ($sscert === false)
+		return false;
 
+	$certout = $pkeyout = '';
 	openssl_x509_export($sscert, $certout);
 	openssl_pkey_export($privkey, $pkeyout);
 
-	/* sanity check */
-	if (strpos($certout, "BEGIN CERTIFICATE") !== false && strpos($pkeyout, "BEGIN RSA PRIVATE KEY") !== false)
+	/* sanity check -- accepts whatever PEM private key OpenSSL gave us */
+	if (strpos($certout, "BEGIN CERTIFICATE") !== false && is_pem_private_key($pkeyout))
 		return array('cert' => $certout, 'key' => $pkeyout);
 	else
 		return false;
+}
+
+/* Does this look like a PEM private key we can actually use?
+ *
+ * One validator for every page that accepts one, because they had all grown the
+ * same bug independently: a test for the literal string "BEGIN RSA PRIVATE KEY",
+ * which is PKCS#1 only. Every current openssl writes PKCS#8 by default
+ * ("BEGIN PRIVATE KEY") and an EC key says "BEGIN EC PRIVATE KEY", so a key
+ * generated today was rejected by the GUI even though the OpenSSL 3 that
+ * lighttpd and strongSwan link against reads all three.
+ *
+ * Encrypted keys are deliberately NOT accepted: lighttpd, charon and mpd5 are
+ * started with no console, so nothing can prompt for the passphrase and the
+ * daemon would simply fail to start. is_pem_encrypted_private_key() lets a
+ * caller say so specifically instead of reporting "not valid".
+ */
+function is_pem_private_key($key) {
+	if (!is_string($key) || $key === '')
+		return false;
+	if (is_pem_encrypted_private_key($key))
+		return false;
+	return preg_match('/-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----/', $key) === 1
+	    && preg_match('/-----END (RSA |EC |DSA )?PRIVATE KEY-----/', $key) === 1;
+}
+
+/* A passphrase-protected key, in either the PKCS#8 form or the older
+ * PKCS#1-with-Proc-Type header that openssl still emits with -aes256. */
+function is_pem_encrypted_private_key($key) {
+	if (!is_string($key))
+		return false;
+	return strpos($key, 'ENCRYPTED PRIVATE KEY') !== false
+	    || strpos($key, 'Proc-Type: 4,ENCRYPTED') !== false;
+}
+
+/* Does this look like a PEM certificate? */
+function is_pem_certificate($cert) {
+	if (!is_string($cert) || $cert === '')
+		return false;
+	return strpos($cert, '-----BEGIN CERTIFICATE-----') !== false
+	    && strpos($cert, '-----END CERTIFICATE-----') !== false;
 }
 
 /* check whether a DHCP client range is valid on an interface with a given IP address and subnet mask;

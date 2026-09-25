@@ -102,7 +102,8 @@ if ($_POST) {
 	if (($_POST['p1authentication_method'] ?? null)== "rsasig") {
 		if (!strstr($_POST['p1cert'] ?? '', "BEGIN CERTIFICATE") || !strstr($_POST['p1cert'] ?? '', "END CERTIFICATE"))
 			$input_errors[] = "This certificate does not appear to be valid.";
-		if (!strstr($_POST['p1privatekey'] ?? '', "BEGIN RSA PRIVATE KEY") || !strstr($_POST['p1privatekey'] ?? '', "END RSA PRIVATE KEY"))
+		/* see the note in system_advanced.php: PKCS#1 is not the only form */
+		if (!is_pem_private_key($_POST['p1privatekey'] ?? ''))
 			$input_errors[] = "This key does not appear to be valid.";	
 	}
 	
