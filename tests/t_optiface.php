@@ -385,9 +385,20 @@ is_same('delete: OPT1, below the hole, is untouched too',
         $ifs['opt1'], array('if' => 'em2', 'descr' => 'LAN-B', 'enable' => true,
                             'ipaddr' => '10.0.1.1', 'subnet' => '24'));
 is_false('delete: the deleted interface is gone', isset($ifs['opt2']));
-is_true ('delete: a reboot is demanded, as before', $r['flag']);
-is_same('delete: no ifconfig is run -- this page has never applied anything',
-        $r['cmds'], array());
+/* NO reboot. A delete is applied live: the deleted interface's device is taken
+   down, the surviving OPTs are reconfigured, and dnsmasq and the ruleset are
+   regenerated (its DHCP section and any rule naming it have just left the
+   config). Only re-plugging LAN's or WAN's port still demands a reboot. */
+is_false('delete: NO reboot is demanded -- it is applied live', $r['flag']);
+is_true ('delete: the deleted interface\'s device is taken down',
+         in_array("/sbin/ifconfig 'em3' delete down", $r['cmds']));
+is_true ('delete: OPT1, which survived, is reconfigured',
+         in_array("/sbin/ifconfig 'em2' '10.0.1.1/24'", $r['cmds']));
+is_true ('delete: OPT3, above the hole, is reconfigured too',
+         in_array("/sbin/ifconfig 'em4' '10.0.3.1/24'", $r['cmds']));
+is_false('delete: the surviving interfaces are NOT taken down',
+         in_array("/sbin/ifconfig 'em2' delete down", $r['cmds']) ||
+         in_array("/sbin/ifconfig 'em4' delete down", $r['cmds']));
 
 /* The description was rewritten by the shift ("OPT3" became "OPT2"), which is
    how an admin first noticed their interfaces had been renamed under them. */
@@ -468,6 +479,56 @@ $r3 = mw_drive('interfaces_assign.php', assign_post(array('add' => true)), optcf
 is_true ('add: with no gap, the next number is one past the last',
          isset($r3['config']['interfaces']['opt4']));
 is_same('add: and it gets the remaining port', $r3['config']['interfaces']['opt4']['if'], 'em5');
+
+/* --- when a reboot is ACTUALLY required --------------------------------
+ *
+ * This page used to touch the reboot flag on every save, which is how adding an
+ * optional interface came to demand one -- an add writes an entry with no
+ * address that is not enabled, so nothing on the running system changes. And
+ * that flag is global: exec_rc_script() returns early while it exists, so one
+ * needless flag puts the whole webGUI into save-only mode until a reboot.
+ *
+ * Only re-plugging LAN's or WAN's port needs one now, and that one is real: the
+ * management session is on lan, and wan carries dhclient/pppoe/modem state. */
+
+is_false('add: no reboot -- the new interface has no address and is not enabled',
+         $r3['flag']);
+
+/* Posting the form back unchanged is the commonest save of all: every <select>
+   is submitted every time, so without a before/after comparison every save
+   would look like a re-plug. */
+$rn = mw_drive('interfaces_assign.php', assign_post(), optcfg());
+is_false('unchanged save: no reboot', $rn['flag']);
+is_false('unchanged save: nothing is taken down',
+         (bool) preg_grep('/delete down/', $rn['cmds']));
+
+/* LAN re-plugged onto a different NIC. */
+$rl = mw_drive('interfaces_assign.php',
+	assign_post(array(), array('lan' => 'em5', 'wan' => 'em0',
+	                           'opt1' => 'em2', 'opt2' => 'em3', 'opt3' => 'em4')),
+	optcfg());
+is_true ('re-plugging LAN DOES demand a reboot', $rl['flag']);
+is_same('re-plugging LAN applies nothing -- the session is on it', $rl['cmds'], array());
+is_same('re-plugging LAN is still saved', $rl['config']['interfaces']['lan']['if'], 'em5');
+
+/* WAN likewise. */
+$rw = mw_drive('interfaces_assign.php',
+	assign_post(array(), array('lan' => 'em1', 'wan' => 'em5',
+	                           'opt1' => 'em2', 'opt2' => 'em3', 'opt3' => 'em4')),
+	optcfg());
+is_true ('re-plugging WAN DOES demand a reboot', $rw['flag']);
+
+/* An OPT moved to a different NIC is a delete of the old device plus a
+   configure of the new one, so it goes live like any other OPT change. */
+$ro = mw_drive('interfaces_assign.php',
+	assign_post(array(), array('lan' => 'em1', 'wan' => 'em0',
+	                           'opt1' => 'em5', 'opt2' => 'em3', 'opt3' => 'em4')),
+	optcfg());
+is_false('re-plugging an OPT does NOT demand a reboot', $ro['flag']);
+is_true ('re-plugging an OPT takes the device it left down',
+         in_array("/sbin/ifconfig 'em2' delete down", $ro['cmds']));
+is_true ('re-plugging an OPT brings its address up on the new device',
+         in_array("/sbin/ifconfig 'em5' '10.0.1.1/24'", $ro['cmds']));
 
 /* --- the page shows a gapped config completely, in number order --------
  *

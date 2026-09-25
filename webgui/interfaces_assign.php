@@ -310,13 +310,48 @@ if ($_POST) {
 
 
 	if (empty($input_errors)) {
-		/* No errors detected, so update the config */
+		/* WHAT ACTUALLY HAS TO HAPPEN TO THE RUNNING SYSTEM.
+		
+		   This page used to touch $d_sysrebootreqd_path for every save, which
+		   is how "add an optional interface" came to demand a reboot -- an add
+		   writes an entry with no address that is not enabled, so it changes
+		   nothing at all on the running system. Worse, that flag is global:
+		   exec_rc_script() returns early while it exists, so one needless
+		   reboot flag puts the WHOLE webGUI into save-only mode until the
+		   machine is rebooted.
+		   
+		   The three things this page can do need three different answers:
+		   
+		     add     nothing. Not enabled, no address. interfaces_opt.php
+		             applies it live when the admin configures it.
+		     delete  down the device it was using and regenerate, because its
+		             address is still live on the wire and its DHCP section and
+		             its rules have just gone from the config.
+		     reassign an OPT's port: same as a delete of the old device plus a
+		             configure of the new one, so also live.
+		     reassign LAN's or WAN's port: reboot, and this one is real. The
+		             management session is ON lan, and wan carries dhclient /
+		             pppoe / modem state that is not re-derivable in place. */
+		$reboot_needed = false;   /* lan or wan was re-plugged */
+		$todown = array();        /* real device names no longer used by their interface */
+		
 		foreach ($_POST as $ifname => $ifport) {
 		
 			if (($ifname == 'lan') || ($ifname == 'wan') ||
 				(substr($ifname, 0, 3) == 'opt')) {
 				
 				if (!is_array($ifport)) {
+					/* Compare BEFORE overwriting: an unchanged <select> is
+					   posted on every save, so without this every save looks
+					   like a re-plug. */
+					$oldif = $config['interfaces'][$ifname]['if'] ?? '';
+					if ($oldif !== $ifport) {
+						if (($ifname == 'lan') || ($ifname == 'wan'))
+							$reboot_needed = true;
+						else if ($oldif !== '')
+							$todown[] = $oldif;
+					}
+					
 					$config['interfaces'][$ifname]['if'] = $ifport;
 					
 					/* check for wireless interfaces, set or clear ['wireless'] */
@@ -342,6 +377,14 @@ if ($_POST) {
 				   opt3 and a scheduler job targeting opt3 all still pointing at
 				   the same interface they meant before the delete. The shift
 				   that used to happen here is the bug, not the tidiness. */
+				
+				/* The real device name, while there is still somewhere to read
+				   it from. Its address is up on the wire right now, and after
+				   the unset there is nothing left to say which device it was. */
+				$delif = $config['interfaces'][$matches[1]]['if'] ?? '';
+				if ($delif !== '')
+					$todown[] = $delif;
+				
 				opt_iface_delete($matches[1]);
 			} else if ($ifname == "add_x") {
 				/* The LOWEST free number, which is what brings a freed slot
@@ -387,14 +430,47 @@ if ($_POST) {
 		}
 	
 		write_config();
-		touch($d_sysrebootreqd_path);
+		
+		if ($reboot_needed) {
+			touch($d_sysrebootreqd_path);
+			$savemsg = get_std_save_message(0);
+		} else {
+			$retval = 0;
+			
+			/* Already flagged by something else: do not apply. The running
+			   system and the config have diverged, so a partial apply now
+			   would be guesswork. Same rule as every other page. */
+			if (!file_exists($d_sysrebootreqd_path)) {
+				config_lock();
+				
+				/* Tear down first, then configure: a swap of two OPT ports
+				   needs both old devices down before either new one is
+				   brought up, or the second configure fights the first. */
+				foreach (array_unique($todown) as $rif)
+					mwexec("/sbin/ifconfig " . escapeshellarg($rif) . " delete down");
+				
+				$retval = interfaces_optional_configure();
+				
+				/* A delete took $config['dhcpd'][optN] with it and a reassign
+				   moved which device serves that subnet, so both files have to
+				   be rewritten -- otherwise dnsmasq keeps serving the old
+				   interface and the ruleset keeps its old device names. */
+				services_dhcpd_configure();
+				filter_configure();
+				
+				config_unlock();
+			}
+			
+			$savemsg = get_std_save_message($retval);
+		}
 	}
 }
 
 ?>
 <?php include("fbegin.inc"); ?>
 <?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
-<?php if (file_exists($d_sysrebootreqd_path)) print_info_box(get_std_save_message(0)); ?>
+<?php if (!empty($savemsg)) print_info_box($savemsg);
+      else if (file_exists($d_sysrebootreqd_path)) print_info_box(get_std_save_message(0)); ?>
 <form action="interfaces_assign.php" method="post" name="iform" id="iform">
 <table width="100%" border="0" cellpadding="0" cellspacing="0" summary="tab pane">
   <tr><td class="tabnavtbl">
