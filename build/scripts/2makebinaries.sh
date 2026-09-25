@@ -292,51 +292,12 @@ find "$FS/usr/local" -type f 2>/dev/null | while read -r f; do
 	esac
 done
 
-# ---------------------------------------------------------------------------
-# The gate. Trace every ELF object with the image's own dynamic linker, inside
-# the image root, and refuse to finish if anything cannot load. This is the
-# check that reflects what will happen at boot; everything above is a best
-# effort to make it pass.
-#
-# Only dynamically linked objects are traced. With LD_TRACE_LOADED_OBJECTS
-# set, rtld prints the dependency list and exits before main() -- the program
-# never runs. A statically linked binary has no rtld, so exec'ing it would
-# RUN it, and this tree contains /sbin/halt.
-# ---------------------------------------------------------------------------
-echo "Verifying every object in the image loads with the image's own linker..."
-# rtld searches only /lib and /usr/lib on its own; /usr/local/lib is reached
-# through the hints file that etc/rc builds with ldconfig at boot. Run the
-# image's own ldconfig line, inside the image, so the trace sees exactly the
-# search path the booted system will have -- taken from etc/rc itself so the
-# two cannot drift apart. The first version of this gate skipped that step
-# and reported every /usr/local/lib dependency of lighttpd and dnsmasq as
-# missing while they sat right there in the image.
-LDCONFIG_LINE=$(grep -m1 '^/sbin/ldconfig' "$FS/etc/rc")
-[ -n "$LDCONFIG_LINE" ] || { echo "ERROR: no ldconfig line in etc/rc -- nothing in /usr/local/lib would load at boot"; exit 1; }
-chroot "$FS" /bin/sh -c "$LDCONFIG_LINE"
-: > "$MW_BUILDPATH/tmp/ldmissing"
-find "$FS/bin" "$FS/sbin" "$FS/usr/bin" "$FS/usr/sbin" "$FS/libexec" \
-     "$FS/usr/libexec" "$FS/usr/local" "$FS/lib" "$FS/usr/lib" -type f 2>/dev/null |
-while read -r f; do
-	rel="${f#$FS}"
-	case "$(file -b "$f" 2>/dev/null)" in
-	*ELF*executable*dynamically\ linked*|*ELF*pie\ executable*dynamically\ linked*)
-		chroot "$FS" /bin/sh -c "LD_TRACE_LOADED_OBJECTS=1 exec $rel" 2>&1 ;;
-	*ELF*shared\ object*dynamically\ linked*)
-		chroot "$FS" /bin/sh -c "LD_TRACE_LOADED_OBJECTS=1 exec /libexec/ld-elf.so.1 $rel" 2>&1 ;;
-	*)	continue ;;
-	esac | grep "not found" | sed "s|^|$rel: |" >> "$MW_BUILDPATH/tmp/ldmissing"
-done
-if [ -s "$MW_BUILDPATH/tmp/ldmissing" ]; then
-	echo
-	echo "ERROR: these objects cannot load in the image:"
-	sed 's/^/  /' "$MW_BUILDPATH/tmp/ldmissing"
-	echo
-	echo "Distinct libraries missing:"
-	awk '{print $2}' "$MW_BUILDPATH/tmp/ldmissing" | sort | uniq -c | sort -rn | sed 's/^/  /'
-	exit 1
-fi
-echo "  all objects load"
+# The ELF-loadability gate used to run here. It moved to the END OF STAGE 3
+# (build/scripts/checkelf.sh, called from 3patchtools.sh) because stage 3 is
+# where m0n0wall's own tools are compiled and installed -- voucher among them,
+# which links against libcrypto. Running it here walked usr/local before any of
+# those existed, so nothing ever verified that they can load.
+
 
 # ---------------------------------------------------------------------------
 # Gate: every PHP file in the image must PARSE, checked with the image's own

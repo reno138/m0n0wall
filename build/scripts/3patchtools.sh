@@ -96,21 +96,29 @@ echo "Stripping..."
 find "$FS" -type f 2>/dev/null | xargs strip -s 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
-# Gate: every external binary the shipped PHP tries to run must be IN the image.
+# Both image gates run HERE, at the end of stage 3, and not at the end of
+# stage 2 where they started.
 #
-# A missing binary is completely silent -- mwexec() gets 127, exec() fills
-# nothing in, and the feature just does not happen. Two menu pages (Diagnostics
-# > IPsec) listed nothing for exactly this reason, and a System: Advanced
-# checkbox configured nothing. See the header of checkbins.php.
+# Stage 3 is where m0n0wall's own tools are compiled and installed -- voucher,
+# minicron, croen, dnswatch, verifysig, stats, choparp -- and it is also where
+# the final strip happens. So this is the first point at which everything that
+# will be in the image is in it, in the form it will ship.
 #
-# THIS RUNS IN STAGE 3, not stage 2, because stage 3 is where m0n0wall's own
-# tools are compiled and installed -- voucher, minicron, croen, dnswatch,
-# verifysig, stats, choparp. Placed at the end of stage 2 it failed the build on
-# all seven of them: they are referenced by the shipped PHP but do not exist yet
-# at that point. (It passed when run by hand only because the build tree still
-# held stage 3's output from a previous run.) Stage 3 is the first point at which
-# everything that will be in the image is in it.
+# Both gates were wrong at the end of stage 2, in opposite directions:
+#
+#   checkbins.php  failed the build on all seven of those tools, because the
+#                  shipped PHP references them and they did not exist yet. (It
+#                  passed when run by hand only because the build tree still
+#                  held stage 3's output from a previous run.)
+#   checkelf.sh    passed when it should not have been able to: it walked
+#                  usr/local before any of them existed, so nothing ever checked
+#                  that they can load. voucher links against libcrypto.
+#
+# Order matters a little: loadability first, because a binary that cannot load
+# is a more basic problem than one that is absent.
 # ---------------------------------------------------------------------------
+sh "$SRC/build/scripts/checkelf.sh" "$FS" "$MW_BUILDPATH/tmp" || exit 1
+
 echo "Verifying every binary the image's PHP invokes is present..."
 php "$SRC/build/scripts/checkbins.php" "$FS" "$SRC" || exit 1
 
