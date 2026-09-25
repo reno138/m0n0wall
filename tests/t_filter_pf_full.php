@@ -291,4 +291,54 @@ foreach (array(
 is_true('an IPv6 destination survives intact', $parsed[0][0] === '2001:db8::2' && $parsed[0][1] === '80');
 is_true('an IPv4 destination still parses',    $parsed[1][0] === '192.0.2.240' && $parsed[1][1] === '65001');
 
+/* --- REGRESSION: a realistic ruleset must generate in SILENCE --------------
+ *
+ * The whole class of defect this file's regressions came from is a config key
+ * that an ordinary setup simply does not have being read bare. Those printed
+ * "Undefined array key" into the Apply-changes page and onto the boot console,
+ * where they buried the messages that mattered. Asserting per-key is endless, so
+ * assert the property instead: building the ruleset for a config with an OPT
+ * interface, a bridged OPT interface, and no IPv6 on either, emits nothing.
+ *
+ * The IPv6 pass is the one that caught the last two: an interface configured for
+ * IPv4 only has no ipaddr6/subnet6 at all. */
+$config = parse_xml_config(MW_ROOT . '/phpconf/config.xml', 'm0n0wall');
+$GLOBALS['aliastable'] = array();
+$config['interfaces']['lan']['if']     = 'em1';
+$config['interfaces']['lan']['ipaddr'] = '10.0.0.1';
+$config['interfaces']['lan']['subnet'] = '24';
+$config['interfaces']['wan']['if']     = 'em0';
+$config['interfaces']['wan']['ipaddr'] = 'dhcp';
+$config['interfaces']['wan']['blockpriv'] = true;
+/* IPv4-only OPT interfaces: one routed, one bridged. No ipaddr6 on any of them. */
+$config['interfaces']['opt1'] = array('if'=>'em2','ipaddr'=>'10.1.0.1','subnet'=>'24',
+                                      'enable'=>true,'descr'=>'DMZ');
+$config['interfaces']['opt2'] = array('if'=>'em3','enable'=>true,'bridge'=>'lan','descr'=>'BR');
+$config['dhcpd']['opt1']['enable'] = true;
+$config['filter']['rule'] = array(
+  array('type'=>'pass','interface'=>'lan','protocol'=>'tcp',
+        'source'=>array('network'=>'lan'),'destination'=>array('any'=>true,'port'=>'80-443')),
+  array('type'=>'pass','interface'=>'opt1','protocol'=>'udp',
+        'source'=>array('any'=>true),'destination'=>array('any'=>true,'port'=>'53')),
+  array('type'=>'reject','interface'=>'wan','protocol'=>'tcp','log'=>true,
+        'source'=>array('any'=>true),'destination'=>array('network'=>'lan','port'=>'3389')),
+);
+$config['nat']['rule'] = array(
+  array('interface'=>'wan','protocol'=>'tcp','external-port'=>'8080',
+        'target'=>'10.0.0.10','local-port'=>'80'),
+);
+
+foreach (array(false, true) as $v6) {
+    $GLOBALS['MW_TEST_V6'] = $v6;
+    $diag = array();
+    set_error_handler(function ($no, $str) use (&$diag) { $diag[] = $str; return true; });
+    $r = pf_rules_generate();
+    restore_error_handler();
+    is_same(($v6 ? 'with IPv6 enabled' : 'IPv4 only') . ': the ruleset generates with no diagnostics',
+            $diag, array());
+    is_true(($v6 ? 'with IPv6 enabled' : 'IPv4 only') . ': and it still produces rules',
+            strpos($r, 'block in') !== false && strlen($r) > 500);
+}
+$GLOBALS['MW_TEST_V6'] = false;
+
 exit(mw_report('filter_pf assembly'));

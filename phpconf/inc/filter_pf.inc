@@ -720,8 +720,11 @@ function pf_build_context($ipv6 = false) {
 	$ctx['lanif']    = $lancfg['if'];
 	$ctx['wanif']    = get_real_wan_interface($ipv6);
 	$ctx['curwanip'] = get_current_wan_address($ipv6);
-	$ctx['lanip']    = $lancfg[$ipv6 ? 'ipaddr6' : 'ipaddr'];
-	$ctx['lansn']    = $lancfg[$ipv6 ? 'subnet6' : 'subnet'];
+	/* ?? '': an interface configured for IPv4 only has no ipaddr6/subnet6 at
+	   all, which is the normal case on a dual-stack-capable build. Reading them
+	   bare warned on every IPv6 ruleset build. */
+	$ctx['lanip']    = $lancfg[$ipv6 ? 'ipaddr6' : 'ipaddr'] ?? '';
+	$ctx['lansn']    = $lancfg[$ipv6 ? 'subnet6' : 'subnet'] ?? '';
 	$ctx['lansa']    = $ipv6 ? gen_subnet6($ctx['lanip'], $ctx['lansn'])
 	                         : gen_subnet($ctx['lanip'], $ctx['lansn']);
 
@@ -740,8 +743,10 @@ function pf_build_context($ipv6 = false) {
 			$oic['bridge'] = 1;
 			$oic['bridge_if'] = $oc['bridge'];
 		} else {
-			$oic['ip'] = $oc[$ipv6 ? 'ipaddr6' : 'ipaddr'];
-			$oic['sn'] = $oc[$ipv6 ? 'subnet6' : 'subnet'];
+			/* same as the LAN above: an OPT interface with only IPv4 has no
+			   ipaddr6, and it is skipped two lines down anyway */
+			$oic['ip'] = $oc[$ipv6 ? 'ipaddr6' : 'ipaddr'] ?? '';
+			$oic['sn'] = $oc[$ipv6 ? 'subnet6' : 'subnet'] ?? '';
 			if (empty($oic['ip']))
 				continue;
 			$oic['sa'] = $ipv6 ? gen_subnet6($oic['ip'], $oic['sn'])
