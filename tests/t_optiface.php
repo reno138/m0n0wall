@@ -530,6 +530,62 @@ is_true ('re-plugging an OPT takes the device it left down',
 is_true ('re-plugging an OPT brings its address up on the new device',
          in_array("/sbin/ifconfig 'em5' '10.0.1.1/24'", $ro['cmds']));
 
+/* --- THE GATE: a successful delete leaves the name NOWHERE -------------
+ *
+ * The delete has to unset every section KEYED BY the interface name, and the
+ * only list of which sections those are is the one inside opt_iface_delete().
+ * A list is exactly the thing that goes stale: add a new per-interface section
+ * to the schema one day, forget to add it there, and the orphan sits in the
+ * config until opt_next_free() hands its number to an unrelated interface and
+ * silently attaches it.
+ *
+ * So instead of checking against a list, check the invariant the list exists to
+ * produce: after a delete that was ACCEPTED, the deleted name appears nowhere
+ * in $config at all -- not as a key, not as a value. Anything a future section
+ * leaves behind fails this and names its own path. Nothing to keep in step.
+ *
+ * The complement is the refusal, asserted above: when the name IS still held as
+ * a value somewhere, the delete does not happen at all. Between the two, a
+ * delete can never leave a dangling reference. */
+function config_mentions($node, $name, $path = '') {
+	$hits = array();
+	if (is_array($node)) {
+		foreach ($node as $k => $v) {
+			$p = $path . '[' . $k . ']';
+			if ($k === $name)
+				$hits[] = $p . ' (key)';
+			$hits = array_merge($hits, config_mentions($v, $name, $p));
+		}
+	} else if (is_string($node) && $node === $name) {
+		$hits[] = $path . ' (value)';
+	}
+	return $hits;
+}
+
+/* The fixture holds opt2 in four places: interfaces, dhcpd (with a static
+   mapping), dhcrelay, and a scheduler job's target. Prove the search finds them
+   all before trusting it to prove they are gone. */
+is_same('gate: the search finds every mention before the delete',
+        config_mentions(optcfg(), 'opt2'),
+        array('[interfaces][opt2] (key)', '[dhcpd][opt2] (key)',
+              '[dhcrelay][opt2] (key)', '[croen][jobset][0][job][0][target] (value)'));
+
+$rg = mw_drive('interfaces_assign.php', assign_post(array('del' => 'opt2')), optcfg());
+is_same('gate: after an accepted delete, the name is nowhere in the config',
+        config_mentions($rg['config'], 'opt2'), array());
+/* opt3's six mentions all survive, at the same paths: its interface, its DHCP
+   server, its DHCP relay, its scheduler job, and its filter rule naming it both
+   as the interface and as the source network. It stays at job[1] even though
+   opt2's job at job[0] was removed from the same list, because croen_update_job()
+   unsets rather than repacks -- harmless here, since nothing addresses a job by
+   its index, and xmlparse.inc packs the list on the next save anyway. */
+is_same('gate: and everything belonging to the OPTs it did not delete survives',
+        config_mentions($rg['config'], 'opt3'),
+        array('[interfaces][opt3] (key)', '[dhcpd][opt3] (key)',
+              '[dhcrelay][opt3] (key)', '[croen][jobset][0][job][1][target] (value)',
+              '[filter][rule][1][interface] (value)',
+              '[filter][rule][1][source][network] (value)'));
+
 /* --- the page shows a gapped config completely, in number order --------
  *
  * Array order is no longer number order: opt2 was appended when it reused the
