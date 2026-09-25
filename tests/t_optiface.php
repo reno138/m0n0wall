@@ -314,7 +314,9 @@ file_put_contents($drv . '/callfn.php', <<<'FN'
 set_include_path(__DIR__ . PATH_SEPARATOR . getenv('MW_TREE') . '/tests/stubs');
 require 'guiconfig.inc';
 $fn = getenv('MW_FN');
-file_put_contents(getenv('MW_OUT'), (string) $fn(getenv('MW_ARG')));
+/* var_export, not a string cast: a function under test may answer null or
+   false, and "" cannot tell those from each other or from 0. */
+file_put_contents(getenv('MW_OUT'), var_export($fn(getenv('MW_ARG')), true));
 FN
 );
 
@@ -630,6 +632,56 @@ is_true ('re-plugging an OPT takes the device it left down',
 is_true ('re-plugging an OPT brings its address up on the new device',
          in_array("/sbin/ifconfig 'em5' '10.0.1.1/24'", $ro['cmds']));
 
+/* --- taking a device down must not cut a VLAN riding on it --------------
+ *
+ * "LAN = vlan0 (on em0), OPT1 = em0 untagged" is an ordinary configuration, and
+ * this page will build it: it offers the physical ports and the VLANs on them
+ * side by side, and its collision check only compares the posted strings, so
+ * em0 and vlan0 do not collide.
+ *
+ * Reassigning OPT1 off em0 leaves em0 addressed by nothing -- but LAN's vlan0 is
+ * still riding on it, and "ifconfig em0 down" takes a VLAN's parent down with
+ * the VLAN. That would kill the management session mid-request, with config.xml
+ * already written and the rest of the apply never reached. */
+$cv = array(
+	'interfaces' => array(
+		'lan'  => array('if' => 'vlan0', 'ipaddr' => '10.0.0.1', 'subnet' => '24'),
+		'wan'  => array('if' => 'em1', 'ipaddr' => 'dhcp'),
+		'opt1' => array('if' => 'em0', 'descr' => 'LAN-B', 'enable' => true,
+		                'ipaddr' => '10.0.1.1', 'subnet' => '24'),
+	),
+	'vlans' => array('vlan' => array(array('if' => 'em0', 'tag' => '10'))),
+);
+$rv = mw_drive('interfaces_assign.php',
+	array('lan' => 'vlan0', 'wan' => 'em1', 'opt1' => 'em5', 'Submit' => 'Save'), $cv);
+
+is_false('VLAN parent: em0 is NOT taken down -- LAN\'s vlan0 is on it',
+         in_array("/sbin/ifconfig 'em0' delete down", $rv['cmds']));
+is_true ('VLAN parent: but its now-stale address IS dropped',
+         in_array("/sbin/ifconfig 'em0' delete", $rv['cmds']));
+is_true ('VLAN parent: and OPT1 comes up on its new device',
+         in_array("/sbin/ifconfig 'em5' '10.0.1.1/24'", $rv['cmds']));
+is_false('VLAN parent: no reboot demanded -- only an OPT moved', $rv['flag']);
+is_same('VLAN parent: LAN is untouched', $rv['config']['interfaces']['lan']['if'], 'vlan0');
+
+/* A swap: neither device is down, because each still has an interface on it and
+   the configure below sets both addresses. */
+$rw2 = mw_drive('interfaces_assign.php',
+	assign_post(array(), array('lan' => 'em1', 'wan' => 'em0',
+	                           'opt1' => 'em3', 'opt2' => 'em2', 'opt3' => 'em4')),
+	optcfg());
+is_false('swap: neither swapped device is taken down',
+         (bool) preg_grep('/em[23].* delete down/', $rw2['cmds']));
+is_true ('swap: and both come up on their new devices',
+         in_array("/sbin/ifconfig 'em3' '10.0.1.1/24'", $rw2['cmds']) &&
+         in_array("/sbin/ifconfig 'em2' '10.0.2.1/24'", $rw2['cmds']));
+
+/* The control: a device nothing needs at all is still taken fully down, or the
+   guards above could be refusing every teardown. */
+$rd = mw_drive('interfaces_assign.php', assign_post(array('del' => 'opt2')), optcfg());
+is_true ('control: a device nothing needs is taken down, address and link',
+         in_array("/sbin/ifconfig 'em3' delete down", $rd['cmds']));
+
 /* --- THE GATE: a successful delete leaves the name NOWHERE -------------
  *
  * The delete has to unset every section KEYED BY the interface name, and the
@@ -943,19 +995,43 @@ function vlancfg() {
 /* --- delete the LAST VLAN: live, no reboot ----------------------------- */
 $r = mw_drive('interfaces_vlan.php', array('del_3_x' => '17'), vlancfg());
 is_same('vlan delete (last): the entry is gone', count($r['config']['vlans']['vlan']), 3);
-is_false('vlan delete (last): NO reboot is demanded', $r['flag']);
 is_same('vlan delete (last): nothing is renumbered -- OPT1 keeps vlan2',
         $r['config']['interfaces']['opt1']['if'], 'vlan2');
 is_same('vlan delete (last): the surviving tags are unchanged',
         array_column($r['config']['vlans']['vlan'], 'tag'), array('10', '20', '30'));
 
-/* On the build host no vlan interface exists, so interface_is_present() is
-   false and there is nothing to destroy -- which is itself a case worth
-   asserting: the config and the running system already agree, so still no
-   reboot. The ifconfig command line itself is asserted below, by calling
-   interfaces_vlan_destroy_if() directly. */
-is_true ('vlan delete (last): nothing is destroyed that is not there',
-         $r['cmds'] === array());
+/* WHICH BRANCH THIS TAKES DEPENDS ON THE HOST, and both outcomes are correct.
+ *
+ * The page asks interface_list_live() what the kernel has. A build host has no
+ * /sbin/ifconfig at all, so that returns NULL -- "I could not look" -- and the
+ * page must NOT then claim the running system needs nothing done to it: it has
+ * already written config.xml, so if the answer were wrong the VLAN would be
+ * gone from the configuration while its interface was still up and still
+ * tagging, with nothing anywhere saying so. It falls back to the reboot flag,
+ * which is what the failed-destroy branch does, and says why in the log.
+ *
+ * On a real box with a working ifconfig and no vlan3, the next branch down
+ * applies instead: genuinely absent, nothing to destroy, no reboot. That branch
+ * is asserted directly below, against a supplied list. */
+is_same('vlan delete (last): an unreadable interface list is NOT read as absent',
+        $r['flag'], true);
+is_true ('vlan delete (last): and it says so, rather than failing silently',
+         strpos($r['log'], 'could not read the interface list') !== false);
+is_same('vlan delete (last): nothing was destroyed, since nothing was confirmed',
+        $r['cmds'], array());
+
+/* The two answers interface_list_live() has to keep apart. Run in the child,
+   because the parent cannot load interfaces.inc -- its mwexec() is the real
+   one. NULL rather than an empty array is the whole point: an empty array would
+   compare equal to "a kernel with no interfaces", which cannot happen. */
+$r = mw_drive('interfaces_vlan.php', array(), vlancfg(),
+              array('fn' => 'interface_list_live'));
+is_same('interface_list_live(): an unreadable list is NULL, not an empty array',
+        $r['fnout'], 'NULL');
+$r = mw_drive('interfaces_vlan.php', array(), vlancfg(),
+              array('fn' => 'interface_is_present', 'arg' => 'lo0'));
+is_same('interface_is_present(): which its callers still read as "not present"',
+        $r['fnout'], 'false');
 
 /* --- delete from the MIDDLE: renumbered, reboot ------------------------ */
 $r = mw_drive('interfaces_vlan.php', array('del_1_x' => '17'), vlancfg());

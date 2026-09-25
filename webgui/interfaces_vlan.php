@@ -206,8 +206,30 @@ if ($_POST) {
 					   interface carrying somebody else's tag. Leave it strictly
 					   alone and let the reboot rebuild the lot -- the same gate,
 					   for the same reason, as the create on the edit page. */
-				} else if (!interface_is_present("vlan{$id}")) {
-					/* Not there to destroy: the configuration and the running
+				} else if (($iflist = interface_list_live()) === null) {
+					/* The interface list could not be read, so "vlan{$id} is
+					   not there" and "ifconfig could not tell us" cannot be
+					   told apart -- and this branch is about to claim the
+					   running system needs nothing done to it.
+					   
+					   Do not claim that. config.xml has already been written,
+					   so if the answer was wrong the VLAN is gone from the
+					   configuration while its interface is still up and still
+					   tagging, with no reboot flag set and the page reporting
+					   that everything was applied. Fall back to the flag, which
+					   is what the failed-destroy branch below does, for the same
+					   reason: a reboot starts from no vlan interfaces at all and
+					   reconciles whatever the true state was.
+					   
+					   The create path on the edit page declines to act on a
+					   possibly-wrong answer from the same function; this is the
+					   same caution pointed the other way. */
+					log_error("VLAN: could not read the interface list, so " .
+						"vlan{$id} was not destroyed; a reboot will clear it");
+					touch($d_sysrebootreqd_path);
+					$status = "delfailed";
+				} else if (!in_array("vlan{$id}", $iflist, true)) {
+					/* Genuinely not there: the configuration and the running
 					   system already agree, so there is nothing to apply and
 					   nothing to reboot for. */
 					$status = "deleted";

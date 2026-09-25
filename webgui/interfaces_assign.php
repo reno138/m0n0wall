@@ -289,10 +289,39 @@ if ($_POST) {
 				config_lock();
 				
 				/* Tear down first, then configure: a swap of two OPT ports
-				   needs both old devices down before either new one is
-				   brought up, or the second configure fights the first. */
-				foreach (array_unique($todown) as $rif)
+				   needs both old devices dealt with before either new one is
+				   brought up, or the second configure fights the first.
+				   
+				   THREE cases, because "down" is not always safe. A device can
+				   still be load-bearing after the interface that had it has
+				   moved elsewhere, and taking it down then locks the admin out
+				   of the box mid-save: "LAN = vlan0, OPT1 = em0 untagged" is an
+				   ordinary configuration -- this page offers em0 and vlan0 side
+				   by side and its collision check only compares posted strings
+				   -- and reassigning OPT1 off em0 would otherwise run
+				   "ifconfig em0 down" and take LAN's vlan0 with it. */
+				$usage = interface_device_usage();
+				
+				foreach (array_unique($todown) as $rif) {
+					if (isset($usage['assigned'][$rif])) {
+						/* Another interface has it now (a swap). Leave it
+						   alone: the configure below sets its address, and
+						   ifconfig replaces the primary address rather than
+						   adding an alias, so nothing stale is left. */
+						continue;
+					}
+					
+					if (isset($usage['needed'][$rif])) {
+						/* Nothing is addressed on it any more, but a VLAN that
+						   IS still assigned is riding on it. Drop the stale
+						   address and leave the link up. */
+						mwexec("/sbin/ifconfig " . escapeshellarg($rif) . " delete");
+						continue;
+					}
+					
+					/* Genuinely unused: address off and link down. */
 					mwexec("/sbin/ifconfig " . escapeshellarg($rif) . " delete down");
+				}
 				
 				/* This is the whole apply. interfaces_optional_configure()
 				   configures each remaining OPT and then, because we are not

@@ -246,11 +246,87 @@ function interfaces_vlan_destroy_if($i) {
    NOT called interface_exists() -- that is a PHP built-in (for interfaces in
    the OO sense), and redeclaring it would be a fatal error on every page
    load. */
-function interface_is_present($if) {
+/* How the current configuration depends on each real device, as
+ * array('assigned' => array(dev => true), 'needed' => array(dev => true)).
+ *
+ * 'assigned' is the devices some interface names directly. 'needed' is wider,
+ * and the difference is a lockout waiting to happen: a VLAN's parent CARRIES
+ * that VLAN, so taking em0 down takes vlan0 down with it. If LAN is on vlan0
+ * then em0 is load-bearing even though no interface names em0 -- and
+ * "LAN = vlan0, OPT1 = em0 untagged" is a perfectly ordinary configuration,
+ * constructible entirely from interfaces_assign.php's own dropdowns, because
+ * that page offers the physical ports and the VLANs on them side by side and
+ * its collision check only compares the posted strings.
+ *
+ * Used before taking a device down. Reassigning OPT1 off em0 must not run
+ * "ifconfig em0 down" while LAN's vlan0 is riding on it: that kills the
+ * management session mid-request, with the configuration already written and
+ * the rest of the apply never reached.
+ */
+function interface_device_usage() {
+	global $config;
+
+	/* position => parent device, because a VLAN's name IS its position */
+	$vlanparent = array();
+	if (is_array($config['vlans']['vlan'] ?? null)) {
+		foreach ($config['vlans']['vlan'] as $i => $vlan)
+			if (is_array($vlan) && !empty($vlan['if']))
+				$vlanparent['vlan' . $i] = $vlan['if'];
+	}
+
+	$assigned = array();
+	$needed   = array();
+
+	if (is_array($config['interfaces'] ?? null)) {
+		foreach ($config['interfaces'] as $ifcfg) {
+			if (!is_array($ifcfg) || empty($ifcfg['if']) || !is_string($ifcfg['if']))
+				continue;
+			$dev = $ifcfg['if'];
+			$assigned[$dev] = true;
+			$needed[$dev]   = true;
+			if (isset($vlanparent[$dev]))
+				$needed[$vlanparent[$dev]] = true;
+		}
+	}
+
+	return array('assigned' => $assigned, 'needed' => $needed);
+}
+
+/* The interfaces the kernel currently has, or NULL if that could not be
+ * established.
+ *
+ * The distinction matters. A caller that is about to DESTROY something must not
+ * read "I could not look" as "it is not there": interface_is_present() returned
+ * plain false for both, so a failed ifconfig looked exactly like an interface
+ * that had already gone, and the VLAN delete on interfaces_vlan.php reported
+ * success and skipped the reboot flag over an interface that was still up and
+ * still tagging.
+ *
+ * Two failure signals: a non-zero exit, and an empty list. An empty list cannot
+ * be genuine on a running kernel -- lo0 is always there -- so it means the
+ * command produced nothing usable.
+ */
+function interface_list_live() {
 	$iflist = array();
-	exec("/sbin/ifconfig -l 2>/dev/null", $iflist);
-	
-	return in_array($if, preg_split("/\s+/", trim(implode(" ", $iflist))), true);
+	$rc = -1;
+	exec("/sbin/ifconfig -l 2>/dev/null", $iflist, $rc);
+
+	if ($rc !== 0)
+		return null;
+
+	$names = array_values(array_filter(
+		preg_split("/\s+/", trim(implode(" ", $iflist))), 'strlen'));
+
+	return count($names) ? $names : null;
+}
+
+/* Is $if there? False when the list could not be read, which is what every
+ * caller of this already assumed -- a caller that needs to tell the two apart
+ * uses interface_list_live() directly. */
+function interface_is_present($if) {
+	$names = interface_list_live();
+
+	return is_array($names) && in_array($if, $names, true);
 }
 
 /* The interfaces that can be a VLAN parent, for the dropdown on
