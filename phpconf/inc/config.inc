@@ -624,11 +624,22 @@ function convert_config() {
 		/* Remove OpenVPN configuration */
 		unset($config['ovpn']);
 		
-		/* Remove OpenVPN interfaces */
-		for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-			if (isset($config['interfaces']['opt' . $i]['ovpn'])) {
+		/* Remove OpenVPN interfaces.
+		
+		   opt_interfaces() rather than counting up until a number is missing: OPT
+		   numbering can have holes now that deleting an interface no longer renumbers
+		   the ones above it, and a 1.5 config hand-edited or partially restored can
+		   already have one. See util.inc.
+		
+		   The shift-down below is left alone -- closing the hole is what this one-time
+		   1.5 -> 1.6 conversion did -- but note it has a hole of its own, and always
+		   has: it moves opt(n+1) down into opt(n), a slot this loop has already
+		   passed, so of two adjacent OpenVPN OPTs the second survives the sweep.
+		   Enumerating a snapshot neither causes nor cures that. */
+		foreach (opt_interfaces() as $i => $optif) {
+			if (isset($config['interfaces'][$optif]['ovpn'])) {
 			
-				unset($config['interfaces']['opt' . $i]);
+				unset($config['interfaces'][$optif]);
 
 				/* shift down other OPTn interfaces to get rid of holes */
 				$j = $i + 1;

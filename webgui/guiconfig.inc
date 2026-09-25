@@ -103,8 +103,14 @@ $tcpflags = array("fin", "syn", "rst", "psh", "ack", "urg");
 
 $specialnets = array("wanip" => "WAN address", "lan" => "LAN net", "pptp" => "PPTP clients", "l2tp" => "L2TP clients");
 
-for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-	$specialnets['opt' . $i] = ($config['interfaces']['opt' . $i]['descr'] ?? '') . " net";
+/* opt_interfaces(), because OPT numbering can have gaps: deleting an interface
+   no longer renumbers the ones above it. Counting up from opt1 stopped at the
+   first missing number, so with a hole every OPT above it was absent from
+   $specialnets -- and pprint_address() below looks a rule's source and
+   destination network up in exactly this array, so a rule on the OPT3 net
+   rendered as an empty table cell plus an undefined-key warning. */
+foreach (opt_interfaces() as $i => $optif) {
+	$specialnets[$optif] = ($config['interfaces'][$optif]['descr'] ?? '') . " net";
 }
 	
 $medias = array("auto" => "autoselect", "100full" => "100BASE-TX full-duplex",

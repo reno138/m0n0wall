@@ -253,8 +253,12 @@ function fr_insline(id, on) {
 				  	$textss = $textse = "";
 				  }
 				  $iflabels = array('lan' => 'LAN', 'wan' => 'WAN', 'pptp' => 'PPTP');
-				  for ($j = 1; isset($config['interfaces']['opt' . $j]); $j++)
-				  	$iflabels['opt' . $j] = $config['interfaces']['opt' . $j]['descr'];
+				  /* opt_interfaces() rather than counting up from 1: a deleted
+				     optional interface no longer renumbers the rest, so the numbering
+				     can have gaps and a counting loop would stop at the first one,
+				     leaving the interface column blank for the rules past it. */
+				  foreach (opt_interfaces() as $optif)
+				  	$iflabels[$optif] = $config['interfaces'][$optif]['descr'];
 				  echo $textss . htmlspecialchars($iflabels[$shaperent['interface'] ?? ''] ?? '');
 				  echo "<br>";
 				  if (($shaperent['direction'] ?? null) != "in")

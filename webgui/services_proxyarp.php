@@ -90,8 +90,12 @@ if ($_POST) {
                   <?php
 				  	if (!empty($arpent['interface'])) {
 					  $iflabels = array('lan' => 'LAN', 'wan' => 'WAN');
-					  for ($j = 1; isset($config['interfaces']['opt' . $j]); $j++)
-						$iflabels['opt' . $j] = $config['interfaces']['opt' . $j]['descr'] ?? '';
+					  /* opt_interfaces() rather than counting up from 1: a deleted
+					     optional interface no longer renumbers the rest, so the numbering
+					     can have gaps and a counting loop would stop at the first one,
+					     leaving the interface column blank for the entries past it. */
+					  foreach (opt_interfaces() as $optif)
+						$iflabels[$optif] = $config['interfaces'][$optif]['descr'] ?? '';
 					  echo htmlspecialchars($iflabels[$arpent['interface']] ?? '');
 					} else {
 						echo "WAN";

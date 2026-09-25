@@ -28,9 +28,11 @@
  *      calling a function.
  *
  * The double cannot simply require util.inc -- that pulls in the real mwexec(),
- * which would run ifconfig for real -- so it lifts the two OPT helpers out of
- * the shipping file verbatim, exactly as t_vlan.php does. The PARENT process
- * here does load the real util.inc, because part 1 needs nothing else from it.
+ * which would run ifconfig for real -- so it requires phpconf/inc/optif.inc,
+ * which holds the two OPT helpers and nothing else for exactly this reason. It
+ * is the real shipping code, so the double cannot drift from it. The PARENT
+ * process here does load the real util.inc, because part 1 needs nothing else
+ * from it.
  */
 require __DIR__ . '/bootstrap.php';
 require MW_ROOT . '/phpconf/inc/xmlparse.inc';

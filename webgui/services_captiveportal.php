@@ -98,9 +98,13 @@ if ($_POST) {
 		
 		do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 		
-		/* make sure no interfaces are bridged */
-		for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-			$coptif = &$config['interfaces']['opt' . $i];
+		/* make sure no interfaces are bridged. opt_interfaces() rather than
+		   counting up from 1: a deleted optional interface no longer renumbers the
+		   rest, so the numbering can have gaps and a counting loop would stop at the
+		   first one -- never seeing a bridged interface past the gap, and letting
+		   the portal be enabled anyway. */
+		foreach (opt_interfaces() as $optif) {
+			$coptif = &$config['interfaces'][$optif];
 			if (isset($coptif['enable']) && !empty($coptif['bridge'])) {
 				$input_errors[] = "The captive portal cannot be used when one or more interfaces are bridged.";
 				break;
@@ -307,9 +311,9 @@ function enable_change(enable_change) {
 	  <td width="78%" class="vtable">
 		<select name="cinterface" class="formfld" id="cinterface">
 		  <?php $interfaces = array('lan' => 'LAN');
-		  for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-			if (isset($config['interfaces']['opt' . $i]['enable']))
-				$interfaces['opt' . $i] = $config['interfaces']['opt' . $i]['descr'];
+		  foreach (opt_interfaces() as $optif) {
+			if (isset($config['interfaces'][$optif]['enable']))
+				$interfaces[$optif] = $config['interfaces'][$optif]['descr'];
 		  }
 		  foreach ($interfaces as $iface => $ifacename): ?>
 		  <option value="<?=$iface;?>" <?php if ($iface == ($pconfig['cinterface'] ?? null)) echo "selected"; ?>> 

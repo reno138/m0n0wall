@@ -176,8 +176,12 @@ if ($_POST) {
 					<select name="interface" class="formfld">
 						<?php
 						$interfaces = array('wan' => 'WAN');
-						for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-							$interfaces['opt' . $i] = $config['interfaces']['opt' . $i]['descr'];
+						/* opt_interfaces() rather than counting up from 1: a deleted
+						   optional interface no longer renumbers the rest, so the
+						   numbering can have gaps and a counting loop would stop at the
+						   first one. */
+						foreach (opt_interfaces() as $optif) {
+							$interfaces[$optif] = $config['interfaces'][$optif]['descr'];
 						}
 						foreach ($interfaces as $iface => $ifacename): ?>
 						<option value="<?=$iface;?>" <?php if ($iface == ($pconfig['interface'] ?? null)) echo "selected"; ?>>

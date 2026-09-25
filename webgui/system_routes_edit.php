@@ -130,8 +130,9 @@ if ($_POST) {
                       <?php $interfaces = array('lan' => 'LAN', 'wan' => 'WAN');
 					  if (!$ipv6routes)
 					      $interfaces['pptp'] = "PPTP";
-					  for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-					  	$interfaces['opt' . $i] = $config['interfaces']['opt' . $i]['descr'];
+					  /* OPT numbering can have gaps: deleting an interface no longer renumbers. */
+					  foreach (opt_interfaces() as $optif) {
+					  	$interfaces[$optif] = $config['interfaces'][$optif]['descr'];
 					  }
 					  foreach ($interfaces as $iface => $ifacename): ?>
                       <option value="<?=$iface;?>" <?php if ($iface == ($pconfig['interface'] ?? null)) echo "selected"; ?>> 

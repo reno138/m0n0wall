@@ -228,11 +228,14 @@ function shaper_rules_generate() {
 	$lansa = gen_subnet($lancfg['ipaddr'], $lancfg['subnet']);
 	$lansn = $lancfg['subnet'];
 	
-	/* optional interfaces */
+	/* optional interfaces. opt_interfaces(), not a loop counting up from opt1:
+	   deleting an optional interface no longer renumbers the ones above it, so
+	   the numbering can have gaps and a counting loop stops at the first one.
+	   See util.inc. */
 	$optcfg = array();
 	
-	for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-		$oc = $config['interfaces']['opt' . $i];
+	foreach (opt_interfaces() as $optif) {
+		$oc = $config['interfaces'][$optif];
 		
 		if (isset($oc['enable']) && $oc['if']) {
 			$oic = array();
@@ -241,9 +244,18 @@ function shaper_rules_generate() {
 			$oic['sa'] = gen_subnet($oc['ipaddr'], $oc['subnet']);
 			$oic['sn'] = $oc['subnet'];
 			
-			$optcfg['opt' . $i] = $oic;
+			$optcfg[$optif] = $oic;
 		}
 	}
+	
+	/* $i is not dead here: the rule walker below carries on incrementing it as
+	   its "rule N" counter and never initialises it, so the numbers it prints
+	   have always started at the first free OPT number rather than at 0 --
+	   filter.inc resets $i to -1 before its walker, this one was never given the
+	   same line. That defect is in diagnostic text only and is left for later;
+	   the loop above used to exit at exactly the lowest unused OPT number, which
+	   is what opt_next_free() answers, so nothing changes here. */
+	$i = opt_next_free();
 	
 	$pptpip = $pptpsa = $pptpsn = "";
 	if ($pptp_server) {

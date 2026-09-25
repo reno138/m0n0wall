@@ -121,10 +121,13 @@ function get_interface_addr($ifdescr, $ipv6 = false) {
 				  <td width="78%" class="vtable">
 				  <select name="interface" class="formfld">
                       <?php $interfaces = array('wan' => 'WAN', 'lan' => 'LAN');
-					  for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-					    if (isset($config['interfaces']['opt' . $i]['enable']) &&
-							empty($config['interfaces']['opt' . $i]['bridge']))
-					  		$interfaces['opt' . $i] = $config['interfaces']['opt' . $i]['descr'] ?? '';
+					  /* OPT numbers can have gaps now that deleting an optional
+					     interface no longer renumbers the survivors; opt_interfaces()
+					     enumerates what is really there (see util.inc). */
+					  foreach (opt_interfaces() as $optif) {
+					    if (isset($config['interfaces'][$optif]['enable']) &&
+							empty($config['interfaces'][$optif]['bridge']))
+					  		$interfaces[$optif] = $config['interfaces'][$optif]['descr'] ?? '';
 					  }
 					  foreach ($interfaces as $iface => $ifacename): ?>
                       <option value="<?=$iface;?>" <?php if ($iface == $interface) echo "selected"; ?>> 

@@ -97,10 +97,14 @@ if ($_POST) {
                   <td width="78%" class="vtable">
 					<select name="interface" class="formfld">
                       <?php $interfaces = array('lan' => 'LAN');
-					  for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-					    if (isset($config['interfaces']['opt' . $i]['enable']) &&
-							empty($config['interfaces']['opt' . $i]['bridge']))
-					  		$interfaces['opt' . $i] = $config['interfaces']['opt' . $i]['descr'] ?? '';
+					  /* opt_interfaces() rather than counting up from 1: a deleted
+					     optional interface no longer renumbers the rest, so the numbering
+					     can have gaps and a counting loop would stop at the first one,
+					     dropping every interface past it from the list. */
+					  foreach (opt_interfaces() as $optif) {
+					    if (isset($config['interfaces'][$optif]['enable']) &&
+							empty($config['interfaces'][$optif]['bridge']))
+					  		$interfaces[$optif] = $config['interfaces'][$optif]['descr'] ?? '';
 					  }
 					  foreach ($interfaces as $iface => $ifacename): ?>
                       <option value="<?=$iface;?>" <?php if ($iface == ($pconfig['interface'] ?? null)) echo "selected"; ?>> 

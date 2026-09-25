@@ -108,8 +108,9 @@ if ($_POST) {
 				  $iflabels = array('lan' => 'LAN', 'wan' => 'WAN');
 				  if (!$ipv6routes)
 					$iflabels['pptp'] = "PPTP";
-				  for ($j = 1; isset($config['interfaces']['opt' . $j]); $j++)
-				  	$iflabels['opt' . $j] = $config['interfaces']['opt' . $j]['descr'];
+				  /* OPT numbering can have gaps: deleting an interface no longer renumbers. */
+				  foreach (opt_interfaces() as $optif)
+				  	$iflabels[$optif] = $config['interfaces'][$optif]['descr'];
 				  echo htmlspecialchars($iflabels[$route['interface']] ?? ''); ?>
                   </td>
                   <td class="listr">

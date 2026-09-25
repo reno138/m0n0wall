@@ -543,8 +543,12 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
 					     Without this the tunnels were up but unreachable by any
 					     rule the admin could write. */
 					  $interfaces += wg_rule_interfaces();
-					  for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-					  	$interfaces['opt' . $i] = $config['interfaces']['opt' . $i]['descr'];
+					  /* opt_interfaces() rather than counting up from 1: a deleted
+					     optional interface no longer renumbers the rest, so the
+					     numbering can have gaps and a counting loop would stop at the
+					     first one. */
+					  foreach (opt_interfaces() as $optif) {
+					  	$interfaces[$optif] = $config['interfaces'][$optif]['descr'];
 					  }
 					  foreach ($interfaces as $iface => $ifacename): ?>
                       <option value="<?=$iface;?>" <?php if ($iface == ($pconfig['interface'] ?? null)) echo "selected"; ?>>
@@ -664,10 +668,10 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
                             <option value="l2tp" <?php if ($pconfig['src'] == "l2tp") { echo "selected"; } ?>>
                             L2TP clients</option>
 							<?php endif; ?>
-							<?php for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++): ?>
+							<?php foreach (opt_interfaces() as $i => $optif): ?>
                             <option value="opt<?=$i;?>" <?php if ($pconfig['src'] == "opt" . $i) { echo "selected"; } ?>>
-                            <?=htmlspecialchars($config['interfaces']['opt' . $i]['descr']);?> subnet</option>
-							<?php endfor; ?>
+                            <?=htmlspecialchars($config['interfaces'][$optif]['descr']);?> subnet</option>
+							<?php endforeach; ?>
                           							<option value="country" <?php if ($pconfig['src'] == "country") { echo "selected"; } ?>>
 							Country</option>
 							</select></td>
@@ -756,10 +760,10 @@ Hint: the difference between block and reject is that with reject, a packet (TCP
                             <option value="l2tp" <?php if ($pconfig['dst'] == "l2tp") { echo "selected"; } ?>>
                             L2TP clients</option>
 							<?php endif; ?>
-							<?php for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++): ?>
+							<?php foreach (opt_interfaces() as $i => $optif): ?>
                             <option value="opt<?=$i;?>" <?php if ($pconfig['dst'] == "opt" . $i) { echo "selected"; } ?>>
-                            <?=htmlspecialchars($config['interfaces']['opt' . $i]['descr']);?> subnet</option>
-							<?php endfor; ?>
+                            <?=htmlspecialchars($config['interfaces'][$optif]['descr']);?> subnet</option>
+							<?php endforeach; ?>
                           							<option value="country" <?php if ($pconfig['dst'] == "country") { echo "selected"; } ?>>
 							Country</option>
 							</select></td>

@@ -151,8 +151,9 @@ if ($_POST) {
                   <td class="listr"><?=$spans;?>
 				  <?php if (!empty($ipsecent['interface'])) {
 							$iflabels = array('lan' => 'LAN', 'wan' => 'WAN');
-							  for ($j = 1; isset($config['interfaces']['opt' . $j]); $j++)
-								$iflabels['opt' . $j] = $config['interfaces']['opt' . $j]['descr'] ?? '';
+							  /* OPT numbering can have gaps: deleting an interface no longer renumbers. */
+							  foreach (opt_interfaces() as $optif)
+								$iflabels[$optif] = $config['interfaces'][$optif]['descr'] ?? '';
 							  $if = htmlspecialchars($iflabels[$ipsecent['interface']] ?? '');
 						} else
 							$if = "WAN";

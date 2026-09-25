@@ -37,6 +37,13 @@ if (!is_array($config['wlans']['wlan'] ?? null))
 
 $a_wlans = &$config['wlans']['wlan'] ;
 
+/* Which logical interfaces are assigned to wlan$num.
+   
+   The walk over optN is opt_interfaces(), which keeps the gaps: an OPT number
+   is a stable identifier now that deleting one no longer renumbers the OPTs
+   above it, so opt1 and opt3 with no opt2 is a normal config. Counting up from
+   opt1 stopped at the first missing number, which made this check -- and the
+   renumber_wlan() pass below -- miss every OPT above a hole. */
 function wlan_inuse($num) {
 	global $config, $g;
 
@@ -45,8 +52,8 @@ function wlan_inuse($num) {
 	if (($config['interfaces']['wan']['if'] ?? null) == "wlan{$num}")
 		return true;
 	
-	for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-		if (($config['interfaces']['opt' . $i]['if'] ?? null) == "wlan{$num}")
+	foreach (opt_interfaces() as $optif) {
+		if (($config['interfaces'][$optif]['if'] ?? null) == "wlan{$num}")
 			return true;
 	}
 	
@@ -77,8 +84,8 @@ if ($_POST) {
 				/* renumber all interfaces that use WLANs */
 				$config['interfaces']['lan']['if'] = renumber_wlan($config['interfaces']['lan']['if'] ?? null, $id);
 				$config['interfaces']['wan']['if'] = renumber_wlan($config['interfaces']['wan']['if'] ?? null, $id);
-				for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++)
-					$config['interfaces']['opt' . $i]['if'] = renumber_wlan($config['interfaces']['opt' . $i]['if'] ?? null, $id);
+				foreach (opt_interfaces() as $optif)
+					$config['interfaces'][$optif]['if'] = renumber_wlan($config['interfaces'][$optif]['if'] ?? null, $id);
 
 				write_config();
 				touch($d_sysrebootreqd_path);

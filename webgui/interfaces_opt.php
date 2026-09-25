@@ -81,10 +81,17 @@ if ($_POST) {
 	/* input validation */
 	if (!empty($_POST['enable'])) {
 	
-		/* description unique? */
-		for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
+		/* description unique?
+		
+		   opt_interfaces() rather than a count up from opt1: an OPT number is a
+		   stable identifier now that deleting one no longer renumbers the OPTs
+		   above it, so the numbers can have gaps. Counting up stopped at the
+		   first missing one, and every interface above a hole was then invisible
+		   here -- a duplicate description would have been accepted. Same for the
+		   bridge list further down. */
+		foreach (opt_interfaces() as $i => $optif) {
 			if ($i != $index) {
-				if (($config['interfaces']['opt' . $i]['descr'] ?? null) == ($_POST['descr'] ?? null)) {
+				if (($config['interfaces'][$optif]['descr'] ?? null) == ($_POST['descr'] ?? null)) {
 					$input_errors[] = "An interface with the specified description already exists.";
 				}
 			}
@@ -261,10 +268,10 @@ function enable_change(enable_over) {
 					<select name="bridge" class="formfld" id="bridge" onChange="enable_change(false)">
 				  	<option <?php if (empty($pconfig['bridge'])) echo "selected";?> value="">none</option>
                       <?php $opts = array('lan' => "LAN", 'wan' => "WAN");
-					  	for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
+					  	foreach (opt_interfaces() as $i => $optif) {
 							if ($i != $index)
-								$opts['opt' . $i] = "Optional " . $i . " (" .
-									$config['interfaces']['opt' . $i]['descr'] . ")";
+								$opts[$optif] = "Optional " . $i . " (" .
+									$config['interfaces'][$optif]['descr'] . ")";
 						}
 					foreach ($opts as $opt => $optname): ?>
                       <option <?php if ($opt == ($pconfig['bridge'] ?? null)) echo "selected";?> value="<?=htmlspecialchars($opt);?>"> 

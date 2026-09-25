@@ -296,9 +296,14 @@ if (array_intersect($if_menu,$allowed ?? array())) {
     	echo '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="/interfaces_wan.php" class="navlnk">WAN</a><br>';
     }
     if (in_array('interfaces_opt.php',$allowed ?? array())) {
-    	for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
+    	/* opt_interfaces(), because OPT numbering can have gaps: deleting an
+    	   interface no longer renumbers the ones above it. Counting up from opt1
+    	   stopped at the first missing number, which dropped every OPT above a
+    	   hole out of the navigation entirely -- there was then no way to reach
+    	   its settings page at all. */
+    	foreach (opt_interfaces() as $i => $optif) {
 			echo '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="/interfaces_opt.php?index=' .$i.
-			     '" class="navlnk">'.htmlspecialchars($config['interfaces']['opt' . $i]['descr']).'</a><br>';
+			     '" class="navlnk">'.htmlspecialchars($config['interfaces'][$optif]['descr'] ?? '').'</a><br>';
     	}
     }
     /* VLANs.

@@ -115,23 +115,26 @@ EOD;
 	$p++;
 	}
 			
-	for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-		if (($config['interfaces']['opt' . $i]['ipaddr6'] ?? null) == "DHCP-PD") {
+	/* OPT numbering can have holes -- deleting an optional interface no longer
+	   renumbers the ones above it -- so enumerate with opt_interfaces() instead of
+	   counting up until a number is missing. See util.inc. */
+	foreach (opt_interfaces() as $optif) {
+		if (($config['interfaces'][$optif]['ipaddr6'] ?? null) == "DHCP-PD") {
 			$d6wanm = "\t\tsend ia-pd 0;\n";
 			$d6pds = "id-assoc pd 0 {\n";
 			$d6pde = "};\n";
-			if (isset($config['interfaces']['opt' . $i]['slaid'])) {
-				$d6pdi = $config['interfaces']['opt' . $i]['slaid'];
+			if (isset($config['interfaces'][$optif]['slaid'])) {
+				$d6pdi = $config['interfaces'][$optif]['slaid'];
 			} else {
 				$d6pdi = $p;
 			}
-			if (isset($config['interfaces']['opt' . $i]['slalen'])) {
-				$d6pdl = $config['interfaces']['opt' . $i]['slalen'];
+			if (isset($config['interfaces'][$optif]['slalen'])) {
+				$d6pdl = $config['interfaces'][$optif]['slalen'];
 			} else {
 				$d6pdl = 16;
 			}
 			$d6opt .= <<<EOD
-		prefix-interface {$config['interfaces']['opt' . $i]['if']} {
+		prefix-interface {$config['interfaces'][$optif]['if']} {
 			sla-id {$d6pdi};
 			sla-len {$d6pdl};
 		};

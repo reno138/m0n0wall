@@ -43,11 +43,15 @@ if (!empty($_POST['if']))
 	
 $iflist = array("lan" => "LAN");
 
-for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-	$oc = $config['interfaces']['opt' . $i];
+/* Enumerate the OPTs with opt_interfaces() rather than counting up from 1:
+   deleting an optional interface no longer renumbers the others, so the
+   numbering can have gaps and a counting loop would stop at the first one --
+   losing the DHCP tab for every interface past it. */
+foreach (opt_interfaces() as $optif) {
+	$oc = $config['interfaces'][$optif];
 	
 	if (isset($oc['enable']) && !empty($oc['if']) && (empty($oc['bridge']))) {
-		$iflist['opt' . $i] = $oc['descr'];
+		$iflist[$optif] = $oc['descr'];
 	}
 }
 

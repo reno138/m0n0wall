@@ -53,8 +53,11 @@ $ifdescrs = array('wan' => 'WAN', 'lan' => 'LAN');
 if (ipv6enabled() && (($config['interfaces']['wan']['ipaddr6'] ?? null) == "aiccu")) {
 	$ifdescrs['SixXS'] = 'SixXS';
 }
-for ($j = 1; isset($config['interfaces']['opt' . $j]); $j++) {
-	$ifdescrs['opt' . $j] = $config['interfaces']['opt' . $j]['descr'];
+/* OPT numbers can have gaps now that deleting an optional interface no
+   longer renumbers the survivors, so enumerate via opt_interfaces()
+   rather than stopping at the first missing number (see util.inc). */
+foreach (opt_interfaces() as $optif) {
+	$ifdescrs[$optif] = $config['interfaces'][$optif]['descr'];
 }
 ?>
 <form name="form1" action="" method="get" style="padding-bottom: 10px; margin-bottom: 14px; border-bottom: 1px solid #999999">

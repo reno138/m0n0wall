@@ -41,13 +41,12 @@ $a_vlans = &$config['vlans']['vlan'] ;
    refusal below can name them. It used to answer only true/false, and the
    message was "still being used as an interface" with no clue which one.
    
-   The walk over optN stops at the first gap, as it always has -- the same
-   pattern gates the renumber_vlan() calls below and interfaces_autoreassign().
-   interfaces_assign.php shifts the OPTs down when one is deleted, so a gap
-   should not occur in normal operation, but a hand-edited or partially restored
-   config can have one, and then this and the renumbering both stop early. Not
-   fixed here; do not read the empty return as a guarantee that nothing is using
-   the VLAN. */
+   The walk over optN is opt_interfaces(), which keeps the gaps: an OPT number
+   is a stable identifier now that deleting one no longer renumbers the OPTs
+   above it, so opt1 and opt3 with no opt2 is a normal config. Counting up from
+   opt1 stopped at the first missing number, which made this check -- and the
+   renumber_vlan() pass below -- miss every OPT above a hole, including one left
+   by a hand-edited or partially restored config. */
 function vlan_inuse($num) {
 	global $config, $g;
 
@@ -58,8 +57,8 @@ function vlan_inuse($num) {
 	if (($config['interfaces']['wan']['if'] ?? null) == "vlan{$num}")
 		$inuse[] = "WAN";
 	
-	for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-		if (($config['interfaces']['opt' . $i]['if'] ?? null) == "vlan{$num}")
+	foreach (opt_interfaces() as $i => $optif) {
+		if (($config['interfaces'][$optif]['if'] ?? null) == "vlan{$num}")
 			$inuse[] = "OPT" . $i;
 	}
 	
@@ -77,11 +76,13 @@ function renumber_vlan($if, $delvlan) {
 		return $if;
 }
 
-/* Fixed messages for the redirect from interfaces_vlan_edit.php, looked up by
-   token so that nothing out of the query string is ever echoed. Only an ADD
-   comes back with one: an add is applied to the running system immediately, and
-   these say whether that actually happened. An edit or a delete redirects
-   without a token and the standard reboot notice below speaks for it. */
+/* Fixed messages for the redirects from interfaces_vlan_edit.php and from the
+   delete below, looked up by token so that nothing out of the query string is
+   ever echoed. The two actions that are applied to the running system come back
+   with one -- an ADD, and a DELETE of the last entry in the list -- and these
+   say whether that actually happened. An edit, or a delete that renumbers,
+   redirects without a token and the standard reboot notice below speaks for
+   it. */
 $vlan_statusmsg = array(
 	"saved" =>
 		"The changes have been saved. Nothing needed to be applied: only the " .
@@ -101,6 +102,14 @@ $vlan_statusmsg = array(
 		"The VLAN has been saved, but a reboot was already pending for an " .
 		"earlier change, so it was not created now. You must " .
 		"<a href=\"/reboot.php\">reboot</a> for the changes to take effect.",
+	"deleted" =>
+		"The VLAN has been deleted and its interface destroyed. Nothing else " .
+		"was renumbered, so no reboot is required.",
+	"delfailed" =>
+		"The VLAN has been deleted from the configuration, but its interface " .
+		"could not be destroyed right now -- see Diagnostics: System logs. It " .
+		"keeps tagging until you " .
+		"<a href=\"/reboot.php\">reboot</a>.",
 );
 /* is_string() first. Indexing an array with an ARRAY key is a TypeError in
    PHP 8 -- "Cannot access offset of type array on array" -- and ?? does not
@@ -124,38 +133,101 @@ if ($_POST) {
 			if (count($inuse)) {
 				$input_errors[] = "This VLAN cannot be deleted because it is still assigned to " .
 					implode(", ", $inuse) . ". Change that assignment on the Interface assignments tab first.";
+			} else if (!array_key_exists($id, $a_vlans)) {
+				/* Nothing to delete. Worth saying rather than falling through:
+				   the old code renumbered nothing, deleted nothing and still set
+				   the reboot flag, which puts the whole webGUI into save-only
+				   mode (exec_rc_script() returns early while that file exists)
+				   over a request that did nothing at all. */
+				$input_errors[] = "There is no VLAN to delete under that number.";
 			} else {
+				/* Is this a pure TRUNCATE -- the last entry in the list?
+				
+				   A VLAN's interface name is its POSITION in this array, and
+				   unlike optN that cannot be made a stable identifier without a
+				   config schema change: a hole in a list section does not even
+				   survive being saved, because xmlparse.inc rebuilds one with
+				   array_push($curpath, count($ptr)) and so reads the entries
+				   back as 0..n-1. The full reasoning is in the block comment
+				   over the VLAN section of interfaces.inc. So renumbering stays
+				   for a delete from the middle, and so does its reboot.
+				   
+				   The LAST entry is the exception, and it is the exact mirror of
+				   the add path's pure append: renumber_vlan() only shifts
+				   positions ABOVE the deleted one and there are none, so no
+				   surviving vlanN changes meaning, and vlan_inuse() has just
+				   come back empty, so this interface is assigned to nothing and
+				   cannot be the one carrying this session. Nothing is left for a
+				   reboot to reconcile, so the interface is destroyed here and no
+				   reboot is demanded -- the same "no destroy of anything in use"
+				   rule the add path follows, satisfied by the same two facts.
+				   
+				   Packed keys are part of the test: a position equals its key
+				   only while the array has no holes, and config.xml cannot
+				   produce one (see above), so a hole here means this page is
+				   looking at an array it did not get from config.xml and the
+				   positional name of the last entry is not $id. Reboot, then. */
+				$keys = array_keys($a_vlans);
+				$islast = ($keys === range(0, count($a_vlans) - 1)) &&
+				          ($id === (count($a_vlans) - 1));
+
 				unset($a_vlans[$id]);
 
-				/* renumber all interfaces that use VLANs */
+				/* renumber all interfaces that use VLANs. A no-op when $islast:
+				   renumber_vlan() returns $if unchanged for every position below
+				   the deleted one, which is all of them. */
 				$config['interfaces']['lan']['if'] = renumber_vlan($config['interfaces']['lan']['if'] ?? '', $id);
 				$config['interfaces']['wan']['if'] = renumber_vlan($config['interfaces']['wan']['if'] ?? '', $id);
-				for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++)
-					$config['interfaces']['opt' . $i]['if'] = renumber_vlan($config['interfaces']['opt' . $i]['if'] ?? '', $id);
+				foreach (opt_interfaces() as $optif)
+					$config['interfaces'][$optif]['if'] = renumber_vlan($config['interfaces'][$optif]['if'] ?? '', $id);
 
+				/* Written to disk BEFORE the running system is touched, as on the
+				   edit page: if the destroy below fails, or the admin's browser
+				   never sees the redirect, config.xml is already correct and the
+				   next boot builds the right set of interfaces. */
 				write_config();
-				/* A delete still requires a reboot, and unlike an add it runs no
-				   ifconfig at all.
-				
-				   Two separate things would have to happen live. The deleted
-				   interface would have to be destroyed -- and although
-				   vlan_inuse() has just established that it is not assigned to
-				   anything, so it cannot be the one carrying this session, that
-				   is only half of it. The renumbering above moves the positional
-				   NAME of every VLAN above the deleted one, and those can be LAN
-				   or WAN: matching it live would mean destroying and recreating
-				   in-use interfaces to shift their names down by one, any of
-				   which may be the interface this request arrived on. So the
-				   config is renumbered, the reboot rebuilds the interfaces from
-				   it, and until then the deleted VLAN keeps tagging -- as it did
-				   before this page applied anything live.
-				
-				   This flag is also what keeps the add path on the edit page
-				   honest: while it is set, an add is saved but not created,
-				   because the live vlanN names no longer match the config
-				   positions. */
-				touch($d_sysrebootreqd_path);
-				header("Location: interfaces_vlan.php");
+
+				$status = "";
+
+				if (!$islast) {
+					/* Renumbered, so the config's positional names and the live
+					   interfaces now disagree, and only a reboot -- which starts
+					   from no vlan interfaces at all -- can reconcile them. Until
+					   then the deleted VLAN keeps tagging, as it always has.
+					   
+					   This flag is also what keeps the add path on the edit page
+					   honest: while it is set, an add is saved but not created,
+					   because the live vlanN names no longer match the config
+					   positions. */
+					touch($d_sysrebootreqd_path);
+				} else if (file_exists($d_sysrebootreqd_path)) {
+					/* A reboot was already pending, so the live vlanN names do
+					   not match the config positions and vlan{$id} may be an
+					   interface carrying somebody else's tag. Leave it strictly
+					   alone and let the reboot rebuild the lot -- the same gate,
+					   for the same reason, as the create on the edit page. */
+				} else if (!interface_is_present("vlan{$id}")) {
+					/* Not there to destroy: the configuration and the running
+					   system already agree, so there is nothing to apply and
+					   nothing to reboot for. */
+					$status = "deleted";
+				} else {
+					config_lock();
+					$retval = interfaces_vlan_destroy_if($id);
+					config_unlock();
+
+					if ($retval != 0) {
+						log_error("VLAN: could not destroy vlan{$id}: ifconfig " .
+							"returned {$retval}");
+						touch($d_sysrebootreqd_path);
+						$status = "delfailed";
+					} else {
+						$status = "deleted";
+					}
+				}
+
+				header("Location: interfaces_vlan.php" .
+					($status ? "?status=" . $status : ""));
 				exit;
 			}
 		}
@@ -201,11 +273,14 @@ if (file_exists($d_sysrebootreqd_path))
 					/* Deleting anything but the last row renumbers the rows
 					   after it -- vlan3 becomes vlan2 and so on -- and the
 					   interface assignments are rewritten to match. Say so
-					   before the click, not after. */
+					   before the click, not after. Deleting the LAST row
+					   renumbers nothing and is applied immediately, so say that
+					   too: the two cases behave differently enough that one
+					   wording cannot cover both. */
 					if ($i < ($nvlans - 1))
 						$delconfirm = "Deleting this VLAN renumbers the VLANs below it (vlan2 becomes vlan1, and so on) and rewrites the interface assignments to match. A reboot is required afterwards. Continue?";
 					else
-						$delconfirm = "Do you really want to delete this VLAN?";
+						$delconfirm = "This is the last VLAN in the list, so deleting it renumbers nothing and takes effect immediately: vlan" . $i . " is destroyed when you confirm. Continue?";
 			  ?>
                 <tr>
                   <td class="listlr">
@@ -246,7 +321,12 @@ if (file_exists($d_sysrebootreqd_path))
 				  Adding a VLAN takes effect immediately &ndash; the interface is created when
 				  you save, and no reboot is required.
 				  <?php endif; ?>
-				  Changing or deleting one still requires a reboot: the running interface has to be destroyed and rebuilt for that, and deleting a VLAN renumbers the ones after it.</span>
+				  Deleting the LAST VLAN in the list also takes effect immediately &ndash; it
+				  renumbers nothing, so its interface is simply destroyed. Changing one, or
+				  deleting one from the middle of the list, still requires a reboot: an
+				  edited tag only reaches an interface that is destroyed and rebuilt, and
+				  deleting from the middle renumbers the VLANs after it, which may be
+				  assigned to LAN, WAN or an OPT.</span>
 				  </td>
 				<td class="list">&nbsp;</td>
 				</tr>

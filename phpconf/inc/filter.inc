@@ -258,9 +258,12 @@ function filter_nat_rules_generate() {
 		$natrules .= filter_nat_rules_generate_if($wanif,
 			$lansa . "/" . ($lancfg['subnet'] ?? ''), "", null);
 	
-		/* optional interfaces */
-		for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-			$optcfg = $config['interfaces']['opt' . $i];
+		/* optional interfaces. opt_interfaces(), not a loop counting up from
+		   opt1: deleting an optional interface no longer renumbers the ones above
+		   it, so the numbering can have gaps and a counting loop stops at the
+		   first one. See util.inc. */
+		foreach (opt_interfaces() as $optif) {
+			$optcfg = $config['interfaces'][$optif];
 			
 			if (isset($optcfg['enable']) && empty($optcfg['bridge'])) {
 				$optsa = gen_subnet($optcfg['ipaddr'] ?? '', $optcfg['subnet'] ?? '');
@@ -418,8 +421,8 @@ function filter_rules_generate($ipv6 = false) {
 	/* optional interfaces */
 	$optcfg = array();
 	
-	for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-		$oc = $config['interfaces']['opt' . $i];
+	foreach (opt_interfaces() as $i => $optif) {
+		$oc = $config['interfaces'][$optif];
 		
 		if (isset($oc['enable']) && !empty($oc['if'])) {
 			$oic = array();
@@ -443,7 +446,7 @@ function filter_rules_generate($ipv6 = false) {
 			} else {
 				if ($ipv6) {
 					if (($oc['ipaddr6'] ?? null) == "6to4") {
-						$oic['ip'] = calc_6to4_address('opt' . $i);
+						$oic['ip'] = calc_6to4_address($optif);
 						$oic['sn'] = 64;
 					} elseif (($oc['ipaddr6'] ?? null) == "DHCP-PD") {
 						$oic['sn'] = 64;
@@ -468,8 +471,8 @@ function filter_rules_generate($ipv6 = false) {
 				$oic['ipv6ra'] = $oc['ipv6ra'] ?? null;
 			}
 			
-			$optcfg['opt' . $i] = $oic;
-			$ifgroups['opt' . $i] = ($i * 100) + 200;
+			$optcfg[$optif] = $oic;
+			$ifgroups[$optif] = ($i * 100) + 200;
 		}
 	}
 	

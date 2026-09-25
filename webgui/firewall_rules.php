@@ -64,8 +64,12 @@ if (isset($config['ipsec']['enable']))
    into pf -- the worst combination. */
 $iflist += wg_rule_interfaces();
 
-for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-	$iflist['opt' . $i] = $config['interfaces']['opt' . $i]['descr'] ?? null;
+/* Enumerate the OPTs with opt_interfaces() rather than counting up from 1:
+   deleting an optional interface no longer renumbers the others, so the
+   numbering can have gaps and a counting loop would stop at the first one --
+   losing the tabs for every interface past it. */
+foreach (opt_interfaces() as $optif) {
+	$iflist[$optif] = $config['interfaces'][$optif]['descr'] ?? null;
 }
 
 if (!$if || !isset($iflist[$if]))

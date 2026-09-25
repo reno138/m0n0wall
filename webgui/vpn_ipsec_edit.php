@@ -356,8 +356,9 @@ function methodsel_change() {
                   <td width="22%" valign="top" class="vncellreq">Interface</td>
                   <td width="78%" class="vtable"><select name="interface" class="formfld">
                       <?php $interfaces = array('wan' => 'WAN', 'lan' => 'LAN');
-					  for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-							$interfaces['opt' . $i] = $config['interfaces']['opt' . $i]['descr'] ?? '';
+					  /* OPT numbering can have gaps: deleting an interface no longer renumbers. */
+					  foreach (opt_interfaces() as $optif) {
+							$interfaces[$optif] = $config['interfaces'][$optif]['descr'] ?? '';
 					  }
 					  foreach ($interfaces as $iface => $ifacename): ?>
                       <option value="<?=$iface;?>" <?php if ($iface == ($pconfig['interface'] ?? null)) echo "selected"; ?>> 

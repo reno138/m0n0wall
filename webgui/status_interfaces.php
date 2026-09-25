@@ -317,8 +317,11 @@ function get_interface_info($ifdescr) {
               <?php $resolvers = get_resolvers();
 					$i = 0; $ifdescrs = array('wan' => 'WAN', 'lan' => 'LAN');
 						
-					for ($j = 1; isset($config['interfaces']['opt' . $j]); $j++) {
-						$ifdescrs['opt' . $j] = $config['interfaces']['opt' . $j]['descr'];
+					/* OPT numbers can have gaps now that deleting an optional interface
+					   no longer renumbers the survivors, so enumerate via
+					   opt_interfaces() and not by counting up (see util.inc). */
+					foreach (opt_interfaces() as $optif) {
+						$ifdescrs[$optif] = $config['interfaces'][$optif]['descr'];
 					}
 					
 			      foreach ($ifdescrs as $ifdescr => $ifname): 

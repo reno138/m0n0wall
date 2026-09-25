@@ -93,32 +93,48 @@ function interfaces_loopback_configure() {
  * assignment stores ($config['interfaces']['opt1']['if'] = "vlan1") and
  * interfaces_assign.php builds its port list with the same running counter.
  *
- * This code only ever CREATES vlan interfaces, and nothing anywhere in the
- * tree destroys one. That is exactly why editing or deleting a VLAN still
- * requires a reboot: "ifconfig vlan0 create" fails when vlan0 already exists,
- * so an edited tag never reaches the running interface, a deleted VLAN keeps
- * tagging, and after a delete the config's positional names have shifted while
- * the live interfaces have not. Only a reboot, which starts from no vlan
- * interfaces at all, can reconcile that.
+ * Because the name is a position, a VLAN number cannot be made stable the way
+ * optN was. optN is an ARRAY KEY, so leaving a hole in it is simply a
+ * configuration with a gap; a hole here does not even survive being saved --
+ * xmlparse.inc rebuilds a list section with array_push($curpath, count($ptr)),
+ * so config.xml round-trips the <vlan> entries back as 0..n-1 and closes the
+ * hole by itself. Giving a VLAN a stable name would mean storing an explicit
+ * number in each entry, which is a config schema change; the OPT fix needed
+ * none. So deleting a VLAN from the MIDDLE still renumbers the ones after it.
  *
- * ADDING a VLAN is the one case that does not need any of it, and
- * interfaces_vlan_edit.php now applies an add immediately without setting the
- * reboot flag. An add is a pure append: the name the new entry gets is the next
- * position, which nothing refers to yet, no existing vlanN changes meaning, and
- * nothing that is already carrying traffic -- including the interface the
- * admin's webGUI session arrived on -- is destroyed or reconfigured. Editing
- * and deleting keep the reboot because making them live means destroying an
- * interface that may be carrying LAN, WAN or an OPT (a delete additionally
- * renumbers the names of OTHER, possibly assigned, VLANs), and destroying the
- * one the request arrived on would cut the admin off mid-change.
+ * Which operations can be applied to the running system, and why:
  *
- * INVARIANT the add path relies on: while $d_sysrebootreqd_path does not
- * exist, the live vlanN interfaces match the config positions. That holds
- * today because nothing destroys a vlan interface and both mutating webGUI
- * paths -- edit in interfaces_vlan_edit.php, delete in interfaces_vlan.php --
- * set that flag. Any future code that creates or destroys a vlan interface
- * outside this file, or that clears the flag without a reboot, has to preserve
- * it or the add path can retag an interface that is already in use.
+ *   ADD -- yes, in place, no reboot. A pure APPEND: the name the new entry gets
+ *   is the next position, which nothing refers to yet, no existing vlanN
+ *   changes meaning, and nothing already carrying traffic -- including the
+ *   interface the admin's webGUI session arrived on -- is destroyed or
+ *   reconfigured. interfaces_vlan_edit.php does this.
+ *
+ *   DELETE OF THE LAST ENTRY -- yes, in place, no reboot. The exact mirror of
+ *   the add: a pure TRUNCATE. renumber_vlan() only shifts positions above the
+ *   deleted one and there are none, so no existing vlanN changes meaning; and
+ *   vlan_inuse() has established that this one is assigned to no interface, so
+ *   it cannot be the one carrying this session. interfaces_vlan.php does this,
+ *   through interfaces_vlan_destroy_if() below.
+ *
+ *   DELETE FROM THE MIDDLE -- no, reboot. It moves the positional name of every
+ *   VLAN above it, and those may be LAN, WAN or an OPT; matching that live would
+ *   mean destroying and recreating in-use interfaces to shift their names down
+ *   by one, any of which may be the one this request arrived on.
+ *
+ *   EDIT -- no, reboot. "create" is a no-op on an interface that already exists,
+ *   so applying an edited tag means destroy-then-recreate, and vlanN may be
+ *   assigned to LAN, WAN or an OPT.
+ *
+ * INVARIANT the add path relies on: while $d_sysrebootreqd_path does not exist,
+ * the live vlanN interfaces match the config positions. The three paths that can
+ * break that -- an edit, a delete from the middle, and a delete whose destroy
+ * failed -- all set the flag, and the one path that destroys an interface
+ * (delete of the last entry) removes the last position and the last live name
+ * together, so it preserves the invariant rather than breaking it. Any future
+ * code that creates or destroys a vlan interface outside this file, or that
+ * clears the flag without a reboot, has to preserve it too, or the add path can
+ * retag an interface that is already in use.
  * ------------------------------------------------------------------------ */
 
 function interfaces_vlan_configure() {
@@ -198,6 +214,29 @@ function interfaces_vlan_configure_if($i, $vlan) {
 	mwexec("/sbin/ifconfig {$vlanif} up");
 	
 	return $retval;
+}
+
+/* Destroy ONE vlan interface, by position.
+ *
+ * The counterpart of interfaces_vlan_configure_if(), and here for the same
+ * reason: the name of a VLAN is its position in $config['vlans']['vlan'], and
+ * that rule belongs in one place rather than spread into the webGUI as a raw
+ * ifconfig command line.
+ *
+ * Nothing here checks whether the interface is in use, because nothing here
+ * CAN: the caller has to have established it. Exactly one caller may -- the
+ * delete in interfaces_vlan.php, for the LAST entry in the list, after
+ * vlan_inuse() has come back empty. See the rules in the block comment above;
+ * every other change to a VLAN goes through a reboot.
+ *
+ * Returns the ifconfig exit status, so the webGUI can say whether the delete it
+ * just applied actually reached the running system. */
+function interfaces_vlan_destroy_if($i) {
+	global $config, $g;
+
+	/* (int): same reason as the create -- the name comes from an array index and
+	   goes into a command line unquoted. */
+	return mwexec("/sbin/ifconfig vlan" . (int) $i . " destroy");
 }
 
 /* Does $if exist in the kernel right now? This asks the running system, not the
@@ -343,7 +382,10 @@ function interfaces_lan_configure6() {
 function interfaces_optional_configure() {
 	global $config, $g;
 	
-	for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
+	/* OPT numbers may have gaps: deleting an optional interface no longer
+	   renumbers the ones above it, so enumerate what is actually there
+	   rather than counting up from 1 (see opt_interfaces() in util.inc) */
+	foreach (opt_interfaces() as $i => $optif) {
 		interfaces_optional_configure_if($i);
 	}
 	
@@ -383,9 +425,9 @@ function interfaces_bridge_configure() {
 	$bridge_if_num = -1;
 	$bridgearray = array();
 	$iflist = array("lan", "wan");
-	for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++)
-		if(isset($config['interfaces']['opt' . $i]['enable']))
-			$iflist['opt' . $i] = 'opt' . $i;
+	foreach (opt_interfaces() as $optif)
+		if(isset($config['interfaces'][$optif]['enable']))
+			$iflist[$optif] = $optif;
 	foreach($iflist as $if) {
 		// go through all interfaces and check for bridged interfaces
 		if (!empty($config['interfaces'][$if]['bridge'])) {
@@ -488,7 +530,7 @@ function interfaces_bridge_configure() {
 function interfaces_optional_configure6() {
 	global $config, $g;
 	
-	for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
+	foreach (opt_interfaces() as $i => $optif) {
 		interfaces_optional_configure_if6($i);
 	}
 	
@@ -1382,27 +1424,27 @@ function interfaces_rtadvd_configure() {
 		$rtadvdconf .= $wanif . ":maxinterval#10:mininterval#4\n";
 	}
 	
-	for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-		$optcfg = $config['interfaces']['opt' . $i];
+	foreach (opt_interfaces() as $optif) {
+		$optcfg = $config['interfaces'][$optif];
 		if (isset($optcfg['ipv6ra']) && isset($optcfg['enable']) &&
 			!empty($optcfg['if']) && empty($optcfg['bridge'])) {
 			$raflags = "";
-			if (isset($config['interfaces']['opt' . $i]['ipv6ram'])) {
+			if (isset($config['interfaces'][$optif]['ipv6ram'])) {
 				$raflags .= "m";
 			}
-			if (isset($config['interfaces']['opt' . $i]['ipv6rao'])) {
+			if (isset($config['interfaces'][$optif]['ipv6rao'])) {
 				$raflags .= "o";
 			}
 			$rtadvdifs .= ' ' . $optcfg['if'];
 			/* maybe this can be configurable in the future */
 			$rtadvdconf .= $optcfg['if'] . ":raflags=\"" . $raflags . "\":maxinterval#10:mininterval#4:prefixlen#";
-			if (($config['interfaces']['opt' . $i]['ipv6mode'] ?? null) == "DHCP-PD") {
-				$rtadvdconf .= 64 - ($config['interfaces']['opt' . $i]['slalen'] ?? null);
+			if (($config['interfaces'][$optif]['ipv6mode'] ?? null) == "DHCP-PD") {
+				$rtadvdconf .= 64 - ($config['interfaces'][$optif]['slalen'] ?? null);
 			} else {
-				$rtadvdconf .= $config['interfaces']['opt' . $i]['subnet6'] ?? '';
+				$rtadvdconf .= $config['interfaces'][$optif]['subnet6'] ?? '';
 			}
-			if (isset($config['interfaces']['opt' . $i]['ipv6ramtu']) && $config['interfaces']['opt' . $i]['ipv6ramtu'] > 0) {
-				$rtadvdconf .= ":mtu#" . $config['interfaces']['opt' . $i]['ipv6ramtu'];
+			if (isset($config['interfaces'][$optif]['ipv6ramtu']) && $config['interfaces'][$optif]['ipv6ramtu'] > 0) {
+				$rtadvdconf .= ":mtu#" . $config['interfaces'][$optif]['ipv6ramtu'];
 			}
 
 			$dnsservers = array();
@@ -1470,8 +1512,8 @@ function interfaces_autoreassign() {
 	$iflist = get_interface_list(true, false, false);
 	
 	$logifs = array('lan', 'wan');
-	for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++)
-		$logifs[] = 'opt' . $i;
+	foreach (opt_interfaces() as $optif)
+		$logifs[] = $optif;
 	
 	/* Compare list of available interfaces with those in config to see whether
 	   at least one of them is available. Bail out on VLAN/WLAN configs too - we
@@ -1515,11 +1557,14 @@ EOD;
 	$config['interfaces']['lan']['if'] = $ifnames[0];
 	$config['interfaces']['wan']['if'] = $ifnames[1];
 	
-	for ($i = 2; isset($ifnames[$i]); $i++) {
-		$opti = $i - 1;
-		if (isset($config['interfaces']['opt' . $opti])) {
-			$config['interfaces']['opt' . $opti]['if'] = $ifnames[$i];
-		}
+	/* hand out the remaining physical interfaces to the OPTs in number order;
+	   deriving the OPT number from the loop counter would skip a gap's worth
+	   of interfaces and leave the OPTs above it pointing at nothing */
+	$i = 2;
+	foreach (opt_interfaces() as $optif) {
+		if (!isset($ifnames[$i]))
+			break;
+		$config['interfaces'][$optif]['if'] = $ifnames[$i++];
 	}
 	
 	write_config();

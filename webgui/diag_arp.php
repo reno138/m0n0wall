@@ -78,8 +78,11 @@ if ($dnsmasqleases !== false) {
 $i = 0; 
 $ifdescrs = array('wan' => 'WAN', 'lan' => 'LAN');
 						
-for ($j = 1; isset($config['interfaces']['opt' . $j]); $j++) {
-	$ifdescrs['opt' . $j] = $config['interfaces']['opt' . $j]['descr'];
+/* OPT numbers can have gaps, because deleting an optional interface no
+   longer renumbers the ones after it; enumerate with opt_interfaces()
+   instead of counting up until one is missing (see util.inc). */
+foreach (opt_interfaces() as $optif) {
+	$ifdescrs[$optif] = $config['interfaces'][$optif]['descr'];
 }
 
 foreach ($ifdescrs as $key =>$interface) {

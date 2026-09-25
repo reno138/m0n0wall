@@ -491,8 +491,12 @@ function dst_rep_change() {
                   <td width="22%" valign="top" class="vncellreq">Interface</td>
                   <td width="78%" class="vtable"><select name="interface" class="formfld">
                       <?php $interfaces = array('lan' => 'LAN', 'wan' => 'WAN');
-					  for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-					  	$interfaces['opt' . $i] = $config['interfaces']['opt' . $i]['descr'];
+					  /* opt_interfaces() rather than counting up from 1: a deleted
+					     optional interface no longer renumbers the rest, so the
+					     numbering can have gaps and a counting loop would stop at the
+					     first one. */
+					  foreach (opt_interfaces() as $optif) {
+					  	$interfaces[$optif] = $config['interfaces'][$optif]['descr'];
 					  }
 					  foreach ($interfaces as $iface => $ifacename): ?>
                       <option value="<?=$iface;?>" <?php if ($iface == ($pconfig['interface'] ?? null)) echo "selected"; ?>> 
@@ -534,11 +538,11 @@ function dst_rep_change() {
                             Network</option>
                             <option value="lan" <?php if (($pconfig['src'] ?? null) == "lan") { echo "selected"; } ?>> 
                             LAN subnet</option>
-                            <?php for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++): ?>
+                            <?php foreach (opt_interfaces() as $i => $optif): ?>
                             <option value="opt<?=$i;?>" <?php if (($pconfig['src'] ?? null) == "opt" . $i) { echo "selected"; } ?>> 
-                            <?=htmlspecialchars($config['interfaces']['opt' . $i]['descr'] ?? '');?>
+                            <?=htmlspecialchars($config['interfaces'][$optif]['descr'] ?? '');?>
                             subnet</option>
-                            <?php endfor; ?>
+                            <?php endforeach; ?>
                           </select></td>
                       </tr>
                       <tr> 
@@ -614,11 +618,11 @@ function dst_rep_change() {
                             Network</option>
                             <option value="lan" <?php if (($pconfig['dst'] ?? null) == "lan") { echo "selected"; } ?>> 
                             LAN subnet</option>
-                            <?php for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++): ?>
+                            <?php foreach (opt_interfaces() as $i => $optif): ?>
                             <option value="opt<?=$i;?>" <?php if (($pconfig['dst'] ?? null) == "opt" . $i) { echo "selected"; } ?>> 
-                            <?=htmlspecialchars($config['interfaces']['opt' . $i]['descr'] ?? '');?>
+                            <?=htmlspecialchars($config['interfaces'][$optif]['descr'] ?? '');?>
                             subnet</option>
-                            <?php endfor; ?>
+                            <?php endforeach; ?>
                           </select> </td>
                       </tr>
                       <tr> 

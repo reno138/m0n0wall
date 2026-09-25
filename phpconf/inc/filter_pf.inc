@@ -291,8 +291,12 @@ function pf_nat_rules_generate() {
 		$rules .= pf_nat_rule_generate_if($wanif,
 			$lansa . "/" . $lancfg['subnet'], "", null);
 
-		for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-			$optcfg = $config['interfaces']['opt' . $i];
+		/* opt_interfaces(), not a loop counting up from opt1: deleting an
+		   optional interface no longer renumbers the ones above it, so the
+		   numbering can have gaps and a counting loop stops at the first one.
+		   See util.inc. */
+		foreach (opt_interfaces() as $optif) {
+			$optcfg = $config['interfaces'][$optif];
 			if (isset($optcfg['enable']) && empty($optcfg['bridge'])) {
 				$optsa = gen_subnet($optcfg['ipaddr'], $optcfg['subnet']);
 				$rules .= pf_nat_rule_generate_if($wanif,
@@ -748,8 +752,8 @@ function pf_build_context($ipv6 = false) {
 	                         : gen_subnet($ctx['lanip'], $ctx['lansn']);
 
 	$ctx['optcfg'] = array();
-	for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-		$oc = $config['interfaces']['opt' . $i];
+	foreach (opt_interfaces() as $optif) {
+		$oc = $config['interfaces'][$optif];
 		if (!isset($oc['enable']) || empty($oc['if']))
 			continue;
 		/* Every key the consumers read is initialised, so a plain
@@ -771,7 +775,7 @@ function pf_build_context($ipv6 = false) {
 			$oic['sa'] = $ipv6 ? gen_subnet6($oic['ip'], $oic['sn'])
 			                   : gen_subnet($oic['ip'], $oic['sn']);
 		}
-		$ctx['optcfg']['opt' . $i] = $oic;
+		$ctx['optcfg'][$optif] = $oic;
 	}
 
 	/* No pptpsa/pptpsn: PPTP is removed, and pf_resolve_network() answers null
@@ -1311,8 +1315,8 @@ function pf_log_interface_map() {
 	$wanif = function_exists('get_real_wan_interface') ? get_real_wan_interface() : '';
 	if (!empty($wanif))
 		$map[$wanif] = "WAN";
-	for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++) {
-		$oc = $config['interfaces']['opt' . $i];
+	foreach (opt_interfaces() as $i => $optif) {
+		$oc = $config['interfaces'][$optif];
 		if (!empty($oc['if']))
 			$map[$oc['if']] = !empty($oc['descr']) ? $oc['descr'] : ('OPT' . $i);
 	}
