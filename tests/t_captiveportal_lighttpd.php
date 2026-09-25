@@ -9,6 +9,7 @@
  * with no images or stylesheet and looks merely ugly rather than broken.
  */
 require __DIR__ . '/bootstrap.php';
+require __DIR__ . '/lighttpd_directives.inc';
 require MW_ROOT . '/phpconf/inc/xmlparse.inc';
 require MW_ROOT . '/phpconf/inc/util.inc';
 require MW_ROOT . '/phpconf/inc/webgui_lighttpd.inc';   /* LIGHTTPD_BIN */
@@ -145,5 +146,15 @@ $sock = strpos($s2, '$SERVER["socket"] == "10.9.9.1:8001"');
 is_true('the HTTPS redirect target is listened on', $sock !== false);
 is_true('TLS is enabled on that socket too',
         strpos($s2, 'ssl.engine', $sock) !== false);
+
+/* --- REGRESSION: a misspelled directive is silently ignored ---------------
+ *
+ * lighttpd does not reject an unknown configuration key and `lighttpd -t` calls
+ * it "Syntax OK", so a typo costs the feature in silence. See
+ * lighttpd_directives.inc for the verified list. */
+mw_check_lighttpd_directives('portal HTTP',  captiveportal_lighttpd_config_generate(false));
+$config['captiveportal']['httpslogin'] = true;
+$config['captiveportal']['httpsname']  = 'portal.example.com';
+mw_check_lighttpd_directives('portal HTTPS', captiveportal_lighttpd_config_generate(true));
 
 exit(mw_report('captive portal'));

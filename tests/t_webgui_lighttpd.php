@@ -9,6 +9,7 @@
  * would not be obvious which.
  */
 require __DIR__ . '/bootstrap.php';
+require __DIR__ . '/lighttpd_directives.inc';
 require MW_ROOT . '/phpconf/inc/xmlparse.inc';
 require MW_ROOT . '/phpconf/inc/webgui_lighttpd.inc';
 
@@ -63,5 +64,15 @@ is_true('TLS 1.2 minimum',          strpos($s, '"MinProtocol" => "TLSv1.2"') !==
 $config['system']['webgui'] = array('protocol' => 'http', 'port' => '8080');
 $p = webgui_lighttpd_config_generate();
 is_true('custom port honoured',     strpos($p, 'server.port          = 8080') !== false);
+
+/* --- REGRESSION: a misspelled directive is silently ignored ---------------
+ *
+ * lighttpd does not reject an unknown configuration key and `lighttpd -t` calls
+ * it "Syntax OK", so a typo costs the feature in silence. Checked for every
+ * variant this file builds, since they take different branches. */
+mw_check_lighttpd_directives('webGUI current', webgui_lighttpd_config_generate());
+mw_check_lighttpd_directives('webGUI no-auth', $noauth);
+mw_check_lighttpd_directives('webGUI https',   $s);
+mw_check_lighttpd_directives('webGUI port',    $p);
 
 exit(mw_report('webgui (lighttpd)'));
