@@ -768,6 +768,34 @@ $rs2 = mw_drive('interfaces_assign.php', assign_post(array('del' => 'opt2')), $c
 is_false('secondaries: the last one leaves no empty list behind',
          isset($rs2['config']['secondaries']['secondary']));
 
+/* --- a stale ASSIGNMENT form cannot resurrect one either ----------------
+ *
+ * The companion to the ?index= case below. The assignment branch used to write
+ * straight into $config['interfaces'][$ifname], creating whatever name it was
+ * posted -- so a form left open in another tab across a delete, or a
+ * back-button save, brought the deleted interface back with its old port.
+ * Creating one is the add branch's job. */
+$c = optcfg();
+unset($c['interfaces']['opt2'], $c['dhcpd']['opt2'], $c['dhcrelay']['opt2']);
+
+/* exactly what the stale tab still has in its form */
+$rq = mw_drive('interfaces_assign.php',
+	array('lan' => 'em1', 'wan' => 'em0', 'opt1' => 'em2', 'opt2' => 'em3',
+	      'opt3' => 'em4', 'Submit' => 'Save'), $c);
+is_false('stale form: the deleted interface is NOT recreated',
+         array_key_exists('opt2', $rq['config']['interfaces']));
+is_same('stale form: and the interfaces that do exist are still assigned',
+        array($rq['config']['interfaces']['opt1']['if'],
+              $rq['config']['interfaces']['opt3']['if']), array('em2', 'em4'));
+
+/* The control: a re-plug of an interface that EXISTS is still applied, or the
+   guard could be rejecting every assignment. */
+$rq2 = mw_drive('interfaces_assign.php',
+	array('lan' => 'em1', 'wan' => 'em0', 'opt1' => 'em5', 'opt3' => 'em4',
+	      'Submit' => 'Save'), $c);
+is_same('stale form control: a real interface is still re-pluggable',
+        $rq2['config']['interfaces']['opt1']['if'], 'em5');
+
 /* --- a stale ?index= cannot resurrect a deleted interface ---------------
  *
  * interfaces_opt.php is addressed by number, and a number is a stable

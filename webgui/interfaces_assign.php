@@ -186,6 +186,23 @@ if ($_POST) {
 				(substr($ifname, 0, 3) == 'opt')) {
 				
 				if (!is_array($ifport)) {
+					/* UPDATE only, never create. This branch used to assign
+					   straight into $config['interfaces'][$ifname], which
+					   created whatever name it was posted -- so a form left
+					   open in another tab across a delete, or a back-button
+					   save, resurrected the deleted interface with its old
+					   port. Now that a number is a stable identifier and the
+					   numbering has permanent holes, a stale form names a hole
+					   rather than a live interface, and a ghost holds the freed
+					   number out of the pool opt_next_free() reuses. Creating
+					   an optional interface is the add branch's job, below.
+					   
+					   lan and wan always exist, so this only ever rejects an
+					   OPT. array_key_exists(), not is_array(), so a hand-edited
+					   empty <opt2/> can still be given a port. */
+					if (!array_key_exists($ifname, $config['interfaces'] ?? array()))
+						continue;
+					
 					/* Compare BEFORE overwriting: an unchanged <select> is
 					   posted on every save, so without this every save looks
 					   like a re-plug. */
