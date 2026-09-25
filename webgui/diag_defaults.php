@@ -45,7 +45,7 @@ if ($_POST) {
 }
 ?>
 <?php include("fbegin.inc"); ?>
-<?php if ($rebootmsg): echo print_info_box($rebootmsg); else: ?>
+<?php if (!empty($rebootmsg)): echo print_info_box($rebootmsg); else: ?>
 <form action="diag_defaults.php" method="post">
               <p><strong>If you click &quot;Yes&quot;, the firewall will be reset 
                 to factory defaults and will reboot immediately. The entire system 

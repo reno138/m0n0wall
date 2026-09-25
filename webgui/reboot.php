@@ -43,7 +43,7 @@ if ($_POST) {
 }
 ?>
 <?php include("fbegin.inc"); ?>
-<?php if ($rebootmsg): echo print_info_box($rebootmsg); else: ?>
+<?php if (!empty($rebootmsg)): echo print_info_box($rebootmsg); else: ?>
       <form action="reboot.php" method="post">
         <p><strong>Are you sure you want to reboot the system?</strong></p>
         <p> 
