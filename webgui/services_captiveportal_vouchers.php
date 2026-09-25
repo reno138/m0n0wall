@@ -94,6 +94,12 @@ if (!isset($config['voucher']['msgexpired'])) {
     $config['voucher']['msgexpired'] = "Voucher expired";
 }
 
+/* Guaranteed to be an array before the reference is taken. A firewall with no
+   voucher rolls yet -- which is every firewall until the admin adds one -- has no
+   'roll' section at all, so the foreach that renders the table below was handed
+   null and warned on every view of the page. */
+if (!isset($config['voucher']['roll']) || !is_array($config['voucher']['roll']))
+    $config['voucher']['roll'] = array();
 $a_roll = &$config['voucher']['roll'];
 
 if ($_POST) {
