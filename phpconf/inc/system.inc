@@ -271,9 +271,23 @@ function system_routing_configure() {
 			}
 		
 			foreach ($routes as $rtent) {
-				mwexec("/sbin/route add $inet " . escapeshellarg($rtent['network']) . 
-					' ' . escapeshellarg($rtent['gateway']) .
-					' ' . escapeshellarg($rtent['opts']));
+				/* 'opts' is appended only when there IS one.
+				
+				   It is set on the hardcoded IPv6 reject routes above and on
+				   nothing else -- system_routes_edit.php writes interface,
+				   network, gateway and descr, and no user route has ever had an
+				   'opts'. So for every route an admin actually adds, this passed
+				   an empty third argument, and route(8) answers
+				
+				       route: bad address:
+				
+				   and exits 0. mwexec() therefore reported success while NOT ONE
+				   IPv4 static route was ever installed. */
+				$cmd = "/sbin/route add $inet " . escapeshellarg($rtent['network']) .
+					' ' . escapeshellarg($rtent['gateway']);
+				if (!empty($rtent['opts']))
+					$cmd .= ' ' . escapeshellarg($rtent['opts']);
+				mwexec($cmd);
 			
 				/* record route so it can be easily removed later (if necessary) */
 				fwrite($fd, $rtent['network'] . "\n");
@@ -389,11 +403,42 @@ EOD;
 	} else {
 		$retval = mwexec("/usr/sbin/syslogd -ss");
 	}
-	
+
+	system_log_rotation_start();
+
 	if ($g['booting'])
 		echo "done\n";
 		
 	return $retval;
+}
+
+/* Bound the log files.
+ *
+ * The port replaced the old patched syslogd plus clog(8) ring buffers with
+ * ordinary files "bounded by newsyslog(8)" -- etc/rc, build/files/newsyslog.conf
+ * and 3patchtools.sh all state that as the design. But newsyslog was never added
+ * to the image manifest and nothing ever invoked it, so /var/log grew without
+ * any limit at all. On a firewall whose entire root is a RAMDISK that means a
+ * busy filter log eventually consumes the memory the system is running in.
+ *
+ * FreeBSD normally drives newsyslog from /etc/crontab. There is no cron here, so
+ * minicron -- already in the image for the captive portal pruner and the GeOIP
+ * refresh -- runs it instead. Hourly: newsyslog itself decides whether anything
+ * has reached its size limit, so the interval only sets how promptly that is
+ * noticed, and the check costs nothing.
+ */
+function system_log_rotation_start() {
+	global $g;
+
+	killbypid("{$g['varrun_path']}/newsyslogcron.pid");
+
+	/* -C creates any log listed in newsyslog.conf that does not exist yet, which
+	   also gives them the 600 mode the file specifies rather than whatever
+	   etc/rc's touch left behind. */
+	mwexec("/usr/sbin/newsyslog -C");
+
+	mwexec("/usr/local/bin/minicron 3600 {$g['varrun_path']}/newsyslogcron.pid " .
+	       "/usr/sbin/newsyslog");
 }
 
 function system_webgui_start() {
@@ -566,7 +611,9 @@ function system_ntp_configure() {
 		echo "Starting NTP client... ";
 	else {
 		killbypid("{$g['varrun_path']}/runsntp.pid");
-		killbypid("{$g['varrun_path']}/sntp.pid");
+		/* No sntp.pid: sntp is a one-shot invoked by runsntp.sh and writes no
+		   pidfile. The old msntp was a long-running daemon with a -l lock file,
+		   which is where this came from. */
 	}
 
 	/* start ntp client if needed - needs to be forced into background */

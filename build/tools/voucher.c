@@ -647,7 +647,6 @@ int main(int argc, char *argv[]) {
     int         roll_bits, ticket_bits, checksum_bits, magic_bits;
 
     char        charset[MAX_CHARSET_LEN+1];
-    int         base;
     int         ch;
     int         failed = 0;
 
@@ -799,16 +798,14 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    // base is used to compute the conversion from the encrypted
-    // number to a string consisting only of characters found in
-    // charset. Think dec/hex/oct ... and you'll get it.
-
-    base = strlen(charset);
+    // The conversion base -- the number of characters the printed code may be
+    // built from -- is strlen(charset). Think dec/hex/oct and you'll get it.
+    // code_render()/code_parse() take it from the charset directly.
 
 #ifdef DEBUG
     if (debug)
         fprintf(stderr, "roll_bits=%d ticket_bits=%d checksum_bits=%d base=%d charset=%s\n",
-                roll_bits, ticket_bits, checksum_bits, base, charset);
+                roll_bits, ticket_bits, checksum_bits, (int)strlen(charset), charset);
 #endif
 
     /* Whatever roll, ticket and checksum leave of the 64 bits holds the magic.

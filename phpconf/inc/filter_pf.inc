@@ -214,9 +214,28 @@ function pf_nat_rules_generate() {
 			if (!$target)
 				continue;                   /* unresolvable alias */
 
+			/* The external address, with the dynamic-WAN case handled.
+			
+			   'wan' means "whatever address the WAN currently has", and
+			   get_current_wan_address() returns NULL on a DHCP, PPPoE, PPTP or
+			   modem WAN that has no address yet -- at boot, before the lease, or
+			   whenever the link is down. That null used to be interpolated
+			   straight into the rdr line below, producing
+			
+			       rdr on em0 proto tcp from any to port 8080 -> 10.0.0.5 port 80
+			
+			   which pfctl rejects. pfctl rejects the FILE, not the line, so a
+			   single port forward on a dynamic WAN meant the firewall booted with
+			   NO RULESET AT ALL. Using the interface name instead is both correct
+			   and better than the original: pf resolves '(em0)' at match time, so
+			   the rule keeps working across a lease change without a reload.
+			
+			   pf needs the parentheses for that -- a bare interface name is
+			   expanded once when the ruleset loads. */
 			if (!empty($rule['external-address'])) {
 				$extaddr = ($rule['external-address'] == 'wan')
-					? get_current_wan_address(false) : $rule['external-address'];
+					? "(" . get_real_wan_interface(false) . ":0)"
+					: $rule['external-address'];
 			} else {
 				$extaddr = "any";
 			}

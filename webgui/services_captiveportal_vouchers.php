@@ -52,21 +52,40 @@ if (!isset($config['voucher']['checksumbits'])) {
     $config['voucher']['checksumbits'] = 5;
 }
 if (!isset($config['voucher']['magic'])) {
-    $config['voucher']['magic'] = rand();   // anything slightly random will do
+    /* random_int(), not rand(): rand() is a Mersenne Twister capped at 2^31-1,
+       so two of the magic field's 33 bits would always be zero and the value
+       would be predictable from any other rand() output in the same request.
+       Kept as a decimal STRING because voucher.cfg parses it with %llu. */
+    $config['voucher']['magic'] = (string) random_int(0, PHP_INT_MAX);
 }
-if (!isset($config['voucher']['publickey'])) {
-	
-	/* generate a random 64 bit RSA key pair using the voucher binary */
-	$fd = popen("/usr/local/bin/voucher -g 64", "r");
-	if ($fd !== false) {
-		$output = fread($fd, 16384);
-	    pclose($fd);
-		
-		list($privkey, $pubkey) = array_pad(explode("\0", $output), 2, null);
-		
-	    $config['voucher']['publickey'] = base64_encode($pubkey);
-	    $config['voucher']['privatekey'] = base64_encode($privkey);
-	}
+
+/* The voucher secret: one 256-bit key that both prints and validates vouchers.
+   It replaces $config['voucher']['publickey'] / ['privatekey'] outright.
+   The RSA pair could not even be generated under OpenSSL 3 -- "voucher -g 64"
+   failed with "key size too small" -- so the feature has never worked on this
+   platform and there is nothing in the field to preserve. See
+   build/tools/voucher.c for the full reasoning.
+
+   Persisted IMMEDIATELY with write_config(). The CSV link in the roll list
+   below is a GET that prints a roll, so an admin who clicks it before pressing
+   Save would otherwise get vouchers printed under a secret that the next page
+   load regenerates -- silently orphaning every voucher just printed. */
+$keygen_error = "";
+if (empty($config['voucher']['fpekey'])) {
+    if (voucher_new_key()) {
+        $had_rsa = isset($config['voucher']['publickey']) ||
+                   isset($config['voucher']['privatekey']);
+        unset($config['voucher']['publickey']);
+        unset($config['voucher']['privatekey']);
+        write_config();
+        voucher_log(LOG_NOTICE, $had_rsa
+            ? "generated a new voucher secret and discarded the unusable RSA " .
+              "voucher key pair from the configuration"
+            : "generated a new voucher secret");
+    } else {
+        $keygen_error = "Could not generate a voucher secret. " .
+            "Is /usr/local/bin/voucher installed and working?";
+    }
 }
 if (!isset($config['voucher']['msgnoaccess'])) {
     $config['voucher']['msgnoaccess'] = "Voucher invalid";
@@ -97,31 +116,33 @@ if ($_POST) {
 
 /* print all vouchers of the selected roll */
 if (($_GET['act'] ?? null) == "csv") {
-    $privkey = base64_decode($config['voucher']['privatekey'] ?? '');
-    if (strstr($privkey,"BEGIN RSA PRIVATE KEY")) {
-        $fd = fopen("{$g['varetc_path']}/voucher.private","w");
-        if (!$fd) {
-            $input_errors[] = "Cannot write private key file.\n";
-        } else {
-            chmod("{$g['varetc_path']}/voucher.private", 0600);
-            fwrite($fd, $privkey);
-            fclose($fd);
-
-            $a_voucher = &$config['voucher']['roll'];
-            $id = $_GET['id'] ?? null;
-            if (isset($id) && !empty($a_voucher[$id])) {
-                $number = $a_voucher[$id]['number'] ?? null;
-                $count = $a_voucher[$id]['count'] ?? null;
-
-                header("Content-Type: application/octet-stream");
-                header("Content-Disposition: attachment; filename=vouchers_roll$number.csv");
-                system("/usr/local/bin/voucher -c {$g['varetc_path']}/voucher.cfg -p {$g['varetc_path']}/voucher.private $number $count");
-                unlink("{$g['varetc_path']}/voucher.private");
-                exit;
-            }
-        }
+    if (empty($config['voucher']['fpekey'])) {
+        $input_errors[] = "No voucher secret configured yet. Save this page first.\n";
+    } else if (voucher_write_keyfile() != 0) {
+        $input_errors[] = "Cannot write the voucher key file.\n";
+    } else if (voucher_write_cfgfile() != 0) {
+        $input_errors[] = "Cannot write the voucher config file.\n";
     } else {
-        $input_errors[] = "Need private RSA key to print vouchers\n";
+        $a_voucher = &$config['voucher']['roll'];
+        $id = $_GET['id'] ?? null;
+        if (isset($id) && !empty($a_voucher[$id])) {
+            /* (int): these are numeric by definition and they reach a shell */
+            $number = (int)($a_voucher[$id]['number'] ?? 0);
+            $count = (int)($a_voucher[$id]['count'] ?? 0);
+
+            header("Content-Type: application/octet-stream");
+            header("Content-Disposition: attachment; filename=vouchers_roll$number.csv");
+            system("/usr/local/bin/voucher -c {$g['varetc_path']}/voucher.cfg -K {$g['varetc_path']}/voucher.key -p $number $count");
+            /* DO NOT unlink the key here.
+               The RSA version wrote voucher.private, printed, then unlinked it,
+               because a gateway that only validates needed nothing but the
+               public key. One secret now does both jobs, so deleting the file
+               after a print destroys the key the captive portal needs to
+               validate -- logins would then fail for every guest, and only
+               after an admin printed a roll. tests/t_voucher.php validates a
+               voucher AFTER a print so this cannot be "tidied" back in. */
+            exit;
+        }
     }
 }
 
@@ -132,8 +153,12 @@ $pconfig['ticketbits'] = $config['voucher']['ticketbits'] ?? null;
 $pconfig['saveinterval'] = $config['voucher']['saveinterval'] ?? null;
 $pconfig['checksumbits'] = $config['voucher']['checksumbits'] ?? null;
 $pconfig['magic'] = $config['voucher']['magic'] ?? null;
-$pconfig['publickey'] = base64_decode($config['voucher']['publickey'] ?? '');
-$pconfig['privatekey'] = base64_decode($config['voucher']['privatekey'] ?? '');
+/* The secret itself is never shown or accepted through the form: both printing
+   and validating are local, so there is nothing to paste in and nothing to
+   copy out. A fingerprint is enough for an admin to see whether it changed. */
+$pconfig['keyfp'] = !empty($config['voucher']['fpekey'])
+    ? substr(hash('sha256', base64_decode($config['voucher']['fpekey'], true) ?: ''), 0, 16)
+    : '';
 $pconfig['msgnoaccess'] = $config['voucher']['msgnoaccess'] ?? null;
 $pconfig['msgexpired'] = $config['voucher']['msgexpired'] ?? null;
 
@@ -144,8 +169,8 @@ if ($_POST) {
 
 	/* input validation */
 	if (!empty($_POST['enable'])) {
-		$reqdfields = explode(" ", "charset rollbits ticketbits checksumbits publickey magic saveinterval");
-		$reqdfieldsn = explode(",", "charset,rollbits,ticketbits,checksumbits,publickey,magic,saveinterval");
+		$reqdfields = explode(" ", "charset rollbits ticketbits checksumbits magic saveinterval");
+		$reqdfieldsn = explode(",", "charset,rollbits,ticketbits,checksumbits,magic,saveinterval");
 		
 		do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	}
@@ -153,11 +178,18 @@ if ($_POST) {
 	if (!empty($_POST['charset']) && (strlen($_POST['charset']) < 2)) {	/* the ) was inside strlen() */
 		$input_errors[] = "Need at least 2 characters to create vouchers.";
 	}
-	if (!empty($_POST['charset']) && (strpos($_POST['charset'],"\"")>0)) {
-		$input_errors[] = "Double quotes aren't allowed.";
-	}
-	if (!empty($_POST['charset']) && (strpos($_POST['charset'],",")>0)) {
-		$input_errors[] = "',' aren't allowed.";
+	/* strpos() !== false, not > 0: a charset that STARTS with the forbidden
+	   character gave offset 0, which "> 0" accepts. A leading comma puts a
+	   sixth field in voucher.cfg and the tool's five-field fscanf then
+	   mis-parses the line. A space is newly rejected as well: the tool's
+	   code_parse() treats a space as the end of the code (the CSV prints each
+	   code as " %s"), so a space in the charset would silently truncate every
+	   voucher at that character. */
+	$badchars = array('"' => "Double quotes", ',' => "Commas", ' ' => "Spaces");
+	foreach ($badchars as $bc => $bcname) {
+		if (!empty($_POST['charset']) && (strpos($_POST['charset'], $bc) !== false)) {
+			$input_errors[] = "$bcname aren't allowed in the character set.";
+		}
 	}
 	if (!empty($_POST['rollbits']) && (!is_numeric($_POST['rollbits']) || ($_POST['rollbits'] < 1) || ($_POST['rollbits'] > 31))) {
 		$input_errors[] = "# of Bits to store Roll Id needs to be between 1..31.";
@@ -165,17 +197,36 @@ if ($_POST) {
 	if (!empty($_POST['ticketbits']) && (!is_numeric($_POST['ticketbits']) || ($_POST['ticketbits'] < 1) || ($_POST['ticketbits'] > 16))) {
 		$input_errors[] = "# of Bits to store Ticket Id needs to be between 1..16.";
 	}
-	if (!empty($_POST['checksumbits']) && (!is_numeric($_POST['checksumbits']) || ($_POST['checksumbits'] < 1) || ($_POST['checksumbits'] > 31))) {
-		$input_errors[] = "# of Bits to store checksum needs to be between 1..31.";
+	/* is_numeric(), not !empty(): the help text and the tool both allow 0, but
+	   !empty("0") is false so 0 skipped validation entirely. */
+	if (isset($_POST['checksumbits']) && $_POST['checksumbits'] !== "" &&
+	    (!is_numeric($_POST['checksumbits']) || ($_POST['checksumbits'] < 0) || ($_POST['checksumbits'] > 31))) {
+		$input_errors[] = "# of Bits to store checksum needs to be between 0..31.";
+	}
+	/* The anti-forgery floor. Whatever Roll, Ticket and Checksum bits leave of
+	   the 64 holds the magic number, and magic + checksum together are the only
+	   thing that makes a made-up code fail -- so the redundancy is exactly
+	   64 - Roll - Ticket, however the remainder is split. Capping Roll + Ticket
+	   at 32 therefore keeps at least 32 bits of it at every legal setting.
+	   The old page permitted 31 + 16 + 16, which leaves 1 magic bit and 17 bits
+	   of redundancy in total: about 131000 guesses, a weekend at 10 tries a
+	   second. The voucher binary refuses the same combination, because
+	   voucher.cfg is hand-editable and is also rewritten from a restored
+	   config.xml that never passed through this page. */
+	if (is_numeric($_POST['rollbits'] ?? null) && is_numeric($_POST['ticketbits'] ?? null) &&
+	    (($_POST['rollbits'] + $_POST['ticketbits']) > 32)) {
+		$input_errors[] = "# of Roll Bits plus # of Ticket Bits must not exceed 32, so that " .
+			"at least 32 of each voucher's 64 bits are left as verifiable magic number and " .
+			"checksum. The defaults are 16 and 10.";
+	}
+	/* 'magic' is free text and is interpolated straight into voucher.cfg. If it
+	   is blanked or non-numeric the %llu in the tool's five-field fscanf eats
+	   the charset instead and the config line silently mis-parses. */
+	if (!is_numeric($_POST['magic'] ?? null) || ($_POST['magic'] < 0)) {
+		$input_errors[] = "The magic number must be a positive integer.";
 	}
 	if (!empty($_POST['saveinterval']) && (!is_numeric($_POST['saveinterval']) || ($_POST['saveinterval'] < 1))) {
 		$input_errors[] = "Save interval in minutes cant be negative.";
-	}
-	if (!empty($_POST['publickey']) && (!strstr($_POST['publickey'],"BEGIN PUBLIC KEY"))) {
-		$input_errors[] = "This doesn't look like an RSA Public key.";
-	}
-	if (!empty($_POST['privatekey']) && (!strstr($_POST['privatekey'],"BEGIN RSA PRIVATE KEY"))) {
-		$input_errors[] = "This doesn't look like an RSA Private key.";
 	}
 
 	if (empty($input_errors)) {

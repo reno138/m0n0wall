@@ -89,6 +89,12 @@ usr/sbin/arp
 usr/sbin/efibootmgr
 usr/sbin/efivar
 usr/sbin/syslogd
+# newsyslog bounds the log files. The port dropped the patched syslogd + clog
+# ring buffers in favour of plain files "bounded by newsyslog(8)" (see
+# build/files/newsyslog.conf and etc/rc), but the binary was never added to this
+# manifest and nothing invoked it -- so /var/log grew without limit on a RAMDISK
+# root until it filled memory.
+usr/sbin/newsyslog
 usr/sbin/rtadvd
 usr/sbin/tcpdump
 usr/sbin/chown

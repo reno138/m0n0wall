@@ -70,8 +70,34 @@ if ($_POST) {
 	
 	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
 	
-	if (!empty($_POST['prefix']) && (!is_numericint($_POST['prefix']) || ($_POST['prefix'] < '1') || ($_POST['prefix'] > '128'))) {
-		$input_errors[] = "The subnet/prefix must be an integer between 1 and 128.";
+	/* Validate the address.
+	
+	   There was no check at all here -- do_input_validation() only rejects
+	   control characters and empty required fields -- so any string went
+	   straight into the config and from there into
+	
+	       ifconfig <if> inet <whatever-was-typed>/<prefix> alias
+	
+	   in interfaces_secondaries_configure(). A typo produced a malformed
+	   ifconfig command that failed silently, leaving the alias missing with
+	   nothing to say why. Every sibling page (services_dhcp_edit.php,
+	   system.php, vpn_ipsec_edit.php) validates its address fields; this one
+	   was the omission. */
+	$secip = $_POST['ipaddr'] ?? '';
+	$is4 = is_ipaddr($secip);
+	$is6 = is_ipaddr6($secip);
+	if (!empty($secip) && !$is4 && !$is6)
+		$input_errors[] = "A valid IP address must be specified.";
+	if ($is6 && !ipv6enabled())
+		$input_errors[] = "An IPv6 address cannot be added while IPv6 is disabled " .
+		    "on the System: Advanced page -- it would be saved and then ignored.";
+
+	/* The prefix range depends on the family: 1..32 for IPv4. Accepting up to
+	   128 for an IPv4 address let /64 be saved, and ifconfig then rejects it. */
+	$maxprefix = $is4 ? 32 : 128;
+	if (!empty($_POST['prefix']) && (!is_numericint($_POST['prefix'])
+	    || ($_POST['prefix'] < 1) || ($_POST['prefix'] > $maxprefix))) {
+		$input_errors[] = "The subnet/prefix must be an integer between 1 and {$maxprefix}.";
 	}
 
 	foreach ($a_secondaries as $secondary) {

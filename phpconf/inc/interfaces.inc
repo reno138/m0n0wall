@@ -39,16 +39,38 @@ function interfaces_secondaries_configure($if) {
 		$a_secondaries = &$config['secondaries']['secondary'];
 		foreach ($a_secondaries as $secondary) {
 			if ($if == ($secondary['if'] ?? null)) {
-				if (!ipv6enabled() && is_ipaddr6($secondary['ipaddr'] ?? '')){
+				$secip  = $secondary['ipaddr'] ?? '';
+				$secpfx = $secondary['prefix'] ?? '';
+				$is6 = is_ipaddr6($secip);
+				$is4 = is_ipaddr($secip);
+
+				if ($is6 && !ipv6enabled())
+					continue;
+
+				/* Refuse to build a command out of a value that is not an
+				   address.
+				
+				   The address used to be interpolated whatever it was, because
+				   $ifconfig kept the value from the PREVIOUS loop iteration when
+				   neither is_ipaddr test matched -- so a bad entry either
+				   produced a malformed ifconfig that failed silently, or, worse,
+				   inherited the previous entry's interface and family and
+				   aliased the wrong thing. The GUI validates this now too; this
+				   is the backstop for a restored config. */
+				if (!$is4 && !$is6) {
+					log_error("Skipping secondary address '" . $secip . "' on $if: " .
+					          "not a valid IP address.");
 					continue;
 				}
-				if (ipv6enabled() && is_ipaddr6($secondary['ipaddr'] ?? '')){
-					$ifconfig = $config['interfaces'][$if]['if'] . " inet6 ";
+				if (!is_numericint($secpfx) || $secpfx < 1
+				    || $secpfx > ($is4 ? 32 : 128)) {
+					log_error("Skipping secondary address " . $secip . " on $if: " .
+					          "prefix '" . $secpfx . "' is out of range.");
+					continue;
 				}
-				if (is_ipaddr($secondary['ipaddr'] ?? '')){
-					$ifconfig = $config['interfaces'][$if]['if'] . " inet ";
-				}
-				$ifconfig .=  ($secondary['ipaddr'] ?? '') . "/" . ($secondary['prefix'] ?? '')  . " alias";
+
+				$ifconfig = $config['interfaces'][$if]['if'] . ($is6 ? " inet6 " : " inet ");
+				$ifconfig .= $secip . "/" . $secpfx . " alias";
 				mwexec("/sbin/ifconfig " . $ifconfig);
 			}
 		}
