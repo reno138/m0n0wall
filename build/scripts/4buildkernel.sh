@@ -64,7 +64,23 @@ gzip -9f "$MW_BUILDPATH/tmp/kernel"
 echo "Installing modules into the image..."
 mkdir -p "$FS/boot/kernel"
 MODDIR="$MW_SRC/sys/$MW_ARCH/compile/$KERNCONF/modules$MW_SRC/sys/modules"
-for m in dummynet ipfw if_vlan aesni padlock glxsb; do
+
+# The list comes from MODULES_OVERRIDE in the kernel config, not from a second
+# copy of it here.
+#
+# There used to be a hardcoded "for m in dummynet ipfw if_vlan aesni padlock
+# glxsb", and it silently disagreed with the config the moment anything was
+# added: coretemp and amdtemp were added to MODULES_OVERRIDE for the System
+# status page's temperature readings, built correctly, and were then simply not
+# installed -- so the sensors feature could not work and the build said nothing.
+# Two lists that must agree is one list too many.
+MODULES=$(sed -n 's/^makeoptions[[:space:]]*MODULES_OVERRIDE="\([^"]*\)".*/\1/p' \
+          "$SRC/build/kernelconfigs/${KERNCONF}.${MW_ARCH}")
+[ -n "$MODULES" ] || { echo "ERROR: no MODULES_OVERRIDE in the kernel config -- refusing to guess"; exit 1; }
+echo "  from MODULES_OVERRIDE: $MODULES"
+
+for m in $MODULES; do
+	[ -d "$MODDIR/$m" ] || { echo "ERROR: module '$m' is in MODULES_OVERRIDE but was not built"; exit 1; }
 	find "$MODDIR/$m" -name '*.ko' 2>/dev/null | while read -r ko; do
 		strip "$ko" 2>/dev/null || true
 		cp "$ko" "$FS/boot/kernel/"
