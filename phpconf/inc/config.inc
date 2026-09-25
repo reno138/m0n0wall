@@ -639,22 +639,24 @@ function convert_config() {
 		foreach (opt_interfaces() as $i => $optif) {
 			if (isset($config['interfaces'][$optif]['ovpn'])) {
 			
-				unset($config['interfaces'][$optif]);
-
-				/* shift down other OPTn interfaces to get rid of holes */
-				$j = $i + 1;
-				
-				/* look at the following OPTn ports */
-				while (is_array($config['interfaces']['opt' . $j])) {
-					$config['interfaces']['opt' . ($j - 1)] =
-						$config['interfaces']['opt' . $j];
-					
-					if ($config['interfaces']['opt' . ($j - 1)]['descr'] == "OPT" . $j)
-						$config['interfaces']['opt' . ($j - 1)]['descr'] = "OPT" . ($j - 1);
-					
-					unset($config['interfaces']['opt' . $j]);
-					$j++;
-				}
+				/* NO shift-down. The loop that used to sit here moved opt(n+1)
+				   into opt(n) to close the hole, and shifted
+				   $config['interfaces'] alone -- so a 1.5 config with a DHCP
+				   server or a filter rule on a higher OPT came out of the
+				   migration mis-wired in exactly the way a delete used to
+				   mis-wire a live config: opt1 became the DMZ while
+				   $config['dhcpd']['opt1'] still held the range of the
+				   OpenVPN interface that had just been removed.
+				   
+				   It also had a bug of its own. It shifted into a slot this
+				   foreach had already passed, so of two ADJACENT OpenVPN OPTs
+				   the second was skipped and survived the sweep. Not shifting
+				   fixes that for free.
+				   
+				   The gap is left deliberately, as everywhere else now: optN
+				   belongs to its interface, and a hole in the numbering is not
+				   a problem to be tidied away. */
+				opt_iface_delete($optif);
 			}
 		}
 

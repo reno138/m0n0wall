@@ -61,165 +61,10 @@ if (is_array($config['wlans']['wlan'] ?? null) && count($config['wlans']['wlan']
 	}
 }
 
-/* ---------------------------------------------------------------------------
- * OPTn is a stable identifier.
- *
- * Deleting an optional interface used to CLOSE THE HOLE: opt3 was shifted down
- * into opt2, opt4 into opt3, and so on. Only $config['interfaces'] was shifted,
- * so every other reference to the name stayed where it was and quietly changed
- * meaning. $config['dhcpd']['opt1'] went on handing out the range configured
- * for the interface that had just been deleted -- now on whichever interface
- * moved into its place -- while $config['dhcpd']['opt2'] was orphaned; and a
- * filter rule naming opt2 stopped matching anything at all, because
- * pf_rule_interface() found no such interface and the rule was dropped from the
- * ruleset without a word.
- *
- * Nothing shifts now. optN belongs to its interface for as long as that
- * interface exists, which is what makes every reference to optN -- from any
- * section, written by any page -- still correct afterwards. It is also what
- * makes opt_iface_references() below answerable at all: under the shift-down,
- * every name above the one being deleted was about to mean a different
- * interface, so there was no honest answer to "what still refers to this?".
- *
- * The numbering simply acquires gaps (OPT1, OPT3). Nothing in the tree requires
- * it to be contiguous -- every enumeration goes through opt_interfaces(), which
- * preserves gaps -- and an add takes the LOWEST free number, so a freed slot
- * comes back rather than the numbering climbing for ever.
- * ------------------------------------------------------------------------ */
-
-/* Does $val name $optif?
- *
- * Guarded rather than compared directly: these values come out of config.xml,
- * where a hand-edited or half-written entry can be an array, an integer or
- * absent, and only a string can be an interface name. */
-function opt_iface_isref($val, $optif) {
-	return is_string($val) && $val === $optif;
-}
-
-/* Everything OUTSIDE $config['interfaces'] that still names $optif, as a list
- * of places an admin can go and fix, so that a refusal can say where.
- *
- * There are two kinds of reference to an interface name, and they need opposite
- * treatment:
- *
- *   - a config section KEYED BY the name -- $config['dhcpd']['opt3'],
- *     $config['dhcrelay']['opt3'] -- describes that one interface and means
- *     nothing without it, so a delete takes it along. Those are NOT listed
- *     here; see opt_iface_delete().
- *
- *   - a name stored as a rule VALUE -- a filter rule's ['interface'], a shaper
- *     rule's source ['network'], a bridge -- is the admin's intent, and there
- *     is no way to guess what they would want instead. Those are what this
- *     function finds, so the delete can refuse.
- */
-function opt_iface_references($optif) {
-	global $config;
-
-	$refs = array();
-
-	/* Rule lists whose entries name an interface: ['interface'] in all of them,
-	   and filter, shaper and advanced outbound NAT additionally accept an
-	   interface name as a source or destination ['network'] (the $specialnets
-	   entries built in guiconfig.inc). A path a given config does not have is
-	   skipped, so this is safe on a minimal or a partially restored config. */
-	$lists = array(
-		array(array('filter', 'rule'),                  "Firewall: Rules"),
-		array(array('filter', 'rule6'),                 "Firewall: Rules, IPv6"),
-		array(array('shaper', 'rule'),                  "Firewall: Traffic shaper"),
-		array(array('nat', 'rule'),                     "Firewall: NAT, inbound"),
-		array(array('nat', 'onetoone'),                 "Firewall: NAT, 1:1"),
-		array(array('nat', 'advancedoutbound', 'rule'), "Firewall: NAT, outbound"),
-		array(array('staticroutes', 'route'),           "System: Static routes"),
-		array(array('staticroutes', 'route6'),          "System: Static routes, IPv6"),
-		array(array('proxyarp', 'proxyarpnet'),         "Services: Proxy ARP"),
-		array(array('wol', 'wolentry'),                 "Services: Wake on LAN"),
-		array(array('ipsec', 'tunnel'),                 "VPN: IPsec"),
-	);
-
-	foreach ($lists as $l) {
-		$list = $config;
-		foreach ($l[0] as $key) {
-			if (!is_array($list) || !isset($list[$key])) {
-				$list = null;
-				break;
-			}
-			$list = $list[$key];
-		}
-		if (!is_array($list))
-			continue;
-
-		foreach ($list as $k => $ent) {
-			if (!is_array($ent))
-				continue;
-			if (!opt_iface_isref($ent['interface'] ?? null, $optif) &&
-			    !opt_iface_isref($ent['source']['network'] ?? null, $optif) &&
-			    !opt_iface_isref($ent['destination']['network'] ?? null, $optif))
-				continue;
-
-			/* $k is the id in that page's own edit link, so the admin can go
-			   straight to the entry rather than hunt for it. */
-			$where = $l[1] . " (id " . $k;
-			if (!empty($ent['descr']) && is_string($ent['descr']))
-				$where .= ", \"" . $ent['descr'] . "\"";
-			$refs[] = $where . ")";
-		}
-	}
-
-	if (opt_iface_isref($config['captiveportal']['interface'] ?? null, $optif))
-		$refs[] = "Services: Captive portal";
-
-	/* A bridge is recorded on the OTHER interface, as the name of the one it is
-	   bridged to. Delete the target and that interface is bridged to nothing:
-	   filter.inc and filter_pf.inc then read an address and a subnet out of an
-	   interface that is not there, and its DHCP check looks up
-	   $config['dhcpd'][<the missing name>]. */
-	if (is_array($config['interfaces'] ?? null)) {
-		foreach ($config['interfaces'] as $ifn => $ifcfg) {
-			if (is_array($ifcfg) && opt_iface_isref($ifcfg['bridge'] ?? null, $optif))
-				$refs[] = "Interfaces: " . strtoupper($ifn) . ", which is bridged to it";
-		}
-	}
-
-	return $refs;
-}
-
-/* Delete $optif, and the configuration that belonged to it.
- *
- * ONLY $optif: no other interface's key is touched. That is the change -- see
- * the note at the top of this block.
- *
- * What goes with it is every section KEYED BY the interface name, because such
- * a section describes that interface and nothing else. Leaving one behind is
- * how the old shift-down came to serve one interface's DHCP range on another,
- * and leaving one behind now would be just as wrong for a different reason: the
- * number is reused by the next add, so an orphaned $config['dhcpd']['opt2']
- * would silently attach itself to a completely unrelated interface.
- *
- * The sections keyed by an interface name are $config['dhcpd'] and
- * $config['dhcrelay']. Both were found by grepping the tree for
- * $config[<section>][<an interface name>]; those are the only two. Both also
- * hold non-interface keys at the same level -- $config['dhcrelay']['server'],
- * ['proxydhcp'], ['agentoption'] -- which is why this unsets the one key rather
- * than filtering the section. Everything else that can name an interface stores
- * it as a VALUE and is the admin's to change, not ours to rewrite: see
- * opt_iface_references(), and the refusal in the input validation below.
- */
-function opt_iface_delete($optif) {
-	global $config;
-
-	unset($config['interfaces'][$optif]);
-
-	/* DHCP server and DHCP relay for this interface: its address range, its
-	   lease times, its WINS/DNS servers and its static mappings. */
-	unset($config['dhcpd'][$optif]);
-	unset($config['dhcrelay'][$optif]);
-
-	/* Scheduler: any enable/disable job whose target was this interface. Left
-	   behind, such a job fires at its next scheduled time against a name that
-	   no longer exists -- or, once the number has been reused, against an
-	   entirely different interface. */
-	croen_update_job(Array('interface-enable', 'interface-disable'), $optif);
-}
+/* opt_iface_references() and opt_iface_delete() live in phpconf/inc/optif.inc,
+   because the console wizard (phpconf/rc.initial.setports) has to delete an
+   optional interface too and must do it the same way -- see the block comment
+   there. */
 
 if ($_POST) {
 
@@ -449,14 +294,18 @@ if ($_POST) {
 				foreach (array_unique($todown) as $rif)
 					mwexec("/sbin/ifconfig " . escapeshellarg($rif) . " delete down");
 				
+				/* This is the whole apply. interfaces_optional_configure()
+				   configures each remaining OPT and then, because we are not
+				   booting, already re-runs system_routing_configure(),
+				   filter_configure(), shaper_configure(),
+				   vpn_ipsec_configure(), services_dhcpd_configure() and
+				   services_dhcp6s_configure() -- which is what a delete needs,
+				   since it took $config['dhcpd'][optN] and any rule naming that
+				   interface with it, and what a re-plug needs, since the device
+				   serving that subnet has changed. Calling dnsmasq and pf again
+				   here would just do the same work twice. It is also exactly
+				   what interfaces_opt.php does for an address change. */
 				$retval = interfaces_optional_configure();
-				
-				/* A delete took $config['dhcpd'][optN] with it and a reassign
-				   moved which device serves that subnet, so both files have to
-				   be rewritten -- otherwise dnsmasq keeps serving the old
-				   interface and the ruleset keeps its old device names. */
-				services_dhcpd_configure();
-				filter_configure();
 				
 				config_unlock();
 			}
@@ -469,6 +318,14 @@ if ($_POST) {
 ?>
 <?php include("fbegin.inc"); ?>
 <?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
+<?php
+      /* interfaces_opt.php bounces here when its ?index= names an optional
+         interface that does not exist -- a stale tab or a bookmark from before a
+         delete. Say so, or the redirect looks like the link is broken. */
+      if (!isset($savemsg) && ($_GET['status'] ?? '') === 'nosuchopt')
+          $savemsg = "That optional interface no longer exists. The interfaces " .
+                     "that do are listed below.";
+?>
 <?php if (!empty($savemsg)) print_info_box($savemsg);
       else if (file_exists($d_sysrebootreqd_path)) print_info_box(get_std_save_message(0)); ?>
 <form action="interfaces_assign.php" method="post" name="iform" id="iform">

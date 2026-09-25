@@ -164,6 +164,17 @@ EOD;
 		}
 	}
 	
+	/* Which optional interface gets which port. The ports just entered go to the
+	   interfaces that already exist, in number order, so each keeps its name and
+	   therefore its DHCP section, its rules, its secondary addresses and its
+	   scheduler jobs; surplus ports become new interfaces at the lowest free
+	   number; interfaces left without a port are deleted below, with their
+	   dependent config. The reasoning, and what this replaces, is at
+	   opt_assign_map() in phpconf/inc/optif.inc. */
+	$assign  = opt_assign_map($optif);
+	$optmap  = $assign['map'];
+	$surplus = $assign['surplus'];
+	
 	echo <<<EOD
 	
 The interfaces will be assigned as follows:
@@ -173,9 +184,15 @@ WAN  -> {$wanif}
 
 EOD;
 
-	for ($i = 0; $i < count($optif); $i++) {
-		echo "OPT" . ($i+1) . " -> " . $optif[$i] . "\n";
-	}
+	/* The real names, not a 1..n count: if the interfaces are opt1 and opt3 then
+	   that is what this has to say, or the admin is shown one mapping and given
+	   another. */
+	foreach ($optmap as $optname => $optdev)
+		echo strtoupper($optname) . " -> " . $optdev . "\n";
+	
+	foreach ($surplus as $optname)
+		echo strtoupper($optname) . " -> (removed, with its DHCP server and " .
+			"any rules that name it)\n";
 
 echo <<<EOD
 
@@ -202,27 +219,41 @@ EOD;
 			unset($config['interfaces']['wan']['wireless']);
 		}
 		
-		for ($i = 0; $i < count($optif); $i++) {
-			if (!is_array($config['interfaces']['opt' . ($i+1)]))
-				$config['interfaces']['opt' . ($i+1)] = array();
+		foreach ($optmap as $optname => $optdev) {
+			$isnew = !is_array($config['interfaces'][$optname] ?? null);
+			if ($isnew)
+				$config['interfaces'][$optname] = array();
 			
-			$config['interfaces']['opt' . ($i+1)]['if'] = $optif[$i];
+			$config['interfaces'][$optname]['if'] = $optdev;
 			
 			/* wireless interface? */
-			if (preg_match($g['wireless_regex'], $optif[$i])) {
-				if (!is_array($config['interfaces']['opt' . ($i+1)]['wireless']))
-					$config['interfaces']['opt' . ($i+1)]['wireless'] = array();
+			if (preg_match($g['wireless_regex'], $optdev)) {
+				if (!is_array($config['interfaces'][$optname]['wireless'] ?? null))
+					$config['interfaces'][$optname]['wireless'] = array();
 			} else {
-				unset($config['interfaces']['opt' . ($i+1)]['wireless']);
+				unset($config['interfaces'][$optname]['wireless']);
 			}
 			
-			unset($config['interfaces']['opt' . ($i+1)]['enable']);
-			$config['interfaces']['opt' . ($i+1)]['descr'] = "OPT" . ($i+1);
+			/* Left disabled deliberately, as before: the port underneath this
+			   interface has just changed, so its address may no longer belong to
+			   the network it is now plugged into, and the admin has to look. */
+			unset($config['interfaces'][$optname]['enable']);
+			
+			/* The description is the admin's, and is only set for an interface
+			   that did not exist a moment ago. This used to overwrite every one
+			   of them with "OPTn", which is how an admin first discovered their
+			   interfaces had been renamed under them. */
+			if ($isnew)
+				$config['interfaces'][$optname]['descr'] = strtoupper($optname);
 		}
 		
-		/* remove all other (old) optional interfaces */
-		for (; isset($config['interfaces']['opt' . ($i+1)]); $i++)
-			unset($config['interfaces']['opt' . ($i+1)]);
+		/* The optional interfaces left without a port. opt_iface_delete() takes
+		   the configuration that belonged to each with it -- its DHCP server,
+		   its DHCP relay, its secondary addresses and its scheduler jobs -- so
+		   nothing is left behind for a later add to inherit when it reuses the
+		   number. */
+		foreach ($surplus as $optname)
+			opt_iface_delete($optname);
 		
 		write_config();
 		

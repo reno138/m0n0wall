@@ -146,6 +146,65 @@ $config['interfaces'] = $base + array('opt1' => array('if' => 'em2'),
 is_same('only opt<digits> counts', opt_interfaces(), array(1 => 'opt1'));
 
 
+/* --- the console wizard's port mapping ----------------------------------
+ *
+ * phpconf/rc.initial.setports asks for LAN's port, WAN's port and then the
+ * optional ports in order. It used to write them straight to opt1..optN, which
+ * RENAMED the interfaces: enter GUEST's port before the DMZ's and GUEST became
+ * opt1, inheriting the DMZ's DHCP range and every rule written for the DMZ.
+ * opt_assign_map() gives the entered ports to the interfaces that already
+ * exist, in number order, so each keeps its name. */
+$config['interfaces'] = $base + array('opt1' => array('if' => 'em3', 'descr' => 'DMZ'),
+                                      'opt2' => array('if' => 'em4', 'descr' => 'GUEST'));
+
+$a = opt_assign_map(array('em4', 'em3'));
+is_same('wizard: the ports swap over, the NAMES stay put',
+        $a['map'], array('opt1' => 'em4', 'opt2' => 'em3'));
+is_same('wizard: nothing is surplus when the counts match', $a['surplus'], array());
+
+/* A gapped config -- the ordinary state after a delete. The old cleanup loop
+   stopped at the hole and left opt3 alive holding a port the wizard had just
+   given away; the old assignment loop would have called it opt1. */
+$config['interfaces'] = $base + array('opt1' => array('if' => 'em3', 'descr' => 'DMZ'),
+                                      'opt3' => array('if' => 'em5', 'descr' => 'LAB'));
+
+$a = opt_assign_map(array('em3', 'em5'));
+is_same('wizard: a gap is preserved -- OPT3 is not renamed to OPT2',
+        $a['map'], array('opt1' => 'em3', 'opt3' => 'em5'));
+
+$a = opt_assign_map(array('em3'));
+is_same('wizard: one port for two interfaces assigns the first',
+        $a['map'], array('opt1' => 'em3'));
+is_same('wizard: and the other is surplus, PAST the hole -- not missed',
+        $a['surplus'], array('opt3'));
+
+$a = opt_assign_map(array('em3', 'em5', 'em4'));
+is_same('wizard: a third port fills the hole, at the lowest free number',
+        $a['map'], array('opt1' => 'em3', 'opt3' => 'em5', 'opt2' => 'em4'));
+is_same('wizard: and nothing is surplus', $a['surplus'], array());
+
+$a = opt_assign_map(array('em3', 'em5', 'em4', 'em2'));
+is_same('wizard: a fourth goes above the hole, not into it twice',
+        array_keys($a['map']), array('opt1', 'opt3', 'opt2', 'opt4'));
+
+/* No optional interfaces yet: the first-run case. */
+$config['interfaces'] = $base;
+$a = opt_assign_map(array('em3', 'em4'));
+is_same('wizard: a fresh config numbers from 1',
+        $a['map'], array('opt1' => 'em3', 'opt2' => 'em4'));
+
+$a = opt_assign_map(array());
+is_same('wizard: no optional ports entered at all', $a['map'], array());
+is_same('wizard: and nothing to remove', $a['surplus'], array());
+
+/* Every interface removed. */
+$config['interfaces'] = $base + array('opt1' => array('if' => 'em3'),
+                                      'opt2' => array('if' => 'em4'));
+$a = opt_assign_map(array());
+is_same('wizard: entering no ports marks every OPT surplus',
+        $a['surplus'], array('opt1', 'opt2'));
+
+
 /* =======================================================================
  * Part 2: the pages.
  * ======================================================================= */
@@ -163,7 +222,8 @@ $drv = mw_sandbox() . '/optdrv';
 file_put_contents($drv . '/guiconfig.inc', <<<'STUB'
 <?php
 /* test double -- see tests/t_optiface.php */
-$g = array('booting' => false, 'wireless_regex' => '/^(ath|an|wi|ral|ndis)/');
+$g = array('booting' => false, 'wireless_regex' => '/^(ath|an|wi|ral|ndis)/',
+           'varrun_path' => '/var/run');
 $d_sysrebootreqd_path = getenv('MW_FLAG');
 
 function mwexec($command) {
@@ -207,6 +267,24 @@ function get_std_save_message($ok) {
    whole cannot be loaded here for the reason at the top of this file -- its
    mwexec() would run ifconfig for real -- but the OPT helpers live in their own
    file precisely so this stub can require the REAL code and never drift. */
+/* interfaces_opt.php needs these. IPv6 OFF, so the page takes its v4-only
+   path -- the v6 half is interfaces_opt.php's business, not this suite's. The
+   apply functions are captured rather than run: what matters here is WHETHER
+   the page applies and what it writes, and interfaces.inc's real
+   interfaces_optional_configure() is already exercised through
+   interfaces_assign.php above. */
+function ipv6enabled() { return false; }
+function captiveportal_configure() { $GLOBALS['mw_cmds'][] = 'captiveportal_configure'; return 0; }
+function services_dhcpd_configure() { $GLOBALS['mw_cmds'][] = 'services_dhcpd_configure'; return 0; }
+function filter_configure() { $GLOBALS['mw_cmds'][] = 'filter_configure'; return 0; }
+function killbyname() { return 0; }
+function system_routing_configure() { return 0; }
+function shaper_configure() { return 0; }
+function vpn_ipsec_configure() { return 0; }
+function services_dhcp6s_configure() { return 0; }
+function is_ipaddr($a) { return (bool) filter_var($a, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4); }
+function is_ipaddr6($a) { return (bool) filter_var($a, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6); }
+
 require getenv('MW_TREE') . '/phpconf/inc/optif.inc';
 
 require getenv('MW_TREE') . '/phpconf/inc/scheduler.inc';
@@ -242,14 +320,28 @@ FN
 
 /* The PHP diagnostics in a captured page render, if any.
    
-   Matched on PHP's own " ... on line N" suffix rather than on the word alone:
-   interfaces_assign.php's footer prose contains "Warning:" itself, and so does
-   half the webGUI. */
+   TWO patterns, because the two kinds of message do not look alike and one
+   pattern for both had a hole in it.
+   
+   Warning/Notice/Deprecated are matched on PHP's own " ... on line N" suffix
+   rather than on the word alone, because interfaces_assign.php's footer prose
+   contains "Warning:" itself and so does half the webGUI.
+   
+   A fatal has no such suffix on the line that names it: PHP writes
+       PHP Fatal error:  Uncaught Error: Call to undefined function f() in /x.inc:1376
+   ending in ":1376", and the later "thrown in ... on line 1376" line carries
+   neither keyword. Requiring " on line N" of these too therefore matched
+   NOTHING, and this suite reported a clean render over a page that had died
+   half way down -- which is exactly what it did, until the stubs below were
+   completed. These three words never appear in the webGUI's own prose, so they
+   need no suffix to disambiguate. */
 function mw_diags($out) {
 	$d = array();
-	foreach (explode("\n", $out) as $line)
-		if (preg_match('/\b(Warning|Notice|Deprecated|Fatal error|Parse error|Uncaught)\b.* on line \d+/', $line))
+	foreach (explode("\n", $out) as $line) {
+		if (preg_match('/\b(Warning|Notice|Deprecated)\b.* on line \d+/', $line) ||
+		    preg_match('/\b(Fatal error|Parse error|Uncaught)\b/', $line))
 			$d[] = trim($line);
+	}
 	return $d;
 }
 
@@ -336,6 +428,14 @@ function optcfg() {
 			'opt2'      => array('enable' => true),
 			'opt3'      => array('enable' => true),
 		),
+		/* ['if'] here holds an INTERFACE NAME, not a device name -- the one
+		   place in the config where that field means that. */
+		'secondaries' => array('secondary' => array(
+			array('if' => 'opt2', 'ipaddr' => '192.168.99.1', 'prefix' => '24',
+			      'descr' => 'DMZ alias'),
+			array('if' => 'opt3', 'ipaddr' => '192.168.98.1', 'prefix' => '24',
+			      'descr' => 'GUEST alias'),
+		)),
 		'croen' => array('interval' => '10', 'jobset' => array(
 			array('repeat' => 'daily', 'job' => array(
 				array('name' => 'interface-enable',  'target' => 'opt2'),
@@ -568,7 +668,8 @@ function config_mentions($node, $name, $path = '') {
 is_same('gate: the search finds every mention before the delete',
         config_mentions(optcfg(), 'opt2'),
         array('[interfaces][opt2] (key)', '[dhcpd][opt2] (key)',
-              '[dhcrelay][opt2] (key)', '[croen][jobset][0][job][0][target] (value)'));
+              '[dhcrelay][opt2] (key)', '[secondaries][secondary][0][if] (value)',
+              '[croen][jobset][0][job][0][target] (value)'));
 
 $rg = mw_drive('interfaces_assign.php', assign_post(array('del' => 'opt2')), optcfg());
 is_same('gate: after an accepted delete, the name is nowhere in the config',
@@ -582,9 +683,94 @@ is_same('gate: after an accepted delete, the name is nowhere in the config',
 is_same('gate: and everything belonging to the OPTs it did not delete survives',
         config_mentions($rg['config'], 'opt3'),
         array('[interfaces][opt3] (key)', '[dhcpd][opt3] (key)',
-              '[dhcrelay][opt3] (key)', '[croen][jobset][0][job][1][target] (value)',
+              '[dhcrelay][opt3] (key)', '[secondaries][secondary][0][if] (value)',
+              '[croen][jobset][0][job][1][target] (value)',
               '[filter][rule][1][interface] (value)',
               '[filter][rule][1][source][network] (value)'));
+
+/* --- secondary (alias) addresses go with the interface ------------------
+ *
+ * These are owned config, like the DHCP range, but they are not KEYED by the
+ * name: they are a flat list carrying it in ['if'] -- the one field in the
+ * config where ['if'] is an interface name rather than a device name, which is
+ * how this section came to be missed. Leaving one behind is worse than an
+ * ordinary orphan: interfaces_secondaries_configure() matches on the name
+ * alone, so once opt_next_free() reuses the number the new interface silently
+ * comes up carrying the deleted one's alias address, and filter.inc emits pass
+ * rules for its subnet. And it is invisible while it waits -- the only webGUI
+ * route to it is on interfaces_opt.php, which reports no such interface. */
+$rs = mw_drive('interfaces_assign.php', assign_post(array('del' => 'opt2')), optcfg());
+is_same('secondaries: the deleted interface\'s alias address is gone with it',
+        array_column($rs['config']['secondaries']['secondary'], 'if'), array('opt3'));
+is_same('secondaries: the surviving interface keeps its own',
+        $rs['config']['secondaries']['secondary'][0]['ipaddr'], '192.168.98.1');
+is_same('secondaries: the list is repacked, not left with a hole',
+        array_keys($rs['config']['secondaries']['secondary']), array(0));
+
+/* Delete the only one and the empty container goes too, rather than leaving
+   <secondaries><secondary/></secondaries> for the parser to read back as "". */
+$c = optcfg();
+$c['secondaries']['secondary'] = array(array('if' => 'opt2', 'ipaddr' => '192.168.99.1',
+                                             'prefix' => '24'));
+$rs2 = mw_drive('interfaces_assign.php', assign_post(array('del' => 'opt2')), $c);
+is_false('secondaries: the last one leaves no empty list behind',
+         isset($rs2['config']['secondaries']['secondary']));
+
+/* --- a stale ?index= cannot resurrect a deleted interface ---------------
+ *
+ * interfaces_opt.php is addressed by number, and a number is a stable
+ * identifier now -- so a delete leaves its index permanently valid-LOOKING. A
+ * tab left open across the delete, a bookmark, or a back-button Save posts it.
+ *
+ * $optcfg there is taken by REFERENCE, and =& creates the key it is given, so
+ * without a guard the POST handler writes descr/ipaddr/subnet/enable straight
+ * through it and saves -- an interface with no ['if'] at all, holding a number
+ * back out of the pool opt_next_free() reuses and making
+ * interfaces_optional_configure_if() run ifconfig with an empty device name. */
+$c = optcfg();
+unset($c['interfaces']['opt2'], $c['dhcpd']['opt2'], $c['dhcrelay']['opt2']);
+
+$rz = mw_drive('interfaces_opt.php',
+	array('index' => '2', 'descr' => 'GHOST', 'ipaddr' => '10.9.9.1',
+	      'subnet' => '24', 'enable' => 'yes', 'Submit' => 'Save'),
+	$c, array('get' => array('index' => '2')));
+is_false('stale index: the deleted interface is NOT recreated',
+         array_key_exists('opt2', $rz['config']['interfaces']));
+is_same('stale index: and nothing else was written either',
+        array_keys($rz['config']['interfaces']), array('lan', 'wan', 'opt1', 'opt3'));
+is_false('stale index: no reboot demanded for a bounced request', $rz['flag']);
+
+/* The control: an index that IS there saves normally. Without this the guard
+   could be refusing everything and the test above would still pass. */
+$rz2 = mw_drive('interfaces_opt.php',
+	array('index' => '3', 'descr' => 'GUEST RENAMED', 'ipaddr' => '10.0.3.1',
+	      'subnet' => '24', 'enable' => 'yes', 'Submit' => 'Save'),
+	$c, array('get' => array('index' => '3')));
+is_same('stale index control: a real index still saves',
+        $rz2['config']['interfaces']['opt3']['descr'], 'GUEST RENAMED');
+
+/* --- REFUSED: an IPsec tunnel carrying the interface's network ----------
+ *
+ * The ORDINARY shape, not an exotic one: a tunnel's ['interface'] is the
+ * OUTSIDE interface and defaults to wan, so "tunnel over WAN carrying the OPT1
+ * network" names opt1 only in ['local-subnet']['network']. Dangling, it makes
+ * ipsec_ss_local_ts() return null, ipsec_strongswan.inc omits local_ts and
+ * swanctl substitutes its own default; once the number is reused the tunnel
+ * offers the NEW interface's subnet to the remote peer. */
+$c = optcfg();
+$c['ipsec']['tunnel'] = array(array('interface' => 'wan', 'descr' => 'to branch office',
+                                    'local-subnet' => array('network' => 'opt1'),
+                                    'remote-subnet' => '10.9.0.0/24'));
+$r = mw_drive('interfaces_assign.php', assign_post(array('del' => 'opt1')), $c);
+is_true ('refusal: a tunnel whose LOCAL SUBNET is the interface net refuses it',
+         strpos($r['out'], 'VPN: IPsec (id 0, "to branch office")') !== false);
+is_true ('refusal: and the interface is still there', isset($r['config']['interfaces']['opt1']));
+
+/* the outside-interface case still refuses, and must not double-report */
+$c['ipsec']['tunnel'][0]['interface'] = 'opt1';
+$r = mw_drive('interfaces_assign.php', assign_post(array('del' => 'opt1')), $c);
+is_same('refusal: a tunnel naming it BOTH ways is reported once, not twice',
+        substr_count($r['out'], 'VPN: IPsec (id 0'), 1);
 
 /* --- the page shows a gapped config completely, in number order --------
  *

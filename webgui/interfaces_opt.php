@@ -40,6 +40,31 @@ else if (!empty($_POST['index']))
 if (empty($index))
 	exit;
 
+/* The interface has to EXIST.
+ *
+ * $index is a stable identifier now, and a delete leaves its number a
+ * permanently valid-looking one -- so a tab left open across a delete, a
+ * bookmark or a back-button Save posts an index that names nothing. Under the
+ * old shift-down the same stale request overwrote whichever interface had moved
+ * into that slot; with holes it names a hole, which is an everyday state.
+ *
+ * And naming a hole is not benign, because $optcfg below is taken by REFERENCE:
+ * =& CREATES the key it is given. The POST handler then writes descr, ipaddr,
+ * subnet and enable straight through that reference and calls write_config(),
+ * resurrecting an interface with no ['if'] at all. That takes the freed number
+ * back out of the pool opt_next_free() reuses, puts a ghost in every
+ * enumeration built from opt_interfaces() -- rule tabs, status pages,
+ * $specialnets -- and leaves interfaces_optional_configure_if() running
+ * ifconfig with an empty device name on every apply and every boot.
+ *
+ * The same guard interfaces_assign.php grew for its delete: the target has to
+ * be a real key, tested with array_key_exists() rather than is_array() so that
+ * a hand-edited empty <opt2/> is still editable. */
+if (!array_key_exists('opt' . $index, $config['interfaces'] ?? array())) {
+	header("Location: interfaces_assign.php?status=nosuchopt");
+	exit;
+}
+
 $optcfg = &$config['interfaces']['opt' . $index];
 $pconfig['descr'] = $optcfg['descr'] ?? null;
 $pconfig['bridge'] = $optcfg['bridge'] ?? null;

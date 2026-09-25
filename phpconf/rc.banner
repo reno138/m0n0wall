@@ -58,7 +58,12 @@
 
 EOD;
 
-	for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++)
-		echo "    OPT{$i}  -> {$config['interfaces']['opt' . $i]['if']} " .
-			"({$config['interfaces']['opt' . $i]['descr']})\n";
+	/* opt_interfaces(), not a counter: a delete leaves a hole in the numbering
+	   now, and counting up from 1 stopped at the first missing number -- so on
+	   a box whose OPT2 had been deleted this banner listed OPT1 and silently
+	   omitted OPT3, on the one screen an admin at the console has to identify
+	   which cable is which. */
+	foreach (opt_interfaces() as $i => $optif)
+		echo "    OPT{$i}  -> " . ($config['interfaces'][$optif]['if'] ?? '-') .
+			" (" . ($config['interfaces'][$optif]['descr'] ?? '') . ")\n";
 ?>
