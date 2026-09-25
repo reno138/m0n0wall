@@ -64,27 +64,47 @@ sbin/sysctl
 sbin/umount
 
 # contents of /usr/bin
-usr/bin/gzip:usr/bin/gunzip
-# grep, wc and id: for the Diagnostics > Command prompt page and for anyone
-# working on the serial console. Nothing in the product calls them -- the PHP
-# uses absolute paths to tools that were already here -- but their absence made
-# the console and the exec page far less useful than they look, and it cost me
-# an afternoon of wrongly suspecting popen() when a pipeline silently produced
-# nothing. Every library all three need (libregex, libxo, libcasper,
-# libcap_fileargs, libutil, libnv) is already in the image for other base tools,
-# so this adds about 55KB of binaries and no new library closure.
+#
+# A usable shell: awk cut du find grep head id sed sort tr uname wc.
+#
+# Nothing in the product calls any of them -- the PHP invokes tools by absolute
+# path and those were all already here -- so this is purely about what you get on
+# the serial console and the Diagnostics > Command prompt page. Without them a
+# pipeline silently produces nothing, because the shell's "not found" goes to a
+# stderr that page does not capture; that cost me an afternoon of wrongly
+# suspecting popen().
+#
+# Checked before adding rather than discovered by the ELF gate afterwards: every
+# library the whole set needs (libregex, libxo, libcasper, libcap_fileargs,
+# libutil, libnv) is already in the image for other base tools, so the library
+# closure does not grow at all and the cost is just the binaries -- about 540KB,
+# of which awk alone is 233KB.
+#
+# The a:b form hardlinks, as it does for halt/reboot: grep's egrep/fgrep/rgrep
+# and awk's nawk are single inodes in base, and both binaries dispatch on
+# argv[0].
+usr/bin/awk:usr/bin/nawk
+usr/bin/cut
+usr/bin/du
+usr/bin/find
 usr/bin/grep:usr/bin/egrep:usr/bin/fgrep:usr/bin/rgrep
+usr/bin/gzip:usr/bin/gunzip
+usr/bin/head
 usr/bin/id
 usr/bin/killall
 usr/bin/logger
 usr/bin/netstat
 # usr/bin/nsupdate -- now from the bind-tools package, see stage 2
 usr/bin/nohup
+usr/bin/sed
+usr/bin/sort
 usr/bin/su
 usr/bin/tail
 usr/bin/tar
 usr/bin/top
 usr/bin/touch
+usr/bin/tr
+usr/bin/uname
 usr/bin/uptime:usr/bin/w
 usr/bin/wc
 
