@@ -424,21 +424,25 @@ function get_interface_list($ethernet = true, $wireless = true, $serial = true) 
 /* convert friendly interface name (WAN, OPTx, etc.) to real interface (fxp0, ng0, etc.) */
 function convert_friendly_interface_to_real_interface_name($interface) {
 	global $config, $g;
-	if($config['interfaces'][$interface]['ipaddr'] == "pppoe" or $config['interfaces'][$interface]['ipaddr'] == "pptp" or $config['interfaces'][$interface]['ipaddr'] == "modem")
+	/* ?? '': this is called with a friendly name ("WAN", a description), which
+	   is often NOT a key of $config['interfaces'] at all -- three undefined-key
+	   warnings per call for any interface looked up by its description. */
+	$ipaddr = $config['interfaces'][$interface]['ipaddr'] ?? '';
+	if ($ipaddr == "pppoe" or $ipaddr == "pptp" or $ipaddr == "modem")
 		return $g['pppoe_interface'];
 	$lc_interface = strtolower($interface);
 	if($lc_interface == "lan") return $config['interfaces']['lan']['if'];
 	if($lc_interface == "wan") return $config['interfaces']['wan']['if'];
-	$ifdescrs = array();
-	for ($j = 1; isset($config['interfaces']['opt' . $j]); $j++)
-		$ifdescrs['opt' . $j] = "opt" . $j;
-	foreach ($ifdescrs as $ifdescr => $ifname) {
-		if(strtolower($ifname) == $lc_interface)
-	    return $config['interfaces'][$ifname]['if'];
-		if(strtolower($config['interfaces'][$ifname]['descr']) == $lc_interface)
+	/* opt_interfaces(), so a gap in the numbering does not cut the search short.
+	   The $ifdescrs map this replaces was 'optN' => 'optN' -- built only to be
+	   iterated immediately, with both halves the same string. */
+	foreach (opt_interfaces() as $ifname) {
+		if (strtolower($ifname) == $lc_interface)
 			return $config['interfaces'][$ifname]['if'];
-   }
-   return $interface;
+		if (strtolower($config['interfaces'][$ifname]['descr'] ?? '') == $lc_interface)
+			return $config['interfaces'][$ifname]['if'];
+	}
+	return $interface;
 }
 
 /* wrapper for exec() */
@@ -812,68 +816,10 @@ function is_pem_encrypted_private_key($key) {
 	    || strpos($key, 'Proc-Type: 4,ENCRYPTED') !== false;
 }
 
-/* The optional interfaces that actually exist, as number => config key.
- *
- * Returns e.g. array(1 => 'opt1', 3 => 'opt3') -- ordered by number, and with
- * GAPS PRESERVED. Both halves are what callers need: the number for a display
- * label ("OPT3"), an ?index= link and the interfaces_optional_configure_if()
- * family, and the key for $config['interfaces'][...].
- *
- * Why this exists. Fifty-odd sites across thirty-two files each rolled their own
- *
- *     for ($i = 1; isset($config['interfaces']['opt' . $i]); $i++)
- *
- * which stops dead at the first missing number. That was survivable only because
- * interfaces_assign.php closes the hole on delete by shifting opt3 down to opt2
- * -- and THAT is the renumbering that silently misassigns everything referring to
- * an interface by name. $config['dhcpd']['opt1'] is not shifted with it, so the
- * DHCP range configured for the deleted interface starts serving whichever
- * interface moved into its place, and a firewall rule naming opt3 stops matching
- * anything because opt3 no longer exists.
- *
- * The fix is to stop renumbering, which makes optN a stable identifier for the
- * life of the interface and leaves every reference to it correct. This helper is
- * the prerequisite: with gaps tolerated everywhere, closing them is no longer
- * necessary. It also removes a latent bug of its own -- a hand-edited or
- * partially restored config with a hole already defeated every one of those
- * loops, including the in-use checks that guard a VLAN delete.
- *
- * Deliberately NOT cached: callers mutate $config['interfaces'] and then
- * re-enumerate.
- */
-function opt_interfaces() {
-	global $config;
-
-	$out = array();
-	if (!isset($config['interfaces']) || !is_array($config['interfaces']))
-		return $out;
-
-	foreach ($config['interfaces'] as $key => $ifcfg) {
-		if (!is_array($ifcfg))
-			continue;
-		if (!preg_match('/^opt(\d+)$/', $key, $m))
-			continue;
-		$out[(int) $m[1]] = $key;
-	}
-	ksort($out, SORT_NUMERIC);
-
-	return $out;
-}
-
-/* The next free optional interface number.
- *
- * With gaps preserved this is no longer "count + 1": it is the lowest number not
- * in use, so a delete-then-add reuses the freed slot rather than climbing for
- * ever. interfaces_assign.php already looked for the first free number this way;
- * this puts it in one place.
- */
-function opt_next_free() {
-	$used = opt_interfaces();
-	for ($i = 1; $i < 1000; $i++)
-		if (!isset($used[$i]))
-			return $i;
-	return 0;               /* absurd, and the caller should refuse */
-}
+/* Optional-interface enumeration: opt_interfaces() and opt_next_free().
+   In their own file so the test suite can load them without loading all of
+   util.inc, whose mwexec() would run real commands. */
+require_once("optif.inc");
 
 /* Is this an OpenSSH private key? A common paste mistake, and worth naming:
  * the generic "does not appear to be valid" sends people looking for a

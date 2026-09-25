@@ -211,6 +211,11 @@ function write_config() {
 }
 function config_lock() {}
 function config_unlock() {}
+/* The pages enumerate the OPT interfaces with opt_interfaces(). util.inc as a
+   whole cannot be loaded here for the reason at the top of this file -- its
+   mwexec() would run ifconfig for real -- but the OPT helpers live in their own
+   file precisely so this stub can require the REAL code and never drift. */
+require getenv('MW_TREE') . '/phpconf/inc/optif.inc';
 function log_error($text) { file_put_contents(getenv('MW_LOG'), $text . "\n", FILE_APPEND); }
 function print_input_errors($errs) { echo "INPUT_ERRORS: " . implode(" | ", $errs) . "\n"; }
 function print_info_box($msg) { echo "INFO: " . $msg . "\n"; }
