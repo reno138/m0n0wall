@@ -13,7 +13,9 @@
  * (IPv6.php), bcdiv/bcmod/bcsub (captive portal RADIUS accounting).
  *
  * Scans the source as installed: /etc/inc, /usr/local/www,
- * /usr/local/captiveportal and the /etc/rc.* scripts.
+ * /usr/local/captiveportal, the /etc/rc.* scripts and the scheduler's
+ * /etc/croen_jobs/*.cjob -- the job files are PHP too, and one of them calling
+ * a function the image lacks would break the scheduler at run time only.
  */
 
 /* argv[1]: newline-separated list of the functions the IMAGE's php provides,
@@ -41,6 +43,7 @@ $calls   = array();
 $files = array_merge(
 	(array)glob("$root/etc/inc/*"),
 	(array)glob("$root/etc/rc.*"),
+	(array)glob("$root/etc/croen_jobs/*"),
 	(array)glob("$root/usr/local/www/*"),
 	(array)glob("$root/usr/local/captiveportal/*")
 );
@@ -48,7 +51,7 @@ $files = array_merge(
 foreach ($files as $f) {
 	if (!is_file($f))
 		continue;
-	if (!preg_match('/\.(php|inc)$|\/rc\./', $f))
+	if (!preg_match('/\.(php|inc|cjob)$|\/rc\./', $f))
 		continue;
 	$src = @file_get_contents($f);
 	if ($src === false || strpos($src, '<?php') === false)

@@ -124,6 +124,16 @@ if ($_POST) {
 		if (!file_exists($d_sysrebootreqd_path)) {
 			config_lock();
 			$retval = vpn_ipsec_l2tp_configure();
+			/* The IPsec half, and the rules that let clients reach it.
+			
+			   Saving this page used to start mpd5 and stop there: nothing
+			   regenerated swanctl.conf, so the pre-shared key above configured
+			   nothing and the L2TP listener was left unprotected. The ruleset
+			   also has to be rebuilt, because whether pf passes IKE/NAT-T/ESP
+			   depends on whether this server is enabled. */
+			if ($retval == 0)
+				$retval = vpn_ipsec_configure();
+			filter_configure();
 			config_unlock();
 		}
 		$savemsg = get_std_save_message($retval);
@@ -148,7 +158,6 @@ function enable_change(enable_over) {
 		document.iform.remoteip.disabled = 0;
 		document.iform.psk.disabled = 0;
 		document.iform.localip.disabled = 0;
-		document.iform.req128.disabled = 0;
 		document.iform.radiusenable.disabled = 0;
 		
 		if (document.iform.radiusenable.checked || enable_over) {
@@ -165,17 +174,16 @@ function enable_change(enable_over) {
 		document.iform.remoteip.disabled = 1;
 		document.iform.localip.disabled = 1;
 		document.iform.psk.disabled = 1;
-		document.iform.req128.disabled = 1;
 		document.iform.radiusenable.disabled = 1;
 		document.iform.radacct_enable.disabled = 1;
 		document.iform.radiusserver.disabled = 1;
 		document.iform.radiussecret.disabled = 1;
 	}
-	if ((get_radio_value(document.iform.mode) == "redir") || enable_over) {
-		document.iform.redir.disabled = 0;
-	} else {
-		document.iform.redir.disabled = 1;
-	}
+	/* A third block used to live here toggling a 'redir' input. Neither that
+	   input nor a "redir" mode has ever existed on this form, so assigning to
+	   it threw a TypeError on a null element -- which aborted enable_change()
+	   before it returned and left every field on the page disabled, whatever
+	   the mode was set to. Removed along with the config keys behind it. */
 }
 //-->
 </script>
@@ -244,6 +252,37 @@ function enable_change(enable_over) {
                     The IPsec/L2TP server will assign client addresses from the subnet given above
                     to clients. The size of the subnet determines the maximum number of concurrent connections
                     that the IPsec/L2TP server can handle.</td>
+                </tr>
+                <tr>
+                  <td width="22%" valign="top" class="vncell">RADIUS</td>
+                  <td width="78%" class="vtable">
+                    <input name="radiusenable" type="checkbox" id="radiusenable" value="yes" onclick="enable_change(false)" <?php if (!empty($pconfig['radiusenable'])) echo "checked"; ?>>
+                    <strong>Use a RADIUS server for authenticating VPN users</strong><br>
+                    <span class="vexpl">Authenticate against RADIUS instead of the local user list on
+                    the <a href="vpn_l2tp_users.php">Users</a> tab. This is the PPP user
+                    authentication that happens INSIDE the tunnel &ndash; separate from, and in
+                    addition to, the pre-shared key above, which authenticates the IPsec
+                    layer.</span></td>
+                </tr>
+                <tr>
+                  <td width="22%" valign="top" class="vncell">RADIUS server</td>
+                  <td width="78%" class="vtable">
+                    <input name="radiusserver" type="text" class="formfld" id="radiusserver" size="20" value="<?=htmlspecialchars($pconfig['radiusserver'] ?? '');?>"><br>
+                    <span class="vexpl">The IP address of the RADIUS server.</span></td>
+                </tr>
+                <tr>
+                  <td width="22%" valign="top" class="vncell">RADIUS shared secret</td>
+                  <td width="78%" class="vtable">
+                    <input name="radiussecret" type="password" class="formfld" id="radiussecret" size="20" value="<?=htmlspecialchars($pconfig['radiussecret'] ?? '');?>"><br>
+                    <span class="vexpl">The secret this firewall and the RADIUS server share.</span></td>
+                </tr>
+                <tr>
+                  <td width="22%" valign="top" class="vncell">RADIUS accounting</td>
+                  <td width="78%" class="vtable">
+                    <input name="radacct_enable" type="checkbox" id="radacct_enable" value="yes" <?php if (!empty($pconfig['radacct_enable'])) echo "checked"; ?>>
+                    <strong>Send accounting records to the RADIUS server</strong><br>
+                    <span class="vexpl">Reports session start, stop and volume for each VPN
+                    user.</span></td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top">&nbsp;</td>

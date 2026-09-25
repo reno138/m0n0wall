@@ -359,8 +359,16 @@ function convert_config() {
 			$opti++;
 		}
 		
-		/* convert filter rules */
-		$n = count($config['filter']['rule']);
+		/* convert filter rules.
+		
+		   is_array() FIRST. A config being converted may have no filter rules at
+		   all -- the section is simply absent -- and count(null) is a TypeError in
+		   PHP 8, not a warning returning 0. convert_config() runs from rc.bootup,
+		   so restoring an older config killed the next boot before anything could
+		   report why. The shaper loop below had the is_array() test but evaluated
+		   count() on the line ABOVE it, which is the same bug. */
+		$n = is_array($config['filter']['rule'] ?? null)
+		     ? count($config['filter']['rule']) : 0;
 		for ($i = 0; $i < $n; $i++) {
 		
 			$fr = &$config['filter']['rule'][$i];
@@ -403,9 +411,10 @@ function convert_config() {
 			}
 		}
 		
-		/* convert shaper rules */
-		$n = count($config['shaper']['rule']);
-		if (is_array($config['shaper']['rule']))
+		/* convert shaper rules -- same as the filter rules above */
+		$n = is_array($config['shaper']['rule'] ?? null)
+		     ? count($config['shaper']['rule']) : 0;
+		if (is_array($config['shaper']['rule'] ?? null))
 			for ($i = 0; $i < $n; $i++) {
 		
 			$fr = &$config['shaper']['rule'][$i];

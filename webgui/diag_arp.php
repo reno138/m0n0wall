@@ -38,7 +38,9 @@ if (ipv6enabled()){
 }
 
 if (isset($_POST['del_x'])) {
-	if (is_array($_POST['entries']) && count($_POST['entries']) > 0) {
+	/* ?? null: "delete all" submits del_x with no entries at all, so the key is
+	   absent and this warned on an ordinary user action. */
+	if (is_array($_POST['entries'] ?? null) && count($_POST['entries']) > 0) {
 		foreach ($_POST['entries'] as $entry) {
 			/* remove arp entry from arp table */
 			mwexec("/usr/sbin/arp -d " . escapeshellarg($entry));
@@ -114,7 +116,12 @@ if (ipv6enabled()){
 		if (($elements[1] ?? null) != "(incomplete)") {
 			$ndpent = array();
 			$ndpent['ip'] = trim($ip6element[0]);
-			$ndpent['mac'] = "0" . trim($elements[1] ?? '');
+			/* No "0" prefix. ndp(8) and arp(8) both format the hardware
+			   address with the same libc ether_ntoa(), so the two columns on
+			   this page need identical treatment -- prefixing a zero to only
+			   the NDP side turned a4:11:.. into 0a4:11:.. and displayed every
+			   IPv6 neighbour's MAC wrongly. */
+			$ndpent['mac'] = trim($elements[1] ?? '');
 			$ndpent['interface'] = trim($elements[2] ?? '');
 			$data[] = $ndpent;
 		}

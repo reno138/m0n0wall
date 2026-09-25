@@ -74,6 +74,16 @@ $d_passthrumacsdirty_path = $g['varrun_path'] . "/passthrumacs.dirty";
 $d_allowedipsdirty_path = $g['varrun_path'] . "/allowedips.dirty";
 $d_croendirty_path = $g['varrun_path'] . "/croen.dirty";
 
+/* Platforms that support firmware updating.
+ *
+ * Defined BEFORE the firmware lock below. That 'return' hands control back to
+ * an already-running firmware upgrade's own page, and everything after it in
+ * this file is skipped -- function declarations survive (PHP binds those
+ * early) but variables do not. system_firmware.php reads $fwupplatforms while
+ * rendering, so every view of the firmware page during an upgrade died with
+ * "in_array(): Argument #2 must be of type array, null given". */
+$fwupplatforms = array('generic-pc', 'embedded', 'generic-pc-serial');
+
 if (file_exists($d_firmwarelock_path)) {
 	if (!$d_isfwfile) {
 		header("Location: system_firmware.php");
@@ -103,9 +113,6 @@ $medias = array("auto" => "autoselect", "100full" => "100BASE-TX full-duplex",
 
 $wlan_txpowers = array('0' => '0 dBm (1 mW)', '3' => '3 dBm (2 mW)', '7' => '7 dBm (5 mW)', '10' => '10 dBm (10 mW)',
 	'14' => '14 dBm (25 mW)', '17' => '17 dBm (50 mW)', '20' => '20 dBm (100 mW)', '23' => '23 dBm (200 mW)', '26' => '26 dBm (400 mW)');
-
-/* platforms that support firmware updating */
-$fwupplatforms = array('generic-pc', 'embedded', 'generic-pc-serial');
 
 /* IPsec defines */
 $my_identifier_list = array('myaddress' => 'My IP address',

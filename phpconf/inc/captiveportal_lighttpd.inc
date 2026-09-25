@@ -110,7 +110,15 @@ function captiveportal_lighttpd_config_generate($https = false) {
 	   original URL in REQUEST_URI so index.php can redirect the client back to
 	   where they were going. */
 	$out .= "server.error-handler-404 = \"/index.php\"\n";
-	$out .= "server.max-worker    = {$maxproc}\n";
+	/* max-CONNECTIONS, not max-worker.
+	
+	   The GUI calls this "total maximum number of concurrent connections" and
+	   validates it to 4..100. server.max-worker is a count of FORKED lighttpd
+	   worker processes, so the documented meaning was lost and a perfectly
+	   legal value of 100 would have forked 100 processes on a machine chosen
+	   for being small. server.max-connections is the directive that means what
+	   the page says. */
+	$out .= "server.max-connections = {$maxproc}\n";
 	/* An unauthenticated client should not be able to post megabytes. */
 	$out .= "server.max-request-size = 256\n";
 	$out .= "accesslog.filename   = \"/dev/null\"\n\n";

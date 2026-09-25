@@ -283,12 +283,24 @@ function gigawords($bytes) {
 
 
     /*
-     * RFC2866 Specifies a 32bit unsigned integer, which is a max of 4294967295
-     * Currently there is a fault in the PECL radius_put_int function which can handle only 32bit signed integer.
+     * RFC 2866: Acct-Input-Octets is a 32-bit unsigned integer and
+     * Acct-Input-Gigawords counts how many times it has wrapped. So the
+     * divisor is 2^32 = 4294967296 -- the number of distinct values -- and NOT
+     * 4294967295, which is merely the largest one.
+     *
+     * With the off-by-one divisor the error grew by a byte for every 4 GiB
+     * transferred: at exactly 4 GiB the accounting record claimed 1 gigaword
+     * and 1 octet instead of 1 gigaword and 0, and the octet count drifted
+     * further with every wrap. Both attributes were wrong for any session over
+     * 4 GiB, which is most of them.
+     *
+     * (The PECL radius_put_int fault noted here originally is why BCMath is
+     * used at all: the value has to be handed over as a 32-bit quantity that a
+     * signed int cannot hold.)
      */
 
     // We use BCMath functions since normal integers don't work with so large numbers
-    $gigawords = bcdiv( bcsub( $bytes, remainder($bytes) ) , 4294967295) ;
+    $gigawords = bcdiv( bcsub( $bytes, remainder($bytes) ) , 4294967296) ;
 
     // We need to manually set this to a zero instead of NULL for put_int() safety
     if (is_null($gigawords)) {
@@ -301,8 +313,10 @@ function gigawords($bytes) {
 
 function remainder($bytes) {
 
-    // Calculate the bytes we are going to send to the radius
-    $bytes = bcmod($bytes, 4294967295);
+    // Calculate the bytes we are going to send to the radius.
+    // 2^32, for the reason given in gigawords() above: this is the value that
+    // Acct-Input-Octets wraps at.
+    $bytes = bcmod($bytes, 4294967296);
 
     if (is_null($bytes)) {
         $bytes = 0;

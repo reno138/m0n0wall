@@ -36,7 +36,6 @@ $pconfig['mbmon'] = isset($config['system']['webgui']['mbmon']['enable']);
 $pconfig['cert'] = base64_decode($config['system']['webgui']['certificate'] ?? '');
 $pconfig['key'] = base64_decode($config['system']['webgui']['private-key'] ?? '');
 $pconfig['disableconsolemenu'] = isset($config['system']['disableconsolemenu']);
-$pconfig['disablefirmwarecheck'] = isset($config['system']['disablefirmwarecheck']);
 $pconfig['allowipsecfrags'] = isset($config['filter']['allowipsecfrags']);
 $pconfig['expanddiags'] = isset($config['system']['webgui']['expanddiags']);
 if ($g['platform'] == "generic-pc" || $g['platform'] == "generic-pc-serial")
@@ -103,7 +102,6 @@ if ($_POST) {
 		$config['system']['webgui']['certificate'] = base64_encode($_POST['cert'] ?? '');
 		$config['system']['webgui']['private-key'] = base64_encode($_POST['key'] ?? '');
 		$config['system']['disableconsolemenu'] = !empty($_POST['disableconsolemenu']) ? true : false;
-		$config['system']['disablefirmwarecheck'] = !empty($_POST['disablefirmwarecheck']) ? true : false;
 		$config['filter']['allowipsecfrags'] = !empty($_POST['allowipsecfrags']) ? true : false;
 		$config['system']['webgui']['expanddiags'] = !empty($_POST['expanddiags']) ? true : false;
 		if ($g['platform'] == "generic-pc" || $g['platform'] == "generic-pc-serial") {
@@ -287,13 +285,13 @@ if ($_POST) {
                     <strong>Disable console menu</strong><span class="vexpl"><br>
                     Changes to this option will take effect after a reboot.</span></td>
                 </tr>
-				<tr>
-                  <td valign="top" class="vncell">Firmware version check </td>
-                  <td class="vtable">
-                    <input name="disablefirmwarecheck" type="checkbox" id="disablefirmwarecheck" value="yes" <?php if (!empty($pconfig['disablefirmwarecheck'])) echo "checked"; ?>>
-                    <strong>Disable firmware version check</strong><span class="vexpl"><br>
-    This will cause m0n0wall not to check for newer firmware versions when the <a href="system_firmware.php">System: Firmware</a> page is viewed.</span></td>
-			    </tr>
+				<!-- The "Disable firmware version check" checkbox was removed
+				     along with the check itself. That check POSTed this
+				     firewall's platform and version to m0n0.ch over plaintext
+				     HTTP and echoed the reply into the admin page unescaped;
+				     see the note at the top of system_firmware.php. With
+				     nothing left to disable, the option would have been a
+				     control that configured nothing. -->
 				<tr>
                   <td valign="top" class="vncell">IPsec DNS check interval</td>
                   <td class="vtable">                    <span class="vexpl">

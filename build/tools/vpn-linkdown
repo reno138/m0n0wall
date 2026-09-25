@@ -1,7 +1,15 @@
 #!/bin/sh
+#
+# mpd5 iface down-script for the L2TP server. Same arguments as vpn-linkup:
+#
+#   <interface> <proto> <local-ip> <remote-ip> <authname>
 
-# record logout
-/usr/bin/logger -p local3.info "logout,$1,,$3"
+# record logout.
+#
+# $4 and $5, matching vpn-linkup. This used to log "logout,$1,,$3": that left
+# the IP address field empty and put $3 -- the firewall's OWN local address --
+# where diag_logs_vpn.php renders the User column, so every disconnect showed an
+# IP address under "User" and nothing under "IP address".
+/usr/bin/logger -p local3.info "logout,$1,$4,$5"
 
-# resync ipfilter
-/sbin/ipf -y
+# No "/sbin/ipf -y": see the note in vpn-linkup.

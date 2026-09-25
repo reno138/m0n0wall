@@ -54,6 +54,28 @@ if ($_POST) {
 		$reqdfieldsn = explode(",", "Community");
 		
 		do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
+
+		/* Reject what the agent cannot serve, rather than silently rewriting it.
+		
+		   snmpd.conf's rocommunity directive is parsed unquoted -- net-snmp
+		   would take a quote or a space as the start of the next field -- so
+		   the generator strips the community to these characters. It used to do
+		   that silently while this page accepted any text, which meant the
+		   agent answered to a different community than the page displayed, and
+		   a community of only punctuation produced a bare 'rocommunity' that
+		   stopped snmpd starting. Validating here makes what you type what you
+		   get. */
+		if (!empty($_POST['rocommunity'])
+		    && !preg_match('/^[A-Za-z0-9_.-]+$/', $_POST['rocommunity']))
+			$input_errors[] = "The community string may only contain letters, " .
+			    "digits, underscores, dots and hyphens.";
+
+		/* sysLocation and sysContact are copied to the end of their line, so a
+		   newline would inject a directive. */
+		foreach (array('syslocation' => 'Location', 'syscontact' => 'Contact') as $f => $lbl) {
+			if (!empty($_POST[$f]) && preg_match('/[\r\n]/', $_POST[$f]))
+				$input_errors[] = "The {$lbl} may not contain line breaks.";
+		}
 	}
 
 	if (empty($input_errors)) {
@@ -115,7 +137,9 @@ function enable_change(enable_change) {
                   <td width="78%" class="vtable"> 
                     <?=$mandfldhtml;?><input name="rocommunity" type="text" class="formfld" id="rocommunity" size="40" value="<?=htmlspecialchars($pconfig['rocommunity'] ?? '');?>"> 
                     <br>
-                    In most cases, &quot;public&quot; is used here</td>
+                    In most cases, &quot;public&quot; is used here. Letters, digits,
+                    underscores, dots and hyphens only &ndash; the agent's
+                    configuration file parses this field unquoted.</td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vtable"></td>

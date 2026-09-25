@@ -114,10 +114,18 @@ function get_interface_info($ifdescr) {
 	$ifinfo['outbytes'] = $linkinfo[10] ?? null;
 	$ifinfo['collisions'] = $linkinfo[11] ?? null;
 	
-	/* DHCP? -> see if dhclient is up */
-	if (($ifdescr == "wan") && ($config['interfaces']['wan']['ipaddr'] == "dhcp")) {
-		/* see if dhclient is up */
-		if ($ifinfo['status'] == "up" && file_exists("{$g['varrun_path']}/dhclient.pid"))
+	/* DHCP? -> see if dhclient is up.
+	
+	   The pidfile carries the interface name. interfaces.inc runs the client
+	   with '-p /var/run/dhclient.<if>.pid' -- the base client's own default is
+	   /var/run/dhclient/dhclient.<if>.pid, and neither is the bare
+	   "dhclient.pid" this used to look for. So a DHCP WAN always reported
+	   "down", and because the test at the bottom of this page hides the address
+	   rows for a link that is down, it also blanked the WAN IPv4 address,
+	   gateway, IPv6 address, IPv6 gateway and the ISP DNS servers. */
+	if (($ifdescr == "wan") && (($config['interfaces']['wan']['ipaddr'] ?? '') == "dhcp")) {
+		$dhcpidfile = "{$g['varrun_path']}/dhclient." . $ifinfo['if'] . ".pid";
+		if ($ifinfo['status'] == "up" && file_exists($dhcpidfile))
 			$ifinfo['dhcplink'] = "up";
 		else
 			$ifinfo['dhcplink'] = "down";

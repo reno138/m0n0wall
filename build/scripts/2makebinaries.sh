@@ -339,6 +339,47 @@ fi
 echo "  all objects load"
 
 # ---------------------------------------------------------------------------
+# Gate: every PHP file in the image must PARSE, checked with the image's own
+# php.
+#
+# There was no syntax gate at all, which is how etc/croen_jobs/interface.cjob
+# shipped with a call-time pass-by-reference in it -- a parse error since PHP
+# 5.4. A job file that will not parse aborts the whole scheduler run, so every
+# scheduled task on the box stopped working and nothing said why. Tokenising is
+# lexical, so the function gate below cannot see this class at all: only a real
+# php -l can.
+#
+# .cjob is included deliberately: the scheduler's job files are PHP.
+# ---------------------------------------------------------------------------
+echo "Checking every PHP file in the image parses..."
+phpbad=0
+for d in etc/inc etc/croen_jobs usr/local/www usr/local/captiveportal; do
+	[ -d "$FS/$d" ] || continue
+	for f in $(cd "$FS" && find "$d" -type f \
+	           \( -name '*.php' -o -name '*.inc' -o -name '*.cjob' \) | sort); do
+		if ! out=$(chroot "$FS" /usr/local/bin/php -l "/$f" 2>&1); then
+			echo "  PARSE ERROR  $f"
+			echo "$out" | sed 's/^/      /'
+			phpbad=$((phpbad + 1))
+		fi
+	done
+done
+# the boot scripts have no extension, so match them by name
+for f in $(cd "$FS" && ls etc/rc.* 2>/dev/null | sort); do
+	head -1 "$FS/$f" | grep -q '<?php' || continue
+	if ! out=$(chroot "$FS" /usr/local/bin/php -l "/$f" 2>&1); then
+		echo "  PARSE ERROR  $f"
+		echo "$out" | sed 's/^/      /'
+		phpbad=$((phpbad + 1))
+	fi
+done
+if [ "$phpbad" -gt 0 ]; then
+	echo "ERROR: $phpbad PHP file(s) in the image do not parse."
+	exit 1
+fi
+echo "  all PHP parses"
+
+# ---------------------------------------------------------------------------
 # The second gate: every PHP function the image calls must exist in the
 # image's PHP. Run inside the chroot so "available" means what the firewall
 # will have, not what the build host has -- php -l and the unit tests both

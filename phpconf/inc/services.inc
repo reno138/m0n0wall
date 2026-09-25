@@ -534,7 +534,7 @@ function services_snmpd_configure() {
 		
 		/* net-snmp replaces ucd-snmp, whose last release was 2002. It
 		   inherited the directive names, so most of this is unchanged, with
-		   two differences that matter:
+		   three differences that matter:
 
 		     rocommunity   ucd-snmp accepted a quoted string; net-snmp parses
 		                   "rocommunity COMMUNITY [SOURCE [OID]]" and treats
@@ -543,18 +543,35 @@ function services_snmpd_configure() {
 		                   every poll is rejected.
 		     agentaddress  ucd-snmp wrote "udp:161@ADDR"; net-snmp wants
 		                   "udp:ADDR:161". The old form is not an error, it
-		                   just does not bind where you asked. */
+		                   just does not bind where you asked.
+		     sysDescr/     net-snmp's system_mib handler copies the REST OF THE
+		     sysLocation/  LINE verbatim, so quoting these puts the quotes
+		     sysContact    inside the MIB value: every poller saw sysLocation
+		                   as "Server room", quotes included. Written bare.
+
+		   The community is restricted to the characters net-snmp can parse
+		   unquoted. services_snmp.php now validates the same set, so what the
+		   page accepts and what the agent answers to are the same string; the
+		   strip here remains as the second line of defence for a config
+		   restored from an older release. If it strips the value down to
+		   nothing, no rocommunity line is written at all -- a bare directive
+		   is a parse error that stops snmpd from starting. */
 		$community = preg_replace('/[^A-Za-z0-9_.-]/', '',
 		                          $config['snmpd']['rocommunity'] ?? '');
 		$syslocation = $config['snmpd']['syslocation'] ?? '';
 		$syscontact = $config['snmpd']['syscontact'] ?? '';
 		$snmpdconf = <<<EOD
-sysDescr "$sysDescr"
-sysLocation "{$syslocation}"
-sysContact "{$syscontact}"
-rocommunity {$community}
+sysDescr $sysDescr
+sysLocation {$syslocation}
+sysContact {$syscontact}
 
 EOD;
+		if ($community !== '')
+			$snmpdconf .= "rocommunity {$community}\n";
+		else
+			log_error("SNMP: the community string contains no usable characters; " .
+			          "no rocommunity written, so the agent will answer nobody.");
+		$snmpdconf .= "\n";
 
 		if (isset($config['snmpd']['bindlan'])) {
 			$snmpdconf .= "agentaddress udp:{$config['interfaces']['lan']['ipaddr']}:161\n";

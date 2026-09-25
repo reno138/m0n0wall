@@ -835,8 +835,13 @@ function pf_rules_generate($ipv6 = false) {
 	   pf_ipsec_rules_generate() was written with the rest of this file but
 	   never called, so the default 'block in all' above dropped every IKE
 	   packet: strongSwan would load its connections, log nothing, and no
-	   tunnel could ever be established from outside. */
-	if (isset($config['ipsec']['enable']) && !empty($ctx['curwanip'])) {
+	   tunnel could ever be established from outside.
+	
+	   L2TP/IPsec counts: it is enabled from its own page, independently of the
+	   IPsec tunnel feature, and its clients need exactly the same ports open. */
+	$l2tp_ipsec = (($config['l2tp']['mode'] ?? '') == 'server')
+	              && !empty($config['l2tp']['ipsec']['psk']);
+	if ((isset($config['ipsec']['enable']) || $l2tp_ipsec) && !empty($ctx['curwanip'])) {
 		$out .= pf_ipsec_rules_generate($ctx['wanif'], $ctx['curwanip']);
 	}
 
@@ -1315,8 +1320,18 @@ function pf_captiveportal_rules_generate($ctx) {
 	if (!$if)
 		return "";
 
-	/* mini_httpd's -maxperip defaulted to 4. */
-	$perip = isset($cp['nomaxperip']) ? 0 : 4;
+	/* The GUI field is 'maxprocperip' ("maximum concurrent connections per
+	   client IP address"). This used to read 'nomaxperip', a key NO page has
+	   ever written, so the cap was permanently 4 whatever the admin typed --
+	   and captiveportal.inc read the real key only into a -maxperip argument
+	   for the mini_httpd that no longer exists.
+	
+	   Semantics follow the page: blank means the old mini_httpd default of 4,
+	   and an explicit 0 means no limit. */
+	if (!isset($cp['maxprocperip']) || $cp['maxprocperip'] === "" || $cp['maxprocperip'] === false)
+		$perip = 4;
+	else
+		$perip = (int) $cp['maxprocperip'];
 
 	$ports = "{ 8000 8001 }";
 	$out  = "\n# captive portal web servers\n";

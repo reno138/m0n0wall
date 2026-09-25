@@ -227,20 +227,14 @@ EOD;
         
         chdir($g['captiveportal_path']);
         
-        if ($config['captiveportal']['maxproc'])
-            $maxproc = $config['captiveportal']['maxproc'];
-        else
-            $maxproc = 16;
-            
-        if (isset($config['captiveportal']['maxprocperip']) &&
-                $config['captiveportal']['maxprocperip'] !== "") {
-            if ($config['captiveportal']['maxprocperip'] == 0)
-                $maxperiparg = "";
-            else
-                $maxperiparg = "-maxperip " . $config['captiveportal']['maxprocperip'];
-        } else
-            $maxperiparg = "-maxperip 4";
-        
+        /* $maxproc and -maxperip used to be built here as mini_httpd command
+           line arguments. Both limits now live where they can actually be
+           enforced: the connection cap in the generated lighttpd config
+           (captiveportal_lighttpd.inc) and the per-IP cap in the pf ruleset
+           (pf_captiveportal_rules_generate), which drops an excess connection
+           in the kernel before a worker is allocated. Nothing read these two
+           variables, so they are gone rather than merely unused. */
+
         /* Write the portal certificate if HTTPS login is enabled; the
            lighttpd instance on 8001 reads it from cert-portal.pem. */
         if (isset($config['captiveportal']['httpslogin']) &&

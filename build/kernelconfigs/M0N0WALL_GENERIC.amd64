@@ -327,6 +327,13 @@ device		hifn
 device		uhci		# UHCI PCI->USB interface
 device		ohci		# OHCI PCI->USB interface
 device		ehci		# EHCI PCI->USB interface (USB 2.0)
+# XHCI is not optional on anything built in roughly the last decade. Plenty of
+# modern boards expose NO EHCI/UHCI/OHCI controller at all, so without this the
+# kernel finds no USB bus whatsoever: no USB keyboard for the console (ukbd), no
+# installing from a USB stick (umass), and no 3G/LTE modem for the Modem WAN
+# type (u3g). It went unnoticed because a QEMU guest is given a UHCI/EHCI
+# controller, so USB works in a VM and dies on real hardware.
+device		xhci		# XHCI PCI->USB interface (USB 3.0)
 device		usb		# USB Bus (required)
 # HID was split into its own subsystem: uhid/ukbd now link against hid(4),
 # so the bus and transport must be declared or the kernel fails to LINK with

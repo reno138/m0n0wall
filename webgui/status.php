@@ -56,8 +56,13 @@ function doCmdT($title, $command, $isstr) {
 					$line = str_replace("\t", "    ", $line);
 					echo htmlspecialchars($line,ENT_NOQUOTES);
 				}
+				/* inside the guard: fclose(false) is a TypeError in PHP 8, and
+				   this is the support page -- it dies mid-render exactly when
+				   someone is trying to collect information about a fault. */
+				fclose($fd);
+			} else {
+				echo "config.xml could not be opened for reading.";
 			}
-			fclose($fd);
 		} else {
 			exec ($command . " 2>&1", $execOutput, $execStatus);
 			for ($i = 0; isset($execOutput[$i]); $i++) {
@@ -142,16 +147,24 @@ defStrT("unparsed ipfw rules", shaper_rules_generate());
 defCmdT("resolv.conf","cat /etc/resolv.conf");
 
 defCmdT("Processes","ps xauww");
-defCmdT("dhcpd.conf","cat /var/etc/dhcpd.conf");
-defCmdT("ez-ipupdate.cache","cat /conf/ez-ipupdate.cache");
+/* dnsmasq serves DHCP now, and its fragment is written by dhcp_dnsmasq.inc.
+   /var/etc/dhcpd.conf has not existed since ISC dhcpd was dropped. */
+defCmdT("dnsmasq.conf","cat /var/etc/dnsmasq.conf");
+defCmdT("dnsmasq DHCP fragment","cat /var/etc/dnsmasq-dhcp.conf");
+defCmdT("DHCP leases","cat " . dhcp_dnsmasq_leasefile());
+/* ez-ipupdate is gone; dyndns.inc records the last announced address itself. */
+defCmdT("dyndns cache","cat /var/db/dyndns.cache");
 if (ipv6enabled())
 	defCmdT("rtadvd.conf","cat /var/etc/rtadvd.conf");
 
 defCmdT("df","/bin/df");
 
-defCmdT("racoon.conf","cat /var/etc/racoon.conf");
-defCmdT("SPD","/usr/local/sbin/setkey -DP");
-defCmdT("SAD","/usr/local/sbin/setkey -D");
+/* strongSwan replaced racoon: there is no racoon.conf and no setkey in the
+   image, so these three panels were empty or an error on every support page. */
+defCmdT("swanctl.conf","cat " . SWANCTL_DIR . "/swanctl.conf");
+defCmdT("IPsec SAs",         SWANCTL_BIN . " --list-sas");
+defCmdT("IPsec policies",    SWANCTL_BIN . " --list-pols");
+defCmdT("IPsec connections", SWANCTL_BIN . " --list-conns");
 
 defCmdT("last 200 system log entries","/usr/bin/tail -n 200 /var/log/system.log 2>&1");
 defCmdT("last 50 filter log entries","/usr/bin/tail -n 50 /var/log/filter.log 2>&1");

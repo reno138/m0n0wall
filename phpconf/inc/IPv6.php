@@ -349,15 +349,37 @@ class Net_IPv6 {
             if(strstr($ip2, '.')) {
                 $c2++;
             }
+            /* Each branch computes how many zero groups the '::' stands for.
+               An address with MORE groups than '::' leaves room for -- which is
+               simply a malformed address, e.g. eight groups either side of a
+               '::' -- makes that count NEGATIVE.
+            
+               In PHP 5 str_repeat() with a negative count raised a warning and
+               returned "". In PHP 8 it throws a ValueError, and nothing here
+               catches it, so typing a too-long IPv6 address into any field on
+               any page killed the page outright instead of producing "the
+               entered value is not a valid IPv6 address".
+            
+               Returning the input unchanged is the right answer: this function
+               cannot expand an address that does not fit, and its callers --
+               is_ipaddr6() above all -- go on to validate the result and will
+               reject it. That turns a fatal into the input error the user
+               should have seen. */
             if(-1 == $c1 && -1 == $c2) { // ::
                 $uip = "0:0:0:0:0:0:0:0";
             } else if(-1==$c1) {              // ::xxx
+                if (7-$c2 < 0)
+                    return $ip;
                 $fill = str_repeat('0:', 7-$c2);
                 $uip =  str_replace('::', $fill, $uip);
             } else if(-1==$c2) {              // xxx::
+                if (7-$c1 < 0)
+                    return $ip;
                 $fill = str_repeat(':0', 7-$c1);
                 $uip =  str_replace('::', $fill, $uip);
             } else {                          // xxx::xxx
+                if (6-$c2-$c1 < 0)
+                    return $ip;
                 $fill = str_repeat(':0:', 6-$c2-$c1);
                 $uip =  str_replace('::', $fill, $uip);
                 $uip =  str_replace('::', ':', $uip);

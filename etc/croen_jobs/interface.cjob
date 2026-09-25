@@ -98,7 +98,14 @@
 				// LAN/OPT/VLAN/WLAN: change status of interface
 				elseif ($enable != croen_get_interface_status($ifinfo['if'])) {
 					if (preg_match("/^wlan/", $ifinfo['if']) && isset($ifinfo['parent'])) {
-						croen_wireless_parent_interface($enable, $ifinfo['if'], $ifinfo['parent'], &$ifdep);
+						/* No & at the call site: call-time pass-by-reference
+						   has been a PARSE error since PHP 5.4, and a job file
+						   that will not parse aborts the whole scheduler run,
+						   not just this job -- so every scheduled task on the
+						   box silently stopped working. The declaration at the
+						   top of this file already says &$deplist, which is
+						   where a reference belongs. */
+						croen_wireless_parent_interface($enable, $ifinfo['if'], $ifinfo['parent'], $ifdep);
 					} else {
 						mwexec("/sbin/ifconfig ".$ifinfo['if']." ".($enable ? "up" : "down"));
 					}

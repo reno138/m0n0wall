@@ -1,7 +1,20 @@
 #!/bin/sh
+#
+# mpd5 iface up-script for the L2TP server.
+#
+# mpd5 invokes it as:  <interface> <proto> <local-ip> <remote-ip> <authname>
+#
+# The log line is parsed by diag_logs_vpn.php as action,interface,ip,user, so
+# field order matters: $4 is the client's address and $5 the authenticated name.
 
 # record login
 /usr/bin/logger -p local3.info "login,$1,$4,$5"
 
-# resync ipfilter
-/sbin/ipf -y
+# No packet-filter resync here.
+#
+# This used to run "/sbin/ipf -y", which resynced ipfilter's view of the
+# interfaces after a link change. ipfilter is gone and /sbin/ipf is not in the
+# image, so every client connect ran a missing binary. pf needs no equivalent:
+# the generated ruleset already names every l2tp interface the server can
+# create (see pf_rule_interface() in filter_pf.inc), so a new client's
+# interface is covered by rules that are already loaded.

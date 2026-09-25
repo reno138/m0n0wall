@@ -113,8 +113,23 @@ if ($_POST) {
 			} else {
 				if (!strstr($_POST['cert'], "BEGIN CERTIFICATE") || !strstr($_POST['cert'], "END CERTIFICATE"))
 					$input_errors[] = "This certificate does not appear to be valid.";
-				if (!strstr($_POST['key'], "BEGIN RSA PRIVATE KEY") || !strstr($_POST['key'], "END RSA PRIVATE KEY"))
-					$input_errors[] = "This key does not appear to be valid.";
+				/* Accept any PEM private key, not just PKCS#1.
+				
+				   This used to insist on "BEGIN RSA PRIVATE KEY", which is
+				   PKCS#1. Every current openssl emits PKCS#8 ("BEGIN PRIVATE
+				   KEY") by default, and an EC key says "BEGIN EC PRIVATE KEY",
+				   so a key generated today was rejected and HTTPS login could
+				   not be configured at all -- even though the OpenSSL 3 that
+				   lighttpd is linked against reads all three happily. */
+				if (!preg_match('/BEGIN (RSA |EC |ENCRYPTED )?PRIVATE KEY/', $_POST['key'])
+				    || !preg_match('/END (RSA |EC |ENCRYPTED )?PRIVATE KEY/', $_POST['key']))
+					$input_errors[] = "This key does not appear to be valid. It should be " .
+					    "a PEM private key, beginning with \"-----BEGIN PRIVATE KEY-----\" " .
+					    "or \"-----BEGIN RSA PRIVATE KEY-----\".";
+				if (strstr($_POST['key'], "ENCRYPTED PRIVATE KEY"))
+					$input_errors[] = "This key is passphrase-protected. lighttpd is " .
+					    "started without a console, so it cannot prompt for one -- " .
+					    "decrypt the key before uploading it.";
 			}
 			
 			if (empty($_POST['httpsname']) || !is_domain($_POST['httpsname'])) {
