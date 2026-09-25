@@ -65,6 +65,16 @@ sbin/umount
 
 # contents of /usr/bin
 usr/bin/gzip:usr/bin/gunzip
+# grep, wc and id: for the Diagnostics > Command prompt page and for anyone
+# working on the serial console. Nothing in the product calls them -- the PHP
+# uses absolute paths to tools that were already here -- but their absence made
+# the console and the exec page far less useful than they look, and it cost me
+# an afternoon of wrongly suspecting popen() when a pipeline silently produced
+# nothing. Every library all three need (libregex, libxo, libcasper,
+# libcap_fileargs, libutil, libnv) is already in the image for other base tools,
+# so this adds about 55KB of binaries and no new library closure.
+usr/bin/grep:usr/bin/egrep:usr/bin/fgrep:usr/bin/rgrep
+usr/bin/id
 usr/bin/killall
 usr/bin/logger
 usr/bin/netstat
@@ -76,6 +86,7 @@ usr/bin/tar
 usr/bin/top
 usr/bin/touch
 usr/bin/uptime:usr/bin/w
+usr/bin/wc
 
 # contents of usr/sbin
 # usr/sbin/ancontrol -- Aironet driver removed from FreeBSD
