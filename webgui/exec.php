@@ -33,7 +33,9 @@
 $omit_nocacheheaders = true;
 require("guiconfig.inc");
 
-if (($_POST['submit'] == "Download") && file_exists($_POST['dlPath'])) {
+/* Every $_POST read here is guarded: this page is reached by GET first, so on
+   the initial render none of these keys exist and each one warned. */
+if ((($_POST['submit'] ?? '') == "Download") && !empty($_POST['dlPath']) && file_exists($_POST['dlPath'])) {
 	session_cache_limiter('public');
 	$fd = fopen($_POST['dlPath'], "rb");
 	header("Content-Type: application/octet-stream");
@@ -43,9 +45,15 @@ if (($_POST['submit'] == "Download") && file_exists($_POST['dlPath'])) {
 	
 	fpassthru($fd);
 	exit;
-} else if (($_POST['submit'] == "Upload") && is_uploaded_file($_FILES['ulfile']['tmp_name'])) {
-	move_uploaded_file($_FILES['ulfile']['tmp_name'], "/tmp/" . $_FILES['ulfile']['name']);
-	$ulmsg = "Uploaded file to /tmp/" . htmlentities($_FILES['ulfile']['name']);
+} else if ((($_POST['submit'] ?? '') == "Upload") && is_uploaded_file($_FILES['ulfile']['tmp_name'] ?? '')) {
+	/* basename(): the browser controls this string, and "../etc/master.passwd"
+	   would otherwise be written wherever it pointed. This page runs arbitrary
+	   commands as root, so an attacker who reaches it has no need of a
+	   traversal -- but a filename from the network should still never be
+	   concatenated into a path unexamined. */
+	$ulname = basename($_FILES['ulfile']['name']);
+	move_uploaded_file($_FILES['ulfile']['tmp_name'], "/tmp/" . $ulname);
+	$ulmsg = "Uploaded file to /tmp/" . htmlentities($ulname);
 	unset($_POST['txtCommand']);
 }
 ?>
@@ -94,7 +102,7 @@ $intYear = $arrDT[5] + 1900;
 
 <?php
 
-if (isBlank( $_POST['txtRecallBuffer'] )) {
+if (isBlank( $_POST['txtRecallBuffer'] ?? '' )) {
    puts( "   var arrRecallBuffer = new Array;" );
 } else {
    puts( "   var arrRecallBuffer = new Array(" );
@@ -230,19 +238,19 @@ pre {
 </style>
 </head>
 <body<?php
-if(!isBlank($_POST['txtCommand'])) {
+if(!isBlank($_POST['txtCommand'] ?? '')) {
     echo ' onload="document.forms[\'frmExecPlus\'].txtCommand.focus();"';
 }
 ?>>
 <p><span class="pgtitle"><?=$Title ?></span>
-<?php if (isBlank($_POST['txtCommand'])): ?>
+<?php if (isBlank($_POST['txtCommand'] ?? '')): ?>
 <p class="red"><strong>Note: this function is unsupported. Use it
 on your own risk!</strong></p>
 <?php endif; ?>
-<?php if ($ulmsg) echo "<p><strong>" . $ulmsg . "</strong></p>\n"; ?>
+<?php if (!empty($ulmsg)) echo "<p><strong>" . $ulmsg . "</strong></p>\n"; ?>
 <?php
 
-if (!isBlank($_POST['txtCommand'])) {
+if (!isBlank($_POST['txtCommand'] ?? '')) {
    puts("<pre>");
    puts("\$ " . htmlspecialchars($_POST['txtCommand']));
    putenv("PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin");
@@ -264,7 +272,7 @@ if (!isBlank($_POST['txtCommand'])) {
     <tr>
       <td valign="top">&nbsp;</td>
       <td valign="top" class="label">
-         <input type="hidden" name="txtRecallBuffer" value="<?=htmlspecialchars($_POST['txtRecallBuffer']) ?>">
+         <input type="hidden" name="txtRecallBuffer" value="<?=htmlspecialchars($_POST['txtRecallBuffer'] ?? '') ?>">
          <input type="button" class="button" name="btnRecallPrev" value="<" onClick="btnRecall_onClick( this.form, -1 );">
          <input type="submit" class="button" value="Execute">
          <input type="button" class="button" name="btnRecallNext" value=">" onClick="btnRecall_onClick( this.form,  1 );">

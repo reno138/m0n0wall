@@ -704,7 +704,27 @@ EOD;
 			fwrite($fd, $upinst);
 			fclose($fd);
 			
-			/* invoke nsupdate */
+			/* invoke nsupdate.
+			
+			   nsupdate is NOT in the image. It comes from bind-tools, which is
+			   8.5MB plus seven dependencies -- too much to carry for this one
+			   feature on an image chosen for being small. So RFC 2136 updating
+			   is currently unavailable, and this says so once per attempt
+			   instead of running a missing binary and reporting success.
+			
+			   The alternatives, if it is wanted: ship bind-tools and accept the
+			   size, or implement DNS UPDATE with TSIG directly in PHP (the
+			   sockets extension is already in the image, so it needs no new
+			   dependency -- roughly 150 lines for the wire format and the HMAC).
+			   The HTTP-API providers above are unaffected; they need no helper
+			   at all. */
+			if (!file_exists("/usr/bin/nsupdate")) {
+				log_error("Dynamic DNS: RFC 2136 updating is not available in this " .
+				          "build (nsupdate is not installed), so {$hostname} was not " .
+				          "updated. The HTTP-based providers on the same page do work.");
+				return 1;
+			}
+
 			$cmd = "/usr/bin/nsupdate -k {$g['varetc_path']}/K{$keyname}+157+00000.private";
 			if (isset($config['dnsupdate']['usetcp']))
 				$cmd .= " -v";

@@ -367,6 +367,19 @@ function csrf_hash($value, $time = null) {
 
 // Load user configuration
 if (function_exists('csrf_startup')) csrf_startup();
+// Start the session NOW, before this file installs an output handler and before
+// any page has produced a byte.
+//
+// csrf_get_tokens() used to be the first thing to call csrf_start(), and it runs
+// while the output handler is rewriting a form -- i.e. after output exists. On a
+// page that flushes early (diag_ping.php and diag_traceroute.php both run a
+// command and flush so the user sees progress) the headers are already gone by
+// then, so session_start() and setcookie() each warned and the token fell back
+// to the weaker cookie algorithm whose cookie could no longer be set. The pages
+// still worked -- the first render happens before the flush -- but every use of
+// them logged two warnings, and the fallback was one step from producing tokens
+// that would not validate.
+csrf_start();
 // Initialize our handler
 if ($GLOBALS['csrf']['rewrite'])     ob_start('csrf_ob_handler');
 // Perform check

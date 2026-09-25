@@ -695,7 +695,10 @@ function captiveportal_passthrumac_configure() {
     /* clear out passthru macs, if necessary */
     unlink_if_exists("{$g['vardb_path']}/captiveportal_mac.db");
 
-    if (is_array($config['captiveportal']['passthrumac']) && count($config['captiveportal']['passthrumac']) > 0) {
+    /* ?? null throughout: a portal with no pass-through MACs, no allowed IPs and
+       no uploaded elements -- which is how every portal starts -- simply has no
+       such section, and is_array() on the bare read warned each time. */
+    if (is_array($config['captiveportal']['passthrumac'] ?? null) && count($config['captiveportal']['passthrumac']) > 0) {
 
         $fd = @fopen("{$g['vardb_path']}/captiveportal_mac.db", "w");
         if (!$fd) {
@@ -738,7 +741,7 @@ function captiveportal_allowedip_configure() {
         unlink("{$g['vardb_path']}/captiveportal_ip.db");
     }
 
-    if (is_array($config['captiveportal']['allowedip'])) {
+    if (is_array($config['captiveportal']['allowedip'] ?? null)) {
 
         $fd = @fopen("{$g['vardb_path']}/captiveportal_ip.db", "w");
         if (!$fd) {
@@ -970,7 +973,7 @@ function captiveportal_write_elements() {
         mkdir($g['captiveportal_element_path']);
     }
     
-    if (is_array($config['captiveportal']['element'])) {
+    if (is_array($config['captiveportal']['element'] ?? null)) {
     
         foreach ($config['captiveportal']['element'] as $data) {
             $fd = @fopen($g['captiveportal_element_path'] . '/' . $data['name'], "wb");

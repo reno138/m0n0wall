@@ -32,136 +32,103 @@
 $pgtitle = array("Diagnostics", "IPsec");
 
 require("guiconfig.inc");
+
+/* Installed IPsec policies, from strongSwan.
+ *
+ * Was "setkey -DP" plus "setkey -c" to delete. setkey belonged to ipsec-tools,
+ * which went with racoon, and is not in the image -- so this page listed nothing
+ * and its delete button ran a missing binary.
+ *
+ * strongSwan installs and removes its own policies as part of establishing and
+ * tearing down a CHILD_SA; there is no separate SPD to edit, which is why there
+ * is no delete control here any more. The way to remove a policy is to terminate
+ * the SA that installed it, on the SAs tab.
+ */
+
+$swanctl_missing = !file_exists(SWANCTL_BIN);
+
+$raw  = "";
+$pols = array();
+if (!$swanctl_missing) {
+	$out = array();
+	exec(SWANCTL_BIN . " --list-pols 2>&1", $out);
+	$raw = implode("\n", $out);
+
+	/* swanctl --list-pols prints, per policy:
+	 *
+	 *   conn1: TUNNEL, reqid 1
+	 *     local  10.1.0.0/24
+	 *     remote 10.2.0.0/24
+	 *
+	 * Only the header line and the two selectors are parsed; anything else is
+	 * left to the verbatim output below. */
+	$cur = null;
+	foreach ($out as $line) {
+		if ($line === "")
+			continue;
+		if ($line[0] !== " " && $line[0] !== "\t") {
+			if (is_array($cur))
+				$pols[] = $cur;
+			$cur = array('name' => '', 'mode' => '', 'local' => '', 'remote' => '');
+			if (preg_match('/^(\S+):\s*([A-Za-z_-]+)?/', $line, $m)) {
+				$cur['name'] = $m[1];
+				$cur['mode'] = $m[2] ?? '';
+			}
+		} else if (is_array($cur)) {
+			$t = trim($line);
+			if (strpos($t, 'local ') === 0)
+				$cur['local'] = trim(substr($t, 6));
+			else if (strpos($t, 'remote ') === 0)
+				$cur['remote'] = trim(substr($t, 7));
+		}
+	}
+	if (is_array($cur))
+		$pols[] = $cur;
+}
 ?>
 <?php include("fbegin.inc"); ?>
 <table width="100%" border="0" cellpadding="0" cellspacing="0">
   <tr><td class="tabnavtbl">
   <ul id="tabnav">
 <?php 
-    	$tabs = array('SAD' => 'diag_ipsec_sad.php',
-            		  'SPD' => 'diag_ipsec_spd.php');
+    	$tabs = array('SAs' => 'diag_ipsec_sad.php',
+            		  'Policies' => 'diag_ipsec_spd.php');
 		dynamic_tab_menu($tabs);
 ?>
   </ul>
   </td></tr>
   <tr> 
     <td class="tabcont">
-<?php
-
-/* delete any SPs? */
-if (isset($_POST['del_x']) && is_array($_POST['entries'] ?? null)) {
-	$fd = @popen("/usr/local/sbin/setkey -c > /dev/null 2>&1", "w");
-	if ($fd) {
-		foreach ($_POST['entries'] as $entry) {
-			list ($src,$dst,$dir) = explode(";", $entry);
-			fwrite($fd, "spddelete $src $dst any -P $dir ;\n");
-		}
-		pclose($fd);
-		sleep(1);
-	}
-}
-
-/* query SAD */
-$fd = @popen("/usr/local/sbin/setkey -DP", "r");
-$spd = array();
-if ($fd) {
-	while (!feof($fd)) {
-		$line = chop(fgets($fd));
-		if (!$line)
-			continue;
-		if ($line == "No SPD entries.")
-			break;
-		if ($line[0] != "\t") {
-			if (is_array($cursp ?? null)) {
-				$spi=$cursp['spi'] ?? null;
-				$spd[$spi] = $cursp;
-			}
-			$cursp = array();
-			$linea = explode(" ", $line);
-			$cursp['src'] = $linea[0];
-			$cursp['dst'] = $linea[1];
-			$i = 0;
-		} else if (is_array($cursp ?? null)) {
-			$linea = explode(" ", trim($line));
-			if ($i == 1) {
-				if ($linea[1] == "none")	/* don't show default anti-lockout rule */
-					unset($cursp);
-				else
-					$cursp['dir'] = $linea[0];
-			} else if ($i == 2) {
-				$upperspec = explode("/", $linea[0]);
-				$cursp['proto'] = $upperspec[0];
-				list($cursp['ep_src'], $cursp['ep_dst']) = explode("-", $upperspec[2]);
-			} else if ($i == 3) {
-				$upperspec = explode("=", $linea[0]);
-				$cursp['spi'] = $upperspec[1];
-			}
-		}
-		$i++;
-	}
-	if (is_array($cursp ?? null) && count($cursp)) {
-		$spi = $cursp['spi'] ?? null;
-		$spd[$spi] = $cursp;
-	}	/* braces: the second line always ran, storing $spd[""] = null */
-	pclose($fd);
-}
-if (count($spd)):
-?>
-<form action="diag_ipsec_spd.php" method="post">
+<?php if ($swanctl_missing): ?>
+<p><strong>swanctl was not found.</strong> IPsec status cannot be read without it.</p>
+<?php elseif (count($pols)): ?>
             <table width="100%" border="0" cellpadding="0" cellspacing="0" summary="inner content pane">
   <tr>
-    			<td class="list">&nbsp;</td>
-                <td nowrap class="listhdrr">Source</td>
-                <td nowrap class="listhdrr">Destination</td>
-                <td nowrap class="listhdrr">Direction</td>
-                <td nowrap class="listhdrr">Protocol</td>
-                <td nowrap class="listhdrr">Tunnel endpoints</td>
-                <td nowrap class="list"></td>
+                <td nowrap class="listhdrr">Connection</td>
+                <td nowrap class="listhdrr">Mode</td>
+                <td nowrap class="listhdrr">Local network</td>
+                <td nowrap class="listhdr">Remote network</td>
 	</tr>
-<?php
-ksort($spd);
-foreach ($spd as $sp): ?>
+<?php foreach ($pols as $p): ?>
 	<tr>
-		<?php
-			$args = htmlspecialchars(($sp['src'] ?? '') . ";" . ($sp['dst'] ?? '') . ";" . ($sp['dir'] ?? ''));
-		?>
-		<td class="listt"><input type="checkbox" name="entries[]" value="<?=$args;?>" style="margin: 0 5px 0 0; padding: 0; width: 15px; height: 15px;"></td>
-		<td class="listlr" valign="top"><?=htmlspecialchars($sp['src'] ?? '');?></td>
-		<td class="listr" valign="top"><?=htmlspecialchars($sp['dst'] ?? '');?></td>
-		<td class="listr" valign="top"><img src="<?=$sp['dir'] ?? '';?>.gif" width="11" height="11" style="margin-top: 2px"></td>
-		<td class="listr" valign="top"><?=htmlspecialchars(strtoupper($sp['proto'] ?? ''));?></td>
-		<td class="listr" valign="top"><?=htmlspecialchars($sp['ep_src'] ?? '');?> - <br>
-			<?=htmlspecialchars($sp['ep_dst'] ?? '');?></td>
-		<td class="list" nowrap>
-		</td>
-				
+		<td class="listlr"><?=htmlspecialchars($p['name']);?></td>
+		<td class="listr"><?=htmlspecialchars($p['mode']);?></td>
+		<td class="listr"><?=htmlspecialchars($p['local']);?></td>
+		<td class="listr"><?=htmlspecialchars($p['remote']);?></td>
 	</tr>
 <?php endforeach; ?>
-	 <tr> 
-	   <td></td>
-	 </tr> 
-	 <tr> 
-	   <td class="list" colspan="6"></td>
-	   <td class="list"><input name="del" type="image" src="x.gif" width="17" height="17" title="delete selected SPs" alt="delete selected SPs" onclick="return confirm('Do you really want to delete the selected security policies?')"></td>
-	 </tr>
 </table>
-<br>
-<table border="0" cellspacing="0" cellpadding="0" summary="inout content pane">
-  <tr> 
-	<td width="16"><img src="in.gif" width="11" height="11" alt=""></td>
-	<td>incoming (as seen by firewall)</td>
-  </tr>
-  <tr> 
-	<td colspan="5" height="4"></td>
-  </tr>
-  <tr> 
-	<td><img src="out.gif" width="11" height="11" alt=""></td>
-	<td>outgoing (as seen by firewall)</td>
-  </tr>
-</table>
-</form>
+<p><span class="vexpl">strongSwan installs and removes these itself as the
+matching security association comes up and goes down, so there is nothing to
+delete here. To remove a policy, terminate its SA on the
+<a href="diag_ipsec_sad.php">SAs</a> tab.</span></p>
 <?php else: ?>
-<p><strong>No IPsec security policies.</strong></p>
+<p><strong>No IPsec policies installed.</strong></p>
+<?php endif; ?>
+<?php if (!$swanctl_missing && $raw !== ""): ?>
+<p>&nbsp;</p>
+<p><span class="vexpl">Full output of <tt>swanctl --list-pols</tt>:</span></p>
+<pre class="cmdoutput"><?=htmlspecialchars($raw);?></pre>
 <?php endif; ?>
 </td></tr></table>
 <?php include("fend.inc"); ?>

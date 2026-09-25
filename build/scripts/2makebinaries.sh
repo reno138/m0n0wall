@@ -396,6 +396,17 @@ chroot "$FS" /usr/local/bin/php -r \
 php "$SRC/build/scripts/checkfuncs.php" "$MW_BUILDPATH/tmp/image-funcs.txt" "$FS" || exit 1
 rm -f "$MW_BUILDPATH/tmp/image-funcs.txt"
 
+# ---------------------------------------------------------------------------
+# Gate: every external binary the shipped PHP tries to run must be IN the image.
+#
+# A missing binary is completely silent -- mwexec() gets 127, exec() fills
+# nothing in, and the feature just does not happen. Two menu pages (Diagnostics
+# > IPsec) listed nothing for exactly this reason, and a System: Advanced
+# checkbox configured nothing. See the header of checkbins.php.
+# ---------------------------------------------------------------------------
+echo "Verifying every binary the image's PHP invokes is present..."
+php "$SRC/build/scripts/checkbins.php" "$FS" "$SRC" || exit 1
+
 # etc/rc regenerates this at every boot; don't ship a stale one.
 rm -f "$FS/var/run/ld-elf.so.hints"
 

@@ -73,9 +73,22 @@ function enable_cpuhwcrypto() {
 function load_kernel_modules() {
 	global $config;
 
-	/* Load Ralink firmware */
-	if (isset($config['system']['ralink'])) {
-		mwexec("/sbin/kldload runfw");
+	/* No Ralink firmware load.
+	
+	   sys/modules/runfw does not exist in FreeBSD 15 -- the firmware images
+	   moved into the run(4) driver, which is compiled in -- so "kldload runfw"
+	   could only ever fail. The System: Advanced checkbox that drove it is gone
+	   with it. */
+
+	/* Temperature sensors, for the System status page.
+	
+	   Only loaded when the option is on: probing them costs nothing on hardware
+	   that has them and they simply fail to attach on hardware that does not,
+	   but there is no reason to attach drivers nobody asked for. Whichever of
+	   the two matches this CPU will load; the other fails harmlessly. */
+	if (isset($config['system']['webgui']['sensors']['enable'])) {
+		mwexec("/sbin/kldload coretemp");
+		mwexec("/sbin/kldload amdtemp");
 	}
 }
 

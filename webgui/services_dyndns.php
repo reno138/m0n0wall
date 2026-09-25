@@ -249,6 +249,15 @@ function enable_change(enable_change) {
 				    <td align="right" class="optsect_s"><input name="dnsupdate_enable" type="checkbox" value="yes" <?php if (!empty($pconfig['dnsupdate_enable'])) echo "checked"; ?> onClick="enable_change(false)"> <strong>Enable</strong></td></tr>
 				  </table></td>
                 </tr>
+                <tr>
+                  <td colspan="2" class="vtable"><span class="vexpl"><span class="red"><strong>Not
+                  available in this build.</strong></span> RFC 2136 updates need
+                  <tt>nsupdate</tt>, which is part of bind-tools &ndash; 8.5&nbsp;MB plus
+                  seven dependencies, more than this image carries for one feature. The
+                  settings below are still saved, and an attempt to use them is recorded in
+                  the system log, but no update is sent. The HTTP-based providers above are
+                  unaffected and work normally.</span></td>
+                </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">Hostname</td>
                   <td width="78%" class="vtable"> 

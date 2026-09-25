@@ -32,7 +32,7 @@
 $pgtitle = array("System", "Advanced setup");
 require("guiconfig.inc");
 $pconfig['nospoofcheck'] = isset($config['bridge']['nospoofcheck']);
-$pconfig['mbmon'] = isset($config['system']['webgui']['mbmon']['enable']);
+$pconfig['sensors'] = isset($config['system']['webgui']['sensors']['enable']);
 $pconfig['cert'] = base64_decode($config['system']['webgui']['certificate'] ?? '');
 $pconfig['key'] = base64_decode($config['system']['webgui']['private-key'] ?? '');
 $pconfig['disableconsolemenu'] = isset($config['system']['disableconsolemenu']);
@@ -47,7 +47,6 @@ $pconfig['tcpidletimeout'] = $config['filter']['tcpidletimeout'] ?? null;
 $pconfig['preferoldsa_enable'] = isset($config['ipsec']['preferoldsa']);
 $pconfig['polling_enable'] = isset($config['system']['polling']);
 $pconfig['ipfstatentries'] = $config['diag']['ipfstatentries'] ?? null;
-$pconfig['ralink_enable'] = isset($config['system']['ralink']);
 $pconfig['portrangelow'] = $config['nat']['portrange-low'] ?? null;
 $pconfig['portrangehigh'] = $config['nat']['portrange-high'] ?? null;
 
@@ -103,8 +102,10 @@ if ($_POST) {
 
 	if (empty($input_errors)) {
 		$config['bridge']['nospoofcheck'] = !empty($_POST['nospoofcheck']) ? true : false;
-		$config['system']['webgui']['mbmon']['enable'] = !empty($_POST['mbmon']) ? true : false;
-		$config['system']['webgui']['mbmon']['type'] = $_POST['mbmontype'] ?? null;
+		$config['system']['webgui']['sensors']['enable'] = !empty($_POST['sensors']) ? true : false;
+		$config['system']['webgui']['sensors']['type'] = $_POST['sensorstype'] ?? null;
+		/* the mbmon key is retired -- see the sensor block in index.php */
+		unset($config['system']['webgui']['mbmon']);
 		$oldcert = $config['system']['webgui']['certificate'] ?? null;
 		$oldkey = $config['system']['webgui']['private-key'] ?? null;
 		$config['system']['webgui']['certificate'] = base64_encode($_POST['cert'] ?? '');
@@ -130,8 +131,8 @@ if ($_POST) {
 			unset($config['diag']['ipfstatentries']);
 		else
 			$config['diag']['ipfstatentries'] = $_POST['ipfstatentries'] ?? null;	
-		$oldralink = isset($config['system']['ralink']);
-		$config['system']['ralink'] = !empty($_POST['ralink_enable']) ? true : false;
+		/* 'ralink' is retired: see the note where the checkbox used to be. */
+		unset($config['system']['ralink']);
 		$config['nat']['portrange-low'] = $_POST['portrangelow'] ?? null;
 		$config['nat']['portrange-high'] = $_POST['portrangehigh'] ?? null;
 		
@@ -141,7 +142,7 @@ if ($_POST) {
 				|| ($config['system']['webgui']['private-key'] != $oldkey)
 				|| ($config['filter']['tcpidletimeout'] != $oldtcpidletimeout)
 				|| (isset($config['system']['polling']) != $oldpolling)
-				|| (isset($config['system']['ralink']) != $oldralink)) {
+				) {
 			touch($d_sysrebootreqd_path);
 		}
 		if (($g['platform'] == "generic-pc" || $g['platform'] == "generic-pc-serial") && ($config['system']['harddiskstandby'] != $oldharddiskstandby)) {
@@ -275,16 +276,20 @@ if ($_POST) {
 				<table >
 					<tr>
 					<td > 
-                    <select class="formfld" name="mbmontype" align="bottom">
-					<option <?php if(!(($config['system']['webgui']['mbmon']['type'] ?? null) == 'F')) echo('selected');?> value="C">&deg;C</option>
-					<option <?php if(($config['system']['webgui']['mbmon']['type'] ?? null) == 'F') echo('selected');?> value="F">&deg;F</option>
+                    <select class="formfld" name="sensorstype" align="bottom">
+					<option <?php if(!(($config['system']['webgui']['sensors']['type'] ?? null) == 'F')) echo('selected');?> value="C">&deg;C</option>
+					<option <?php if(($config['system']['webgui']['sensors']['type'] ?? null) == 'F') echo('selected');?> value="F">&deg;F</option>
 					</select></td>
 					<td>
-						<input id="mbmon" <?php if (!empty($pconfig['mbmon'])) echo "checked"; ?>=""  name="mbmon" type="checkbox" value="yes"><strong> Enable Motherboard Monitoring</strong></td>
+						<input id="sensors" <?php if (!empty($pconfig['sensors'])) echo "checked"; ?> name="sensors" type="checkbox" value="yes"><strong> Show system temperatures</strong></td>
 						</tr>
 					</table>
 					<span class="vexpl">
-                    This will display Motherboard information on the system status page for supported chipsets.  On some systems this may cause a delay in loading the system status page or wrong temperatures.</span></td>
+                    Shows CPU and chassis temperatures on the
+                    <a href="index.php">System status</a> page, read from
+                    coretemp(4) on Intel, amdtemp(4) on AMD and the ACPI thermal
+                    zones. Nothing is shown if the hardware exposes no sensors
+                    &ndash; virtual machines usually do not.</span></td>
                 </tr>
 				<tr> 
                   <td width="22%" valign="top" class="vncell">Console menu </td>
@@ -369,15 +374,13 @@ if ($_POST) {
     				Default is 300. Setting this to a very high value will cause a slowdown when viewing the
     				firewall states page, depending on your system's processing power.</span></td>
 			    </tr>
-				<tr>
-				  <td width="22%" valign="top" class="vncell">Additional firmware</td>
-                  <td width="78%" class="vtable"> 
-                    <input name="ralink_enable" type="checkbox" id="ralink_enable" value="yes" <?php if (!empty($pconfig['ralink_enable'])) echo "checked"; ?>>
-                    <strong>Enable Ralink USB wireless devices</strong><br>
-					Load additional kernel modules that will allow using network devices that require a specific firmware module.
-					Do not enable any of these modules if all of your network interfaces show up as expected.
-					</td>
-				</tr>
+				<!-- The "Enable Ralink USB wireless devices" checkbox is gone.
+				     It loaded the runfw firmware module, and sys/modules/runfw
+				     no longer exists in FreeBSD 15 -- the firmware moved into
+				     the run(4) driver itself, which is already compiled in. So
+				     the kldload could only fail, and the option was a control
+				     that configured nothing. Ralink USB adapters work without
+				     it. -->
                 <tr> 
                   <td width="22%" valign="top">&nbsp;</td>
                   <td width="78%"> 

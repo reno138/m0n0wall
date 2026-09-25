@@ -155,118 +155,72 @@ if ($_POST) {
 			  	</td>
               </tr>
 			  <?php
-					if ( isset($config['system']['webgui']['mbmon']['enable']) ) {
-								if (($config['system']['webgui']['mbmon']['type'] ?? null) == 'F') {
-                                exec("/usr/local/bin/mbmon -f -c1 -r 2>/dev/null ", $mbmonop, $error);
-								} else {
-								exec("/usr/local/bin/mbmon -c1 -r 2>/dev/null ", $mbmonop, $error);
-								}
-                                if (!$error){
-                        ?>
+					/* System sensors.
+					
+					   This used to shell out to /usr/local/bin/mbmon, which is
+					   not in the image -- so the "Enable Motherboard Monitoring"
+					   option on System: Advanced configured nothing and this
+					   block never rendered. Shipping mbmon would not have been
+					   the right fix either: it reads a handful of Super I/O
+					   chips from the early 2000s and knows nothing about any
+					   CPU made since.
+					
+					   FreeBSD reports CPU temperature through coretemp(4) on
+					   Intel and amdtemp(4) on AMD, and chassis temperature
+					   through ACPI thermal zones, all as sysctls. That covers
+					   essentially every machine this will run on, needs no
+					   extra binary, and the two drivers are kernel modules
+					   loaded by system.inc when the option is on. */
+					if (isset($config['system']['webgui']['sensors']['enable'])) {
+						$fahrenheit = (($config['system']['webgui']['sensors']['type'] ?? null) == 'F');
+						$sensors = array();
+
+						/* dev.cpu.N.temperature and the ACPI thermal zones both
+						   read back as "42.0C" -- tenths of a Kelvin formatted
+						   by the kernel, so the unit is always C here. */
+						$sysctls = array();
+						exec("/sbin/sysctl -n hw.ncpu 2>/dev/null", $ncpuout);
+						$ncpu = (int) ($ncpuout[0] ?? 1);
+						for ($c = 0; $c < $ncpu; $c++)
+							$sysctls["CPU $c"] = "dev.cpu.$c.temperature";
+						/* thermal zones, however many the firmware exposes */
+						$tzout = array();
+						exec("/sbin/sysctl -N hw.acpi.thermal 2>/dev/null", $tzout);
+						foreach ($tzout as $tzname) {
+							if (preg_match('/^hw\.acpi\.thermal\.(tz\d+)\.temperature$/', trim($tzname), $tzm))
+								$sysctls["Thermal zone " . substr($tzm[1], 2)] = trim($tzname);
+						}
+
+						foreach ($sysctls as $label => $oid) {
+							$v = array();
+							exec("/sbin/sysctl -n " . escapeshellarg($oid) . " 2>/dev/null", $v);
+							$raw = trim($v[0] ?? '');
+							if ($raw === '' || !preg_match('/^(-?[0-9.]+)\s*C$/', $raw, $vm))
+								continue;
+							$deg = (float) $vm[1];
+							$sensors[$label] = $fahrenheit
+							                   ? sprintf('%.1f &deg;F', $deg * 9 / 5 + 32)
+							                   : sprintf('%.1f &deg;C', $deg);
+						}
+
+						if (count($sensors)) {
+					?>
 				<tr>
-				<td width="25%" class="vncellt">System Temperatures</td>
+				<td width="25%" class="vncellt">System temperatures</td>
 				<td width="75%" class="listr">
-				<table width="100%" >
-                                           <?php
-                                                foreach ($mbmonop as $mbival) {
-                                                        if (preg_match('/^TEMP/',$mbival)) {
-																$mbmonp = explode(':',$mbival);
-																?>
+				<table width="100%">
+					<?php foreach ($sensors as $label => $val): ?>
 				<tr>
-				<td align="right" width="15%" class="listsensor">
-																<?php
-                                                                echo htmlspecialchars(str_replace('TEMP', 'Sensor ',$mbmonp[0]));
-																?>
-				</td>
-				<td align="left" width="85%" class="listsensorval">
-																<?php
-																echo htmlspecialchars($mbmonp[1]);
-																if (($config['system']['webgui']['mbmon']['type'] ?? null) == 'F') {
-                                                                echo '&deg;F</td></tr>';
-																} else {
-																echo '&deg;C</td></tr>';
-																}
-																
-                                                        }
-                                                }
-                                          ?>
-				</table></td>
+				<td align="right" width="30%" class="listsensor"><?=htmlspecialchars($label);?></td>
+				<td align="left" width="70%" class="listsensorval"><?=$val;?></td>
 				</tr>
-				<tr>
-				<td width="25%" class="vncellt">System Fans</td>
-				<td width="75%" class="listr">
-				<table width="100%" >
-										<?php
-                                                foreach ($mbmonop as $mbival) {
-                                                        if (preg_match('/^FAN/',$mbival)) {
-																$mbmonp = explode(':',$mbival);
-																?>
-				<tr>
-				<td align="right" width="15%" class="listsensor">
-																<?php
-                                                                echo htmlspecialchars(str_replace('FAN', 'Fan ',$mbmonp[0]));
-																?>
+					<?php endforeach; ?>
+				</table>
 				</td>
-				<td align="left" width="85%" class="listsensorval">
-																<?php
-																echo htmlspecialchars($mbmonp[1]);
-                                                                echo ' rpm</td></tr>';
-                                                        }
-                                                }
-                                        ?>
-				</table></td>
 				</tr>
-				<tr>
-				<td width="25%" class="vncellt">System Voltages</td>
-				<td width="75%" class="listr">
-				<table width="100%" >
-										<?php
-                                                foreach ($mbmonop as $mbival) {
-                                                        if (preg_match('/^V\d+/',$mbival)) {
-																$oldvolts = array('V33', 'V50P','V12P', 'V12N', 'V50N');
-                                                                $nicevolts = array('+3.3v','+5v','+12v','-12v','-5v');
-																$mbmonp = explode(':',$mbival);
-																?>
-				<tr>
-				<td align="right" width="15%" class="listsensor">
-																<?php
-                                                                echo str_replace($oldvolts,$nicevolts,$mbmonp[0]);
-																?>
-				</td>
-				<td align="left" width="85%" class="listsensorval">
-																<?php
-																echo htmlspecialchars($mbmonp[1]);
-                                                                echo ' V</td></tr>';
-																
-                                                        }
-                                                }
-                                        ?>
-				</table></td>
-				</tr>
-				<tr>
-				<td width="25%" class="vncellt">Core Voltages</td>
-				<td width="75%" class="listr">
-				<table width="100%" >
-										<?php
-                                                foreach ($mbmonop as $mbival) {
-                                                        if (preg_match('/^VC/',$mbival)) {
-																$mbmonp = explode(':',$mbival);
-																?>
-				<tr>
-				<td align="right" width="15%" class="listsensor">
-																<?php
-                                                                echo htmlspecialchars(str_replace('VC', 'Core ',$mbmonp[0]));
-																?></td>
-				<td align="left" width="85%" class="listsensorval">
-																<?php
-																echo htmlspecialchars($mbmonp[1]);
-                                                                echo ' V</td></tr>';
-																
-                                                        }
-                                                }
-										echo '</table></td></tr>';
-                                }
-                        }
+					<?php
+						}
+					}
 						?>
               <tr> 
                 <td width="25%" class="vncellt" valign="top">Notes</td>

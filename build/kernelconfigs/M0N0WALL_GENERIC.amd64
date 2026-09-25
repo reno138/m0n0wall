@@ -28,7 +28,10 @@
 cpu		HAMMER	
 ident		M0N0WALL_GENERIC64
 
-makeoptions	MODULES_OVERRIDE="dummynet glxsb aesni padlock ipfw if_vlan"	# if_tap merged into tuntap (compiled in); runfw removed from the tree
+# coretemp/amdtemp give CPU temperature through sysctl on Intel and AMD
+# respectively, which is what the System status page reads now that mbmon is
+# gone; 25KB and 35KB, loaded only when the option is enabled.
+makeoptions	MODULES_OVERRIDE="dummynet glxsb aesni padlock ipfw if_vlan coretemp amdtemp"	# if_tap merged into tuntap (compiled in); runfw removed from the tree
 
 options		HZ=1000
 
