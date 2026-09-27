@@ -251,7 +251,7 @@ function showhide(tspan, tri) {
 }
 -->
 </script>
-<table width="750" border="0" cellspacing="0" cellpadding="2" summary="outer first pane">
+<table class="shell" border="0" cellspacing="0" cellpadding="2" summary="outer first pane">
   <tr valign="bottom"> 
     <td width="150" height="65" align="center" valign="middle"> <strong><a href="http://m0n0.ch/wall" target="_blank"><img src="/logo.gif" width="150" height="47" border="0" alt=""></a></strong></td>
     <td height="65" bgcolor="#435370">
@@ -331,7 +331,7 @@ dynamic_menu($menu['Diagnostics'], 'Diagnostics');
 			  </font></span>
             </td>
         </tr></table></td>
-    <td width="600"><table width="100%" border="0" cellpadding="10" cellspacing="0" summary="outer content pane">
+    <td><table width="100%" border="0" cellpadding="10" cellspacing="0" summary="outer content pane">
         <tr><td>
 <?php if (empty($pgtitle_omit)): ?>
       <p class="pgtitle"><?=gentitle($pgtitle);?></p>

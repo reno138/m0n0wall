@@ -73,8 +73,8 @@ foreach ($ifdescrs as $ifn => $ifd) {
 </select>
 </form>
 <div align="center">
-<object data="graph.php?ifnum=<?=htmlspecialchars($ifnum ?? '');?>&amp;ifname=<?=rawurlencode($ifdescrs[$curif] ?? '');?>" type="image/svg+xml" width="550" height="275">
-<embed src="graph.php?ifnum=<?=htmlspecialchars($ifnum ?? '');?>&amp;ifname=<?=rawurlencode($ifdescrs[$curif] ?? '');?>" type="image/svg+xml" width="550" height="275"/>
+<object data="graph.php?ifnum=<?=htmlspecialchars($ifnum ?? '');?>&amp;ifname=<?=rawurlencode($ifdescrs[$curif] ?? '');?>" type="image/svg+xml" width="100%" height="275">
+<embed src="graph.php?ifnum=<?=htmlspecialchars($ifnum ?? '');?>&amp;ifname=<?=rawurlencode($ifdescrs[$curif] ?? '');?>" type="image/svg+xml" width="100%" height="275"/>
 </object>
 </div>
 <?php include("fend.inc"); ?>

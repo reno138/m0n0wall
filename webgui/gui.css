@@ -397,3 +397,28 @@ ul#tabnav li.tabact {
 .gaugetable {
 	border: 1px solid #C0C0C0;
 }
+
+/* The page shell.
+ *
+ * This was width="750" hard-coded on the outer table in fbegin.inc -- the
+ * 800x600 screen the interface was designed for in 2003. Every page includes
+ * that one file, so the whole webGUI was capped at 750px no matter how much
+ * screen there was, and on any modern display most of it went unused while the
+ * rule and lease tables stayed cramped.
+ *
+ * Fluid instead. Nothing else about the look changes: the menu column is still
+ * 150px, the colours, fonts, borders and controls are untouched, and the 99
+ * pages whose own tables are already width="100%" simply get the room.
+ *
+ * min-width keeps the original 750px design as the FLOOR, so the layout can
+ * never collapse into an unreadable squeeze -- a narrow window scrolls
+ * horizontally instead, which is what these dense tables want.
+ *
+ * Deliberately NO max-width: the point was to stop wasting the display. If very
+ * wide tables ever want reining in, add e.g. max-width: 1600px here and the
+ * shell will centre itself.
+ */
+table.shell {
+	width: 100%;
+	min-width: 750px;
+}

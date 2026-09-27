@@ -34,8 +34,8 @@ require("guiconfig.inc");
 ?>
 <?php include("fbegin.inc"); ?>
 <div align="center">
-<object data="graph_cpu.php" type="image/svg+xml" width="550" height="275">
-<embed src="graph_cpu.php" type="image/svg+xml" width="550" height="275"/>
+<object data="graph_cpu.php" type="image/svg+xml" width="100%" height="275">
+<embed src="graph_cpu.php" type="image/svg+xml" width="100%" height="275"/>
 </object>
 </div>
 <?php include("fend.inc"); ?>
