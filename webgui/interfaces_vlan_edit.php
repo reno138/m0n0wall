@@ -144,20 +144,36 @@ if ($_POST) {
 		write_config();
 
 		if (!$isnew && $wirechanged) {
-			/* An edit still requires a reboot, and the notice is now literally
-			   true: no ifconfig runs here at all.
+			/* Applied live: the interface is retargeted in place, not
+			   destroyed and recreated, so its addresses, pf states and leases
+			   survive -- see interfaces_vlan_retag_if(). Then whatever is
+			   assigned on top is re-applied.
 			   
-			   Applying an edit means "ifconfig vlanN destroy" followed by a
-			   recreate -- "create" on its own is a no-op on an interface that
-			   already exists, which is why an edited tag never used to reach the
-			   wire either. That destroy takes the interface's addresses, IPv6
-			   configuration, pf states and DHCP leases with it, and vlanN may be
-			   assigned to LAN, WAN or an OPT -- possibly the very interface this
-			   request arrived on, in which case the connection dies before the
-			   redirect. So the change is saved and the reboot, which rebuilds
-			   every vlan interface from an empty slate, applies it. */
-			touch($d_sysrebootreqd_path);
-			header("Location: interfaces_vlan.php");
+			   If the tag or parent changed on the VLAN that carries this very
+			   session, the session goes wherever the admin just moved it --
+			   which is what they asked for, and what the reboot used to do
+			   too, only a minute later.
+			   
+			   Held, as every page's apply is, while a reboot is already
+			   pending: then the live vlanN names may not match the config
+			   positions, and vlan{$id} could be somebody else's interface. */
+			if (file_exists($d_sysrebootreqd_path)) {
+				header("Location: interfaces_vlan.php?status=held");
+				exit;
+			}
+			config_lock();
+			$retval = interfaces_vlan_retag_if($id, $vlan);
+			if ($retval == 0)
+				$retval = interfaces_vlan_reapply();
+			config_unlock();
+			if ($retval != 0) {
+				log_error("VLAN: could not apply the change to vlan{$id} " .
+					"(tag {$vlan['tag']} on {$vlan['if']}) live; a reboot will");
+				touch($d_sysrebootreqd_path);
+				header("Location: interfaces_vlan.php?status=failed");
+				exit;
+			}
+			header("Location: interfaces_vlan.php?status=applied");
 			exit;
 		}
 

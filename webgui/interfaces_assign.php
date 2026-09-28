@@ -174,10 +174,19 @@ if ($_POST) {
 		             its rules have just gone from the config.
 		     reassign an OPT's port: same as a delete of the old device plus a
 		             configure of the new one, so also live.
-		     reassign LAN's or WAN's port: reboot, and this one is real. The
-		             management session is ON lan, and wan carries dhclient /
-		             pppoe / modem state that is not re-derivable in place. */
-		$reboot_needed = false;   /* lan or wan was re-plugged */
+		     reassign WAN's port: down the old device, then
+		             interfaces_wan_configure(). That is exactly what
+		             interfaces_wan.php already does live for a change of WAN
+		             TYPE (DHCP <-> PPPoE <-> static), which is the harder case:
+		             it kills dhclient/pppoe, strips and re-addresses the
+		             device and, outside boot, re-runs routing, pf and NAT,
+		             shaper, IPsec, dyndns and dnsmasq. A new port is the same
+		             work with a different device name.
+		     reassign LAN's port: reboot, and this one is real. The
+		             management session is ON lan; moving it live would cut
+		             the very connection that submitted the change. */
+		$reboot_needed = false;   /* lan was re-plugged */
+		$wan_replugged = false;
 		$todown = array();        /* real device names no longer used by their interface */
 		
 		foreach ($_POST as $ifname => $ifport) {
@@ -208,10 +217,14 @@ if ($_POST) {
 					   like a re-plug. */
 					$oldif = $config['interfaces'][$ifname]['if'] ?? '';
 					if ($oldif !== $ifport) {
-						if (($ifname == 'lan') || ($ifname == 'wan'))
+						if ($ifname == 'lan') {
 							$reboot_needed = true;
-						else if ($oldif !== '')
-							$todown[] = $oldif;
+						} else {
+							if ($ifname == 'wan')
+								$wan_replugged = true;
+							if ($oldif !== '')
+								$todown[] = $oldif;
+						}
 					}
 					
 					$config['interfaces'][$ifname]['if'] = $ifport;
@@ -353,6 +366,12 @@ if ($_POST) {
 				   what interfaces_opt.php does for an address change. */
 				$retval = interfaces_optional_configure();
 				
+				/* WAN last, so its pf/NAT regeneration sees the final OPT
+				   state too. It re-runs the filter a second time when both
+				   changed; one extra ruleset load is cheap next to a reboot. */
+				if ($wan_replugged)
+					$retval |= interfaces_wan_configure();
+				
 				config_unlock();
 			}
 			
@@ -471,7 +490,7 @@ if ($_POST) {
 </table>
   <input name="Submit" type="submit" class="formbtn" value="Save"><br><br>
 <p><span class="vexpl"><strong><span class="red">Warning:</span><br>
-</strong>After you click &quot;Save&quot;, you must reboot the firewall to make the changes take effect. You may also have to do one or more of the following steps before you can access your firewall again: </span></p>
+</strong>Changes to WAN and to optional interfaces take effect as soon as you click &quot;Save&quot;. Moving LAN to a different port is the one change that needs a reboot, because this page is reached over LAN. After that reboot you may have to do one or more of the following before you can access your firewall again: </span></p>
 <ul>
   <li><span class="vexpl">change the IP address of your computer</span></li>
   <li><span class="vexpl">renew its DHCP lease</span></li>

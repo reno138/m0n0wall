@@ -181,11 +181,36 @@ function interfaces_vlan_configure_if($i, $vlan) {
 	   into a command line unquoted. */
 	$vlanif = "vlan" . (int)$i;
 	
-	$cmd = "/sbin/ifconfig {$vlanif} create vlan " . 
-		escapeshellarg($vlan['tag'] ?? '') . " vlandev " . 
+	/* Created with a kernel-chosen unit and then renamed, NOT as
+	   "ifconfig vlanN create".
+	   
+	   A rename does not move an interface's clone unit: after a live delete
+	   from the middle of the list renames vlan1 to vlan0, that interface is
+	   still unit 1 underneath, and "ifconfig vlan1 create" fails with "already
+	   exists" although nothing is NAMED vlan1 (verified on 15.1). The next add
+	   would then fail every time until a reboot. "ifconfig vlan create" takes
+	   the lowest unit whose name is free, and prints the name it gave; renaming
+	   that to the positional name works whatever units are held. */
+	$cmd = "/sbin/ifconfig vlan create vlan " .
+		escapeshellarg($vlan['tag'] ?? '') . " vlandev " .
 		escapeshellarg($vlan['if'] ?? '');
 	
-	$retval = mwexec($cmd);
+	$retval = mwexec_out($cmd, $out);
+	if ($retval != 0)
+		return $retval;
+	
+	$got = trim($out[0] ?? '');
+	if (!preg_match('/^vlan\d+$/', $got))
+		return 1;
+	if ($got !== $vlanif) {
+		$retval = mwexec("/sbin/ifconfig {$got} name {$vlanif}");
+		if ($retval != 0) {
+			/* Ours, just created and assigned to nothing, so safe to remove
+			   rather than leave behind under a name nothing expects. */
+			mwexec("/sbin/ifconfig {$got} destroy");
+			return $retval;
+		}
+	}
 
 	/* Nothing further if the interface was not created. The two commands below
 	   used to run regardless of the create's status, so a failed add still
@@ -237,6 +262,73 @@ function interfaces_vlan_destroy_if($i) {
 	/* (int): same reason as the create -- the name comes from an array index and
 	   goes into a command line unquoted. */
 	return mwexec("/sbin/ifconfig vlan" . (int) $i . " destroy");
+}
+
+/* Change ONE existing vlan interface's tag and/or parent in place.
+ *
+ * An edit used to demand a reboot, because the only way this file knew to
+ * apply one was destroy + create -- which takes the interface's addresses, pf
+ * states and DHCP leases with it, and may be the interface carrying the
+ * session. FreeBSD can retarget a live vlan interface instead: -vlandev
+ * detaches it, then "vlan TAG vlandev PARENT" reattaches it, and its addresses
+ * survive both steps (verified on 15.1). The caller re-applies the logical
+ * interface on top afterwards with interfaces_vlan_reapply().
+ *
+ * Returns the ifconfig exit status of the reattach. */
+function interfaces_vlan_retag_if($i, $vlan) {
+	$vlanif = "vlan" . (int)$i;
+
+	mwexec("/sbin/ifconfig {$vlanif} -vlandev");
+	$retval = mwexec("/sbin/ifconfig {$vlanif} vlan " .
+		escapeshellarg($vlan['tag'] ?? '') . " vlandev " .
+		escapeshellarg($vlan['if'] ?? ''));
+	if ($retval != 0)
+		return $retval;
+
+	mwexec("/sbin/ifconfig " . escapeshellarg($vlan['if'] ?? '') . " up");
+	mwexec("/sbin/ifconfig {$vlanif} up");
+	return 0;
+}
+
+/* Bring the live vlan names back in line with the config after the entry at
+ * position $id was deleted from a list that had $oldcount entries.
+ *
+ * A VLAN's kernel name is its POSITION, so deleting from the middle shifts
+ * every later one down by one. That used to need a reboot to rebuild the whole
+ * set. Renaming does it live: destroy vlan$id, then rename vlan$id+1 -> vlan$id
+ * and so on upwards. "ifconfig vlanK name vlanJ" keeps addresses, tag and
+ * parent (verified on 15.1), so a renamed VLAN carrying the session keeps
+ * carrying it. Ascending order matters: each target name has just been freed.
+ *
+ * Returns 0, or the first failing ifconfig status. */
+function interfaces_vlan_shift_down($id, $oldcount) {
+	$id = (int)$id;
+	$retval = mwexec("/sbin/ifconfig vlan{$id} destroy");
+	if ($retval != 0)
+		return $retval;
+
+	for ($k = $id + 1; $k < (int)$oldcount; $k++) {
+		$retval = mwexec("/sbin/ifconfig vlan{$k} name vlan" . ($k - 1));
+		if ($retval != 0)
+			return $retval;
+	}
+	return 0;
+}
+
+/* Re-apply everything that depends on the vlan interfaces after a live change.
+ *
+ * interfaces_optional_configure() re-addresses each OPT and, outside boot,
+ * re-runs routing, pf, shaper, IPsec and DHCP -- which also picks up LAN's
+ * renamed device in the ruleset and in dnsmasq, since LAN's address was never
+ * touched. WAN is redone when it sits on a VLAN, because dhclient and pppoe
+ * are bound to the old name. */
+function interfaces_vlan_reapply() {
+	global $config;
+
+	$retval = interfaces_optional_configure();
+	if (preg_match('/^vlan\d+$/', $config['interfaces']['wan']['if'] ?? ''))
+		$retval |= interfaces_wan_configure();
+	return $retval;
 }
 
 /* Does $if exist in the kernel right now? This asks the running system, not the
@@ -839,8 +931,21 @@ function interfaces_wan_configure() {
 		unlink_if_exists("{$g['varetc_path']}/nameservers.inet6.conf");
 	}
 	
-	/* remove all addresses first */
-	while (mwexec("/sbin/ifconfig " . escapeshellarg($wancfg['if']) . " -alias") == 0);
+	/* Remove all IPv4 addresses first, each one by name.
+	
+	   Upstream looped "ifconfig $if -alias" until it failed. FreeBSD 15's
+	   ifconfig exits 0 for a bare -alias even when there is nothing left to
+	   remove, so that loop never ended on ANY interface that exists -- boot
+	   hung at "Configuring WAN interface..." with the NIC never brought up.
+	   It went unnoticed only because the factory WAN (sis1) does not exist on
+	   a PC, and ifconfig on a missing interface fails straight away. */
+	$out = array();
+	exec("/sbin/ifconfig " . escapeshellarg($wancfg['if']) . " inet 2>/dev/null", $out);
+	foreach ($out as $line) {
+		if (preg_match('/^\s+inet (\d+\.\d+\.\d+\.\d+) /', $line, $m))
+			mwexec("/sbin/ifconfig " . escapeshellarg($wancfg['if']) .
+				" inet " . escapeshellarg($m[1]) . " -alias");
+	}
 	mwexec("/sbin/ifconfig " . escapeshellarg($wancfg['if']) . " down");
 	
 	if (!empty($wancfg['spoofmac']))

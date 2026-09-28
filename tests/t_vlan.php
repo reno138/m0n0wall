@@ -27,6 +27,12 @@ function mwexec($command) {
 	$GLOBALS['mw_cmds'][] = $command;
 	return $GLOBALS['mw_rc'];
 }
+function mwexec_out($command, &$output) {
+	$rc = mwexec($command);
+	$output = ($rc == 0 && strpos($command, 'ifconfig vlan create') !== false)
+		? array('vlan90') : array();
+	return $rc;
+}
 
 /* interfaces_vlan_configure() reports a failed create through log_error(), so
    the failure path cannot be exercised without it. Captured rather than
@@ -49,11 +55,13 @@ $config = array('vlans' => array('vlan' => array(
 
 is_same('boot returns success', interfaces_vlan_configure(), 0);
 is_same('boot: every VLAN created, named by position', $GLOBALS['mw_cmds'], array(
-	"/sbin/ifconfig vlan0 create vlan '10' vlandev 'vtnet0'",
+	"/sbin/ifconfig vlan create vlan '10' vlandev 'vtnet0'",
+	"/sbin/ifconfig vlan90 name vlan0",
 	"/sbin/ifconfig 'vtnet0' up",
 	"/sbin/ifconfig vlan0 inet6 -accept_rtadv no_radr",
 	"/sbin/ifconfig vlan0 up",
-	"/sbin/ifconfig vlan1 create vlan '4094' vlandev 'vtnet1'",
+	"/sbin/ifconfig vlan create vlan '4094' vlandev 'vtnet1'",
+	"/sbin/ifconfig vlan90 name vlan1",
 	"/sbin/ifconfig 'vtnet1' up",
 	"/sbin/ifconfig vlan1 inet6 -accept_rtadv no_radr",
 	"/sbin/ifconfig vlan1 up",
@@ -80,7 +88,8 @@ is_same('add: the position is the next index', $newidx, 2);
 is_same('add: the ifconfig status is passed back',
         interfaces_vlan_configure_if($newidx, $new), 0);
 is_same('add: only the new interface is touched', $GLOBALS['mw_cmds'], array(
-	"/sbin/ifconfig vlan2 create vlan '30' vlandev 'vtnet1'",
+	"/sbin/ifconfig vlan create vlan '30' vlandev 'vtnet1'",
+	"/sbin/ifconfig vlan90 name vlan2",
 	"/sbin/ifconfig 'vtnet1' up",
 	"/sbin/ifconfig vlan2 inet6 -accept_rtadv no_radr",
 	"/sbin/ifconfig vlan2 up",
@@ -107,11 +116,13 @@ $config['vlans']['vlan'] = array(0 => array('if' => 'vtnet0', 'tag' => '10'),
                                  2 => array('if' => 'vtnet2', 'tag' => '50'));
 interfaces_vlan_configure();
 is_same('a sparse array is reindexed, not skipped', $GLOBALS['mw_cmds'], array(
-	"/sbin/ifconfig vlan0 create vlan '10' vlandev 'vtnet0'",
+	"/sbin/ifconfig vlan create vlan '10' vlandev 'vtnet0'",
+	"/sbin/ifconfig vlan90 name vlan0",
 	"/sbin/ifconfig 'vtnet0' up",
 	"/sbin/ifconfig vlan0 inet6 -accept_rtadv no_radr",
 	"/sbin/ifconfig vlan0 up",
-	"/sbin/ifconfig vlan1 create vlan '50' vlandev 'vtnet2'",
+	"/sbin/ifconfig vlan create vlan '50' vlandev 'vtnet2'",
+	"/sbin/ifconfig vlan90 name vlan1",
 	"/sbin/ifconfig 'vtnet2' up",
 	"/sbin/ifconfig vlan1 inet6 -accept_rtadv no_radr",
 	"/sbin/ifconfig vlan1 up",
@@ -137,7 +148,8 @@ interfaces_vlan_configure_if("0; /sbin/reboot", array('if' => "vtnet0; /sbin/reb
                                                       'tag' => "10 vlandev vtnet9"));
 is_same('the name comes from an integer and the rest is shell-quoted',
         $GLOBALS['mw_cmds'], array(
-	"/sbin/ifconfig vlan0 create vlan '10 vlandev vtnet9' vlandev 'vtnet0; /sbin/reboot'",
+	"/sbin/ifconfig vlan create vlan '10 vlandev vtnet9' vlandev 'vtnet0; /sbin/reboot'",
+	"/sbin/ifconfig vlan90 name vlan0",
 	"/sbin/ifconfig 'vtnet0; /sbin/reboot' up",
 	"/sbin/ifconfig vlan0 inet6 -accept_rtadv no_radr",
 	"/sbin/ifconfig vlan0 up",
@@ -189,6 +201,14 @@ $d_sysrebootreqd_path = getenv('MW_FLAG');
 function mwexec($command) {
 	file_put_contents(getenv('MW_CMDS'), $command . "\n", FILE_APPEND);
 	return (int) getenv('MW_RC');
+}
+/* "ifconfig vlan create" prints the name the kernel chose. vlan90 is never a
+   positional name in these fixtures, so the rename to one is always visible. */
+function mwexec_out($command, &$output) {
+	$rc = mwexec($command);
+	$output = ($rc == 0 && strpos($command, 'ifconfig vlan create') !== false)
+		? array('vlan90') : array();
+	return $rc;
 }
 function mwexec_bg($command) { return mwexec($command); }
 function get_interface_list($ethernet = true, $wireless = true, $serial = true) {
@@ -315,7 +335,8 @@ $r = mw_drive('interfaces_vlan_edit.php',
 	array('if' => 'vtnet1', 'tag' => '30', 'descr' => 'guest', 'Submit' => 'Save'),
 	$basecfg);
 is_same('add: the page creates the interface itself', $r['cmds'], array(
-	"/sbin/ifconfig vlan{$freeidx} create vlan '30' vlandev 'vtnet1'",
+	"/sbin/ifconfig vlan create vlan '30' vlandev 'vtnet1'",
+	"/sbin/ifconfig vlan90 name vlan{$freeidx}",
 	"/sbin/ifconfig 'vtnet1' up",
 	"/sbin/ifconfig vlan{$freeidx} inet6 -accept_rtadv no_radr",
 	"/sbin/ifconfig vlan{$freeidx} up",
@@ -349,7 +370,7 @@ is_true ('a failed create is logged',
 is_false('a failed create does not destroy anything',
          strpos(implode(" ", $r['cmds']), 'destroy') !== false);
 
-/* --- EDIT still needs a reboot, and runs nothing ------------------------ */
+/* --- EDIT is applied live: retagged in place, no reboot ------------------ */
 $editcfg = $basecfg;
 $editcfg['vlans']['vlan'] = array(
 	array('if' => 'vtnet0', 'tag' => '10', 'descr' => 'servers'),
@@ -358,8 +379,17 @@ $editcfg['vlans']['vlan'] = array(
 $r = mw_drive('interfaces_vlan_edit.php',
 	array('id' => '1', 'if' => 'vtnet1', 'tag' => '21', 'descr' => 'voice', 'Submit' => 'Save'),
 	$editcfg);
-is_same('edit: no ifconfig runs, so the old tag keeps working', $r['cmds'], array());
-is_true('edit: a reboot is demanded', $r['flag']);
+is_same('edit: the interface is retargeted in place, not destroyed',
+        array_slice($r['cmds'], 0, 2),
+        array('/sbin/ifconfig vlan1 -vlandev',
+              "/sbin/ifconfig vlan1 vlan '21' vlandev 'vtnet1'"));
+is_false('edit: nothing is destroyed',
+         strpos(implode(" ", $r['cmds']), 'destroy') !== false);
+is_false('edit: no reboot is demanded', $r['flag']);
+$r2 = mw_drive('interfaces_vlan_edit.php',
+	array('id' => '1', 'if' => 'vtnet1', 'tag' => '21', 'descr' => 'voice', 'Submit' => 'Save'),
+	$editcfg, array('rc' => 1));
+is_true('edit: a retag that fails falls back to the reboot flag', $r2['flag']);
 is_same('edit: the new tag is saved', $r['config']['vlans']['vlan'][1]['tag'], '21');
 
 /* the entry being edited is skipped by KEY, so keeping its own tag is not a
@@ -391,16 +421,17 @@ is_same('delete: the refused entry is still there', count($r['config']['vlans'][
 is_same('delete: nothing was run', $r['cmds'], array());
 is_false('delete: no reboot is demanded for a refusal', $r['flag']);
 
-/* --- DELETE: allowed, config-only, reboot flagged ----------------------
+/* --- DELETE from the middle: applied live by renaming, no reboot ---------
  *
- * The deleted interface keeps tagging until the reboot, as it did before -- and
- * the renumbering below it, which moves the positional name of VLANs that may
- * be LAN or WAN, is applied to the config only. */
+ * vlan0 is destroyed and vlan1 renamed down to vlan0, which keeps its address
+ * and tag, so the running names match the renumbered config straight away. */
 $delcfg = $editcfg;
 $delcfg['interfaces']['opt1'] = array('if' => 'vlan1', 'descr' => 'OPT1');
 $r = mw_drive('interfaces_vlan.php', array('del_0_x' => '1'), $delcfg);
-is_same('delete: no ifconfig runs', $r['cmds'], array());
-is_true ('delete: a reboot is demanded', $r['flag']);
+is_same('delete: destroy, then the one above renamed down',
+        array_slice($r['cmds'], 0, 2),
+        array('/sbin/ifconfig vlan0 destroy', '/sbin/ifconfig vlan1 name vlan0'));
+is_false('delete: no reboot is demanded', $r['flag']);
 is_same('delete: the entry is gone', count($r['config']['vlans']['vlan']), 1);
 is_same('delete: the assignment above it is renumbered in the config',
         $r['config']['interfaces']['opt1']['if'], 'vlan0');
@@ -458,7 +489,7 @@ is_same('a failed create is reported, not swallowed', $rc, 1);
 is_same('and nothing else is attempted after it', count($GLOBALS['mw_cmds']), 1);
 is_same('the one command tried was the create',
         $GLOBALS['mw_cmds'][0] ?? '',
-        "/sbin/ifconfig vlan0 create vlan '77' vlandev 'vtnet0'");
+        "/sbin/ifconfig vlan create vlan '77' vlandev 'vtnet0'");
 is_true ('and the failure names the VLAN, its tag and its parent',
          count($GLOBALS['mw_log']) === 1
          && strpos($GLOBALS['mw_log'][0], 'vlan0') !== false

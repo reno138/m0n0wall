@@ -485,6 +485,15 @@ function mwexec($command) {
 	return $retval; 
 }
 
+/* Like mwexec(), but hands back what the command printed, for the few callers
+   that need an answer from it -- "ifconfig vlan create" prints the name the
+   kernel chose. stderr is discarded so $output holds only the answer. */
+function mwexec_out($command, &$output) {
+	$output = array();
+	exec("$command 2>/dev/null", $output, $retval);
+	return $retval;
+}
+
 /* wrapper for exec() in background; returns PID of background process */
 function mwexec_bg($command) {
 

@@ -224,11 +224,23 @@ file_put_contents($drv . '/guiconfig.inc', <<<'STUB'
 /* test double -- see tests/t_optiface.php */
 $g = array('booting' => false, 'wireless_regex' => '/^(ath|an|wi|ral|ndis)/',
            'varrun_path' => '/var/run');
+/* Where interfaces_wan_configure() writes dhclient.conf and friends: a real,
+   writable per-run directory, or the WAN path fails its fopen() and never
+   reaches dhclient -- which is the very thing the WAN re-plug test checks. */
+$g['varetc_path'] = $g['vardb_path'] = dirname(getenv('MW_FLAG'));
 $d_sysrebootreqd_path = getenv('MW_FLAG');
 
 function mwexec($command) {
 	file_put_contents(getenv('MW_CMDS'), $command . "\n", FILE_APPEND);
 	return (int) getenv('MW_RC');
+}
+/* "ifconfig vlan create" prints the name the kernel chose. vlan90 is never a
+   positional name in these fixtures, so the rename to one is always visible. */
+function mwexec_out($command, &$output) {
+	$rc = mwexec($command);
+	$output = ($rc == 0 && strpos($command, 'ifconfig vlan create') !== false)
+		? array('vlan90') : array();
+	return $rc;
 }
 function mwexec_bg($command) { return mwexec($command); }
 function get_interface_list($ethernet = true, $wireless = true, $serial = true) {
@@ -278,10 +290,18 @@ function captiveportal_configure() { $GLOBALS['mw_cmds'][] = 'captiveportal_conf
 function services_dhcpd_configure() { $GLOBALS['mw_cmds'][] = 'services_dhcpd_configure'; return 0; }
 function filter_configure() { $GLOBALS['mw_cmds'][] = 'filter_configure'; return 0; }
 function killbyname() { return 0; }
+function killbypid($pidfile) { return 0; }
+function sigkillbypid($pidfile, $sig) { return 0; }
+function unlink_if_exists($f) { if (file_exists($f)) @unlink($f); }
 function system_routing_configure() { return 0; }
 function shaper_configure() { return 0; }
 function vpn_ipsec_configure() { return 0; }
 function services_dhcp6s_configure() { return 0; }
+function services_dhcp6c_stop() { return 0; }
+function services_dyndns_configure() { return 0; }
+function services_dnsmasq_configure() { $GLOBALS['mw_cmds'][] = 'services_dnsmasq_configure'; return 0; }
+function filter_resync() { return 0; }
+function services_dnsupdate_process() { return 0; }
 function is_ipaddr($a) { return (bool) filter_var($a, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4); }
 function is_ipaddr6($a) { return (bool) filter_var($a, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6); }
 
@@ -613,12 +633,24 @@ is_true ('re-plugging LAN DOES demand a reboot', $rl['flag']);
 is_same('re-plugging LAN applies nothing -- the session is on it', $rl['cmds'], array());
 is_same('re-plugging LAN is still saved', $rl['config']['interfaces']['lan']['if'], 'em5');
 
-/* WAN likewise. */
+/* WAN is NOT like LAN: it goes live, the way interfaces_wan.php already
+   applies a change of WAN type. The old device is released and the new one
+   brought up by interfaces_wan_configure() -- which is also where the boot
+   hang lived (a "-alias" loop that never ended on an existing NIC), so the
+   address strip is asserted to go by name. */
 $rw = mw_drive('interfaces_assign.php',
 	assign_post(array(), array('lan' => 'em1', 'wan' => 'em5',
 	                           'opt1' => 'em2', 'opt2' => 'em3', 'opt3' => 'em4')),
 	optcfg());
-is_true ('re-plugging WAN DOES demand a reboot', $rw['flag']);
+$rwc = implode("\n", $rw['cmds']);
+is_false('re-plugging WAN does not demand a reboot', $rw['flag']);
+is_same ('re-plugging WAN is saved', $rw['config']['interfaces']['wan']['if'], 'em5');
+is_true ('re-plugging WAN releases the old device',
+         strpos($rwc, "/sbin/ifconfig 'em0' delete down") !== false);
+is_true ('re-plugging WAN starts dhclient on the new device',
+         preg_match("/dhclient .*'?em5'?$/m", $rwc) === 1);
+is_false('and never loops on a bare -alias',
+         preg_match("/ifconfig 'em5' -alias$/m", $rwc) === 1);
 
 /* An OPT moved to a different NIC is a delete of the old device plus a
    configure of the new one, so it goes live like any other OPT change. */
@@ -1061,13 +1093,19 @@ $r = mw_drive('interfaces_vlan.php', array(), vlancfg(),
 is_same('interface_is_present(): which its callers still read as "not present"',
         $r['fnout'], 'false');
 
-/* --- delete from the MIDDLE: renumbered, reboot ------------------------ */
+/* --- delete from the MIDDLE: renumbered, and the live names follow ----- */
 $r = mw_drive('interfaces_vlan.php', array('del_1_x' => '17'), vlancfg());
 is_same('vlan delete (middle): the entry is gone', count($r['config']['vlans']['vlan']), 3);
-is_true ('vlan delete (middle): a reboot IS demanded', $r['flag']);
+is_false('vlan delete (middle): no reboot is demanded', $r['flag']);
 is_same('vlan delete (middle): the assignment above it is renumbered, vlan2 -> vlan1',
         $r['config']['interfaces']['opt1']['if'], 'vlan1');
-is_same('vlan delete (middle): and nothing is destroyed live', $r['cmds'], array());
+is_same('vlan delete (middle): the live interfaces are renamed down to match',
+        array_slice($r['cmds'], 0, 3),
+        array('/sbin/ifconfig vlan1 destroy',
+              '/sbin/ifconfig vlan2 name vlan1',
+              '/sbin/ifconfig vlan3 name vlan2'));
+$r = mw_drive('interfaces_vlan.php', array('del_1_x' => '17'), vlancfg(), array('rc' => 1));
+is_true ('vlan delete (middle): a rename that fails falls back to the reboot flag', $r['flag']);
 
 /* --- still refused while assigned, even past a hole in the OPTs --------
  *

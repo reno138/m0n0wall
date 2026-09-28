@@ -105,6 +105,10 @@ $vlan_statusmsg = array(
 	"deleted" =>
 		"The VLAN has been deleted and its interface destroyed. Nothing else " .
 		"was renumbered, so no reboot is required.",
+	"renumbered" =>
+		"The VLAN has been deleted and its interface destroyed. The VLANs " .
+		"after it have moved up one place, and their interfaces were renamed " .
+		"to match, keeping their addresses. No reboot is required.",
 	"delfailed" =>
 		"The VLAN has been deleted from the configuration, but its interface " .
 		"could not be destroyed right now -- see Diagnostics: System logs. It " .
@@ -168,8 +172,9 @@ if ($_POST) {
 				   looking at an array it did not get from config.xml and the
 				   positional name of the last entry is not $id. Reboot, then. */
 				$keys = array_keys($a_vlans);
-				$islast = ($keys === range(0, count($a_vlans) - 1)) &&
-				          ($id === (count($a_vlans) - 1));
+				$packed = ($keys === range(0, count($a_vlans) - 1));
+				$islast = $packed && ($id === (count($a_vlans) - 1));
+				$oldcount = count($a_vlans);
 
 				unset($a_vlans[$id]);
 
@@ -190,16 +195,36 @@ if ($_POST) {
 				$status = "";
 
 				if (!$islast) {
-					/* Renumbered, so the config's positional names and the live
-					   interfaces now disagree, and only a reboot -- which starts
-					   from no vlan interfaces at all -- can reconcile them. Until
-					   then the deleted VLAN keeps tagging, as it always has.
+					/* A delete from the middle renumbers every later VLAN, so
+					   the live names and the config positions now disagree.
+					   That used to be settled by a reboot; now the deleted
+					   interface is destroyed and the ones above it are renamed
+					   down one each, live -- see interfaces_vlan_shift_down().
+					   A rename keeps addresses, so a renamed VLAN carrying this
+					   session keeps carrying it.
 					   
-					   This flag is also what keeps the add path on the edit page
-					   honest: while it is set, an add is saved but not created,
-					   because the live vlanN names no longer match the config
-					   positions. */
-					touch($d_sysrebootreqd_path);
+					   Still a reboot when the names cannot be trusted: a reboot
+					   already pending (the live set may not match the config at
+					   all), or keys with holes, which config.xml cannot produce,
+					   so the positional names are not what this page thinks. */
+					if (!$packed) {
+						touch($d_sysrebootreqd_path);
+					} else if (!file_exists($d_sysrebootreqd_path)) {
+						config_lock();
+						$retval = interfaces_vlan_shift_down($id, $oldcount);
+						if ($retval == 0)
+							$retval = interfaces_vlan_reapply();
+						config_unlock();
+						if ($retval != 0) {
+							log_error("VLAN: could not renumber the VLAN " .
+								"interfaces live after deleting vlan{$id}; " .
+								"a reboot will");
+							touch($d_sysrebootreqd_path);
+							$status = "delfailed";
+						} else {
+							$status = "renumbered";
+						}
+					}
 				} else if (file_exists($d_sysrebootreqd_path)) {
 					/* A reboot was already pending, so the live vlanN names do
 					   not match the config positions and vlan{$id} may be an
@@ -336,19 +361,17 @@ if (file_exists($d_sysrebootreqd_path))
 				  </strong></span>
 				  Not all drivers/NICs support 802.1Q VLAN tagging properly. On cards that do not explicitly support it, VLAN tagging will still work, but the reduced MTU may cause problems. See the m0n0wall homepage for information on supported cards.<br><br>
 				  <?php if (file_exists($d_sysrebootreqd_path)): ?>
-				  A reboot is pending, so adding a VLAN will be saved but not created until
+				  A reboot is pending, so VLAN changes will be saved but not applied until
 				  you reboot &ndash; while a reboot is outstanding the running interfaces no
-				  longer match the configuration, so it is not safe to create one in place.
+				  longer match the configuration, so it is not safe to change them in place.
 				  <?php else: ?>
-				  Adding a VLAN takes effect immediately &ndash; the interface is created when
-				  you save, and no reboot is required.
-				  <?php endif; ?>
-				  Deleting the LAST VLAN in the list also takes effect immediately &ndash; it
-				  renumbers nothing, so its interface is simply destroyed. Changing one, or
-				  deleting one from the middle of the list, still requires a reboot: an
-				  edited tag only reaches an interface that is destroyed and rebuilt, and
-				  deleting from the middle renumbers the VLANs after it, which may be
-				  assigned to LAN, WAN or an OPT.</span>
+				  Adding, changing and deleting VLANs all take effect immediately, with no
+				  reboot. A changed tag or parent is applied to the running interface in
+				  place, keeping its address. Deleting a VLAN from the middle of the list
+				  renumbers the ones after it, and their running interfaces are renamed to
+				  match &ndash; also keeping their addresses &ndash; before whatever is
+				  assigned to them is re-applied.
+				  <?php endif; ?></span>
 				  </td>
 				<td class="list">&nbsp;</td>
 				</tr>
