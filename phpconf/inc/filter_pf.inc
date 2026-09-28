@@ -777,6 +777,31 @@ function pf_tables_generate() {
 
 /* Build the interface context the rule generators need. Mirrors the setup at
  * the top of filter_rules_generate(). */
+/* An interface's IPv6 address and prefix length as they stand NOW, as
+ * array(address, prefixlen), or array('', '') when it has none yet.
+ *
+ * ipaddr6 is not always an address. "6to4" and "DHCP-PD" mean "derived at run
+ * time" -- from the WAN's IPv4 address, or from the prefix the ISP delegates.
+ * filter.inc resolved both; the pf port read the token as if it were the
+ * address, so with LAN on DHCP-PD every v6 rule naming LAN's network resolved
+ * to nothing and was silently dropped, and LAN had no v6 anti-spoof. An
+ * unresolved token -- no prefix delegated yet -- skips the interface exactly as
+ * IPv4-only does; rc.newwanip6 regenerates the ruleset when one arrives. */
+function pf_v6_prefix($ifname, $cfg) {
+	$ip = $cfg['ipaddr6'] ?? '';
+	if ($ip === '6to4') {
+		$a = calc_6to4_address($ifname);
+		return $a ? array($a, 64) : array('', '');
+	}
+	if ($ip === 'DHCP-PD') {
+		$a = get_dhcppd_address($cfg['if'] ?? '');
+		return $a ? array($a[0], $a[1]) : array('', '');
+	}
+	if ($ip === '' || !is_ipaddr6($ip))
+		return array('', '');
+	return array($ip, $cfg['subnet6'] ?? '');
+}
+
 function pf_build_context($ipv6 = false) {
 	global $config;
 
@@ -789,10 +814,14 @@ function pf_build_context($ipv6 = false) {
 	/* ?? '': an interface configured for IPv4 only has no ipaddr6/subnet6 at
 	   all, which is the normal case on a dual-stack-capable build. Reading them
 	   bare warned on every IPv6 ruleset build. */
-	$ctx['lanip']    = $lancfg[$ipv6 ? 'ipaddr6' : 'ipaddr'] ?? '';
-	$ctx['lansn']    = $lancfg[$ipv6 ? 'subnet6' : 'subnet'] ?? '';
-	$ctx['lansa']    = $ipv6 ? gen_subnet6($ctx['lanip'], $ctx['lansn'])
-	                         : gen_subnet($ctx['lanip'], $ctx['lansn']);
+	if ($ipv6) {
+		list($ctx['lanip'], $ctx['lansn']) = pf_v6_prefix('lan', $lancfg);
+		$ctx['lansa'] = ($ctx['lanip'] !== '') ? gen_subnet6($ctx['lanip'], $ctx['lansn']) : '';
+	} else {
+		$ctx['lanip'] = $lancfg['ipaddr'] ?? '';
+		$ctx['lansn'] = $lancfg['subnet'] ?? '';
+		$ctx['lansa'] = gen_subnet($ctx['lanip'], $ctx['lansn']);
+	}
 
 	$ctx['optcfg'] = array();
 	foreach (opt_interfaces() as $optif) {
@@ -811,8 +840,12 @@ function pf_build_context($ipv6 = false) {
 		} else {
 			/* same as the LAN above: an OPT interface with only IPv4 has no
 			   ipaddr6, and it is skipped two lines down anyway */
-			$oic['ip'] = $oc[$ipv6 ? 'ipaddr6' : 'ipaddr'] ?? '';
-			$oic['sn'] = $oc[$ipv6 ? 'subnet6' : 'subnet'] ?? '';
+			if ($ipv6) {
+				list($oic['ip'], $oic['sn']) = pf_v6_prefix($optif, $oc);
+			} else {
+				$oic['ip'] = $oc['ipaddr'] ?? '';
+				$oic['sn'] = $oc['subnet'] ?? '';
+			}
 			if (empty($oic['ip']))
 				continue;
 			$oic['sa'] = $ipv6 ? gen_subnet6($oic['ip'], $oic['sn'])

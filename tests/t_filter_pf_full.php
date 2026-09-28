@@ -379,6 +379,45 @@ is_true ('the table is declared before it is used',
 is_false('and the spoof check never passes anything outright',
          preg_match('#^pass in quick on em1 (inet6? )?from [0-9a-f:.]+/[0-9]+ to any$#m', $out) === 1);
 $config = $save;
+
+/* ---- LAN on a run-time prefix: DHCP-PD and 6to4 ------------------------
+ * ipaddr6 holds a token, not an address. The pf port used to read the token as
+ * the address, so every v6 rule naming LAN's network was silently dropped. */
+$config['filter']['rule6'] = array(
+    array('type'=>'pass','interface'=>'lan','protocol'=>'tcp',
+          'source'=>array('network'=>'lan'),'destination'=>array('any'=>true)));
+$config['interfaces']['lan']['ipaddr6'] = 'DHCP-PD';
+unset($config['interfaces']['lan']['subnet6']);
+
+$GLOBALS['MW_TEST_PD'] = array('2001:db8:ab:1::1', 64);
+$out = pf_rules_generate();
+is_true ('DHCP-PD: the delegated prefix is what LAN\'s rules use',
+         preg_match('#^pass in quick on em1 inet6 proto tcp from 2001:db8:ab:1:[0-9:]*/64 to any#m', $out) === 1);
+is_true ('DHCP-PD: and LAN gets its IPv6 anti-spoof',
+         strpos($out, 'LAN IPv6 anti-spoof') !== false);
+
+$GLOBALS['MW_TEST_PD'] = null;          /* nothing delegated yet */
+$out = pf_rules_generate();
+is_false('DHCP-PD, no prefix yet: no rule built on an empty prefix',
+         preg_match('#(from|to) !? ?/#', $out) === 1);
+is_false('DHCP-PD, no prefix yet: no anti-spoof for a prefix nobody knows',
+         strpos($out, 'LAN IPv6 anti-spoof') !== false);
+
+$config['interfaces']['lan']['ipaddr6'] = '6to4';
+$out = pf_rules_generate();
+is_true ('6to4: LAN\'s derived 2002:: prefix is used',
+         preg_match('#^pass in quick on em1 inet6 proto tcp from 2002:cb00:7105:1:[0-9:]*/64 to any#m', $out) === 1);
+
+$config = $save;
 $GLOBALS['MW_TEST_V6'] = false;
 
 exit(mw_report('filter_pf assembly'));
+
+/* Run-time prefix sources, which live in interfaces.inc and read the kernel.
+   6to4 derives from the WAN IPv4 get_current_wan_address() returns above,
+   203.0.113.5 = cb00:7105; LAN takes the second /64, as the real one does. */
+function get_dhcppd_address($if) { return $GLOBALS['MW_TEST_PD'] ?? null; }
+function calc_6to4_address($if) {
+    $n = array('wan' => 0, 'lan' => 1);
+    return isset($n[$if]) ? "2002:cb00:7105:{$n[$if]}::1" : false;
+}

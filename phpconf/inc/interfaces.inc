@@ -1932,17 +1932,19 @@ function calc_6to4_address($if) {
 	return false;
 }
 
+/* The address a delegated prefix put on $if, as array(address, prefixlen), or
+   null while none has arrived.
+   
+   This used to test "!fe80 || !autoconf" -- true for nearly every address, and
+   the autoconf half matched against the address string, which never contains
+   that word -- so it returned whichever address ifconfig happened to list
+   LAST, link-local included. The first global one is the delegated one. */
 function get_dhcppd_address($if) {
-	$addresses = get_interface_ipv6_adresses($if);
-	$ipv6addr = null;
-
-	foreach ($addresses as $adr) {
-		if ((!preg_match('/^fe80:/', $adr[0])) || (!preg_match('/autoconf$/',$adr[0]))) {
-			$ipv6addr=$adr;
-		}
+	foreach (get_interface_ipv6_adresses($if) as $adr) {
+		if (!preg_match('/^fe80:/i', $adr[0]))
+			return $adr;
 	}
-	return $ipv6addr;
-	
+	return null;
 }
 
 function suggest_ipv6_lan_addr(){
