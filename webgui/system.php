@@ -129,6 +129,7 @@ if ($_POST) {
 		
 		$olddnsallowoverride = $config['system']['dnsallowoverride'] ?? null;
 		$config['system']['dnsallowoverride'] = !empty($_POST['dnsallowoverride']) ? true : false;
+		$oldipv6 = isset($config['system']['enableipv6']);
 		$config['system']['enableipv6'] = !empty($_POST['enableipv6']) ? true : false;
 		
 		if (!empty($_POST['password'])) {
@@ -173,6 +174,25 @@ if ($_POST) {
  			
  			if ($olddnsallowoverride != $config['system']['dnsallowoverride'])
  				$retval |= interfaces_wan_configure();
+ 			
+			/* IPv6 switched on or off: apply it now. This used to save the
+			   flag, report success and change nothing until the next reboot --
+			   no v6 addresses, no v6 firewall rules, no router advertisements.
+			   
+			   The *_configure6() functions strip each interface's v6 addresses
+			   and re-add them only if IPv6 is on, so they serve both
+			   directions, and they never touch IPv4. That matters: the full
+			   interfaces_lan_configure() re-addresses LAN, which is the link
+			   this very request arrived on, and dropped its connection. They
+			   restart rtadvd and dhcp6c; the firewall and the DHCPv6 server
+			   are regenerated here. */
+			if ($oldipv6 != ipv6enabled()) {
+				$retval |= interfaces_lan_configure6();
+				$retval |= interfaces_optional_configure6();
+				$retval |= interfaces_wan_configure6();
+				$retval |= services_dhcp6s_configure();
+				$retval |= filter_configure();
+			}
  			
 			config_unlock();
 		}

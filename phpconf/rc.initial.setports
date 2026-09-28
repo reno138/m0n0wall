@@ -45,8 +45,10 @@ Valid interfaces are:
 EOD;
 
 	foreach ($iflist as $iface => $ifa) {
-		echo sprintf("% -8s%s% 7s   %s\n", $iface, $ifa['mac'],
-			$ifa['up'] ? "(up)" : "", $ifa['drvname']);
+		/* ?? '': a wg(4) tunnel is in the list with no driver name, which
+		   printed a PHP warning into the middle of the table */
+		echo sprintf("% -8s%s% 7s   %s\n", $iface, $ifa['mac'] ?? '',
+			!empty($ifa['up']) ? "(up)" : "", $ifa['drvname'] ?? '');
 	}
 	
 	echo <<<EOD
@@ -122,7 +124,8 @@ EOD;
 	$optif = array();
 	
 	while (1) {
-		if ($optif[$i])
+		/* ?? '': on the first pass there is no entry yet */
+		if ($optif[$i] ?? '')
 			$i++;
 		$i1 = $i + 1;
 		echo "\nEnter the Optional {$i1} interface name or 'a' for auto-detection\n" .
@@ -175,6 +178,11 @@ EOD;
 	$optmap  = $assign['map'];
 	$surplus = $assign['surplus'];
 	
+	/* IPv6. Asked here -- once the ports are settled, before the summary -- so
+	   the answers are shown with everything else and saved by the same "y".
+	   null means "leave IPv6 exactly as it is". */
+	$v6plan = ipv6_setup($fp, $optmap);
+	
 	echo <<<EOD
 	
 The interfaces will be assigned as follows:
@@ -193,6 +201,14 @@ EOD;
 	foreach ($surplus as $optname)
 		echo strtoupper($optname) . " -> (removed, with its DHCP server and " .
 			"any rules that name it)\n";
+	
+	if ($v6plan !== null) {
+		echo "\nIPv6 will be enabled:\n";
+		echo "WAN  " . ipv6_describe($v6plan['wan']) . "\n";
+		echo "LAN  " . ipv6_describe($v6plan['lan']) . "\n";
+		foreach ($v6plan['opt'] as $optname => $keys)
+			echo str_pad(strtoupper($optname), 5) . ipv6_describe($keys) . "\n";
+	}
 
 echo <<<EOD
 
@@ -254,6 +270,9 @@ EOD;
 		   number. */
 		foreach ($surplus as $optname)
 			opt_iface_delete($optname);
+		
+		if ($v6plan !== null)
+			ipv6_plan_apply($config, $v6plan);
 		
 		write_config();
 		
@@ -333,5 +352,140 @@ EOD;
 			
 			$config['vlans']['vlan'][] = $vlan;
 		}
+	}
+
+	/* Ask for an IPv6 address until one is given, or nothing when $optional. */
+	function ipv6_ask_addr($fp, $prompt, $optional = false) {
+		while (true) {
+			echo $prompt . ($optional ? " (or nothing for none)" : "") . ": ";
+			$a = chop(fgets($fp));
+			if ($a === "" && $optional)
+				return "";
+			if (is_ipaddr6($a))
+				return $a;
+			echo "'{$a}' is not an IPv6 address.\n";
+		}
+	}
+	
+	function ipv6_ask_number($fp, $prompt, $default, $min, $max) {
+		while (true) {
+			echo "{$prompt} [{$default}]: ";
+			$n = chop(fgets($fp));
+			if ($n === "")
+				return (string)$default;
+			if (ctype_digit($n) && (int)$n >= $min && (int)$n <= $max)
+				return (string)(int)$n;
+			echo "Enter a number from {$min} to {$max}.\n";
+		}
+	}
+	
+	function ipv6_ask_choice($fp, $valid) {
+		while (true) {
+			echo "Choose " . implode(", ", $valid) . ": ";
+			$c = chop(fgets($fp));
+			if (in_array($c, $valid, true))
+				return $c;
+		}
+	}
+	
+	/* One line for the summary, from an interface's part of the plan. */
+	function ipv6_describe($keys) {
+		if (empty($keys))
+			return "no IPv6";
+		if (($keys['ipaddr6'] ?? '') === 'DHCP')
+			return "DHCPv6 from the upstream router";
+		if (($keys['ipaddr6'] ?? '') === 'DHCP-PD')
+			$d = "prefix delegated through WAN (a /" . (64 - (int)$keys['slalen']) .
+			     " from the ISP, subnet " . ($keys['slaid'] ?? '0') . ")";
+		else
+			$d = "{$keys['ipaddr6']}/{$keys['subnet6']}";
+		if (!empty($keys['gateway6']))
+			$d .= ", gateway {$keys['gateway6']}";
+		if (!empty($keys['ipv6ra']))
+			$d .= ", router advertisements on";
+		return $d;
+	}
+	
+	/* The IPv6 dialog. Returns a plan for ipv6_plan_apply(), or null to leave
+	   IPv6 untouched. Offers what is set up most often -- static addresses, and
+	   DHCPv6 with prefix delegation from the ISP; 6to4 and tunnel brokers are in
+	   the webGUI. */
+	function ipv6_setup($fp, $optmap) {
+		global $config;
+		
+		$on = isset($config['system']['enableipv6']);
+		echo "\n\nIPv6 is currently " . ($on ? "enabled" : "disabled") . ".\n";
+		echo "Do you want to set up IPv6 now? (y/n; n leaves it as it is) ";
+		if (strcasecmp(chop(fgets($fp)), "y") != 0)
+			return null;
+		
+		$plan = array('wan' => array(), 'lan' => array(), 'opt' => array());
+		
+		/* --- WAN --- */
+		$wantype = $config['interfaces']['wan']['ipaddr'] ?? '';
+		$dhcp6ok = ($wantype === 'dhcp' || is_ipaddr($wantype));
+		echo "\nIPv6 on WAN:\n";
+		echo "  1) Static address\n";
+		echo "  2) DHCPv6 from the upstream router, with prefix delegation\n";
+		echo "  3) None\n";
+		while (true) {
+			$c = ipv6_ask_choice($fp, array('1', '2', '3'));
+			if ($c !== '2' || $dhcp6ok)
+				break;
+			/* the webGUI enforces the same: dhcp6c runs beside dhclient or a
+			   static address, not over PPPoE/PPTP/modem links */
+			echo "DHCPv6 needs WAN's IPv4 to be static or DHCP; it is '{$wantype}'.\n" .
+			     "Change that in the webGUI first, or choose another option.\n";
+		}
+		if ($c === '1') {
+			$plan['wan']['ipaddr6']  = ipv6_ask_addr($fp, "WAN IPv6 address");
+			$plan['wan']['subnet6']  = ipv6_ask_number($fp, "WAN IPv6 prefix length", 64, 1, 128);
+			$plan['wan']['gateway6'] = ipv6_ask_addr($fp, "WAN IPv6 gateway");
+		} else if ($c === '2') {
+			$plan['wan']['ipaddr6'] = 'DHCP';
+		}
+		$wanpd = ($c === '2');
+		
+		/* --- LAN --- */
+		echo "\nIPv6 on LAN:\n";
+		echo "  1) Static address\n";
+		if ($wanpd)
+			echo "  2) A prefix delegated by the ISP through WAN DHCPv6\n";
+		echo "  3) None\n";
+		$c = ipv6_ask_choice($fp, $wanpd ? array('1', '2', '3') : array('1', '3'));
+		if ($c === '1') {
+			$plan['lan']['ipaddr6'] = ipv6_ask_addr($fp, "LAN IPv6 address");
+			$plan['lan']['subnet6'] = ipv6_ask_number($fp, "LAN IPv6 prefix length", 64, 1, 128);
+		} else if ($c === '2') {
+			/* The same two numbers the LAN page asks for: how big a prefix the
+			   ISP hands out, and which /64 of it LAN takes. */
+			$ispfx = ipv6_ask_number($fp, "Prefix length your ISP delegates", 56, 48, 64);
+			$plan['lan']['ipaddr6'] = 'DHCP-PD';
+			$plan['lan']['slalen']  = (string)(64 - (int)$ispfx);
+			$maxid = (1 << (64 - (int)$ispfx)) - 1;
+			$plan['lan']['slaid']   = ipv6_ask_number($fp,
+				"Which /64 of it LAN uses (0 to {$maxid})", 0, 0, $maxid);
+		}
+		if (!empty($plan['lan'])) {
+			echo "Send router advertisements on LAN, so hosts configure " .
+			     "themselves? (y/n) ";
+			if (strcasecmp(chop(fgets($fp)), "y") == 0) {
+				$plan['lan']['ipv6ra'] = true;
+				if (($plan['lan']['subnet6'] ?? '64') !== '64')
+					echo "Note: hosts can only configure themselves from a /64.\n";
+			}
+		}
+		
+		/* --- optional interfaces: static only; the rest is in the webGUI --- */
+		foreach ($optmap as $optname => $optdev) {
+			$a = ipv6_ask_addr($fp, "\nIPv6 address for " . strtoupper($optname) .
+				" ({$optdev})", true);
+			$plan['opt'][$optname] = ($a === "") ? array() : array(
+				'ipaddr6' => $a,
+				'subnet6' => ipv6_ask_number($fp, strtoupper($optname) .
+					" IPv6 prefix length", 64, 1, 128));
+		}
+		
+		return $plan;
 	}
 ?>

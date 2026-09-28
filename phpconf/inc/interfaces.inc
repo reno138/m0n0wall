@@ -1575,11 +1575,7 @@ function interfaces_rtadvd_configure() {
 		}
 		$rtadvdifs .= ' ' . $config['interfaces']['lan']['if'];
 		$rtadvdconf .= $config['interfaces']['lan']['if'] . ":raflags=\"" . $raflags . "\":maxinterval#10:mininterval#4:prefixlen#";
-		if (($config['interfaces']['lan']['ipv6mode'] ?? null) == "DHCP-PD") {
-			$rtadvdconf .= 64 - ($config['interfaces']['lan']['slalen'] ?? null);
-		} else {
-			$rtadvdconf .= $config['interfaces']['lan']['subnet6'] ?? '';
-		}
+		$rtadvdconf .= rtadvd_prefixlen($config['interfaces']['lan']);
 		if (isset($config['interfaces']['lan']['ipv6ramtu']) && $config['interfaces']['lan']['ipv6ramtu'] > 0) {
 			$rtadvdconf .= ":mtu#" . $config['interfaces']['lan']['ipv6ramtu'];
 		}
@@ -1619,11 +1615,7 @@ function interfaces_rtadvd_configure() {
 			$rtadvdifs .= ' ' . $optcfg['if'];
 			/* maybe this can be configurable in the future */
 			$rtadvdconf .= $optcfg['if'] . ":raflags=\"" . $raflags . "\":maxinterval#10:mininterval#4:prefixlen#";
-			if (($config['interfaces'][$optif]['ipv6mode'] ?? null) == "DHCP-PD") {
-				$rtadvdconf .= 64 - ($config['interfaces'][$optif]['slalen'] ?? null);
-			} else {
-				$rtadvdconf .= $config['interfaces'][$optif]['subnet6'] ?? '';
-			}
+			$rtadvdconf .= rtadvd_prefixlen($config['interfaces'][$optif]);
 			if (isset($config['interfaces'][$optif]['ipv6ramtu']) && $config['interfaces'][$optif]['ipv6ramtu'] > 0) {
 				$rtadvdconf .= ":mtu#" . $config['interfaces'][$optif]['ipv6ramtu'];
 			}
@@ -1930,6 +1922,60 @@ function calc_6to4_address($if) {
 		return "2002:{$wan_v6nibbles}:{$nth}::1";
 	}
 	return false;
+}
+
+/* The prefix length to advertise on an interface.
+ *
+ * A delegated or 6to4 prefix always gives the interface a /64 -- sla-len is
+ * chosen so that the ISP's prefix plus it makes 64 -- and hosts can only
+ * autoconfigure from a /64. This used to test an "ipv6mode" key that nothing
+ * ever writes (the pages store the mode in ipaddr6), and even that branch
+ * advertised 64 - sla-len, the ISP's prefix length: with a delegated prefix,
+ * or with 6to4 (no subnet6 at all), rtadvd was given a wrong or empty
+ * prefixlen and LAN hosts got no usable address. */
+function rtadvd_prefixlen($ifcfg) {
+	$ip = $ifcfg['ipaddr6'] ?? '';
+	if ($ip === 'DHCP-PD' || $ip === '6to4')
+		return 64;
+	return $ifcfg['subnet6'] ?? 64;
+}
+
+/* Apply an IPv6 plan to $config -- the console wizard's answers, in the same
+ * keys the webGUI's interface pages write, so either can edit what the other
+ * set up.
+ *
+ * $plan = array('wan' => array(key => value...), 'lan' => ..., 'opt' => array(
+ *               'optN' => array(...), ...)). An empty array for an interface
+ * means "no IPv6 on it".
+ *
+ * Every IPv6 key an interface can carry is cleared before the new ones are
+ * written. Switching mode must not leave the old one's keys behind: a leftover
+ * tunnel6 makes pf and routing treat a static WAN as a tunnel, and a leftover
+ * ipaddr6 keeps IPv6 on an interface the admin just said should have none. */
+function ipv6_plan_apply(&$config, $plan) {
+	$config['system']['enableipv6'] = true;
+
+	$wankeys = array('ipaddr6', 'subnet6', 'gateway6', 'tunnel6', 'aiccu', 'v6duid');
+	$lankeys = array('ipaddr6', 'subnet6', 'slaid', 'slalen', 'ipv6ra', 'ipv6ram', 'ipv6rao');
+
+	foreach ($wankeys as $k)
+		unset($config['interfaces']['wan'][$k]);
+	foreach ($plan['wan'] ?? array() as $k => $v)
+		$config['interfaces']['wan'][$k] = $v;
+
+	foreach ($lankeys as $k)
+		unset($config['interfaces']['lan'][$k]);
+	foreach ($plan['lan'] ?? array() as $k => $v)
+		$config['interfaces']['lan'][$k] = $v;
+
+	foreach ($plan['opt'] ?? array() as $optname => $keys) {
+		if (!isset($config['interfaces'][$optname]))
+			continue;
+		foreach ($lankeys as $k)
+			unset($config['interfaces'][$optname][$k]);
+		foreach ($keys as $k => $v)
+			$config['interfaces'][$optname][$k] = $v;
+	}
 }
 
 /* The address a delegated prefix put on $if, as array(address, prefixlen), or
