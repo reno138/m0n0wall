@@ -240,6 +240,7 @@ EOD;
 			if ($isnew)
 				$config['interfaces'][$optname] = array();
 			
+			$oldport = $config['interfaces'][$optname]['if'] ?? '';
 			$config['interfaces'][$optname]['if'] = $optdev;
 			
 			/* wireless interface? */
@@ -250,10 +251,14 @@ EOD;
 				unset($config['interfaces'][$optname]['wireless']);
 			}
 			
-			/* Left disabled deliberately, as before: the port underneath this
-			   interface has just changed, so its address may no longer belong to
-			   the network it is now plugged into, and the admin has to look. */
-			unset($config['interfaces'][$optname]['enable']);
+			/* Disabled when -- and only when -- the port underneath it has
+			   changed: its address may no longer belong to the network it is now
+			   plugged into, and the admin has to look. This used to disable EVERY
+			   optional interface on every run, so re-running the wizard to change
+			   nothing about the ports (to set up IPv6, say) took all of them
+			   down, addresses and all, after the reboot. */
+			if ($isnew || $oldport !== $optdev)
+				unset($config['interfaces'][$optname]['enable']);
 			
 			/* The description is the admin's, and is only set for an interface
 			   that did not exist a moment ago. This used to overwrite every one
