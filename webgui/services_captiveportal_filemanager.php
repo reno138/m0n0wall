@@ -47,7 +47,7 @@ foreach ($a_element as $element) {
 }
 
 if ($_POST) {
-    unset($input_errors);
+    $input_errors = array();
     
     if (is_uploaded_file($_FILES['new']['tmp_name'] ?? '')) {
     	

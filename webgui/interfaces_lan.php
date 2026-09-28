@@ -66,7 +66,7 @@ if (ipv6enabled()) {
 
 if ($_POST) {
 
-	unset($input_errors);
+	$input_errors = array();
 	$pconfig = $_POST;
 
 	/* input validation */
@@ -91,7 +91,7 @@ if ($_POST) {
 		}
 	}
 
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 		$v4changed = (($_POST['ipaddr'] ?? null) != ($config['interfaces']['lan']['ipaddr'] ?? null) || ($_POST['subnet'] ?? null) != ($config['interfaces']['lan']['subnet'] ?? null));
 		$config['interfaces']['lan']['ipaddr'] = $_POST['ipaddr'] ?? null;
 		$config['interfaces']['lan']['subnet'] = $_POST['subnet'] ?? null;

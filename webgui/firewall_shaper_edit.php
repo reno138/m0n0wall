@@ -230,7 +230,7 @@ if ($_POST) {
 	}
 	$_POST['tcpflags'] = join(",", $intcpflags);
 	
-	unset($input_errors);
+	$input_errors = array();
 	$pconfig = $_POST;
 
 	/* input validation */

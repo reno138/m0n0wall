@@ -72,7 +72,7 @@ if (($_SERVER['REMOTE_USER'] ?? null) === ($config['system']['username'] ?? null
 		}
 
 		if (!$deldone) {
-	    	unset($input_errors);
+	    	$input_errors = array();
 	    	$pconfig = $_POST;
     
 	    	/* input validation */
@@ -257,7 +257,7 @@ if(($_GET['act'] ?? null)=="new" || ($_GET['act'] ?? null)=="edit" || !empty($in
 } else { // end of admin user code, start of normal user code
 	if (isset($_POST['save'])) {
 
-	    unset($input_errors);
+	    $input_errors = array();
     
     	/* input validation */
    		$reqdfields = explode(" ", "password");

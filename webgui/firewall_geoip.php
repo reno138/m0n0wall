@@ -40,7 +40,7 @@ $pconfig['failclosed'] = isset($config['geoip']['failclosed']);
 
 if ($_POST) {
 
-	unset($input_errors);
+	$input_errors = array();
 	$pconfig = $_POST;
 
 	if (($_POST['interval'] ?? '') !== '' && !is_numericint($_POST['interval']))
@@ -133,7 +133,7 @@ foreach ($status as $st)
     <td width="22%" valign="top" class="vncell">When data is missing</td>
     <td width="78%" class="vtable">
       <input name="failclosed" type="checkbox" id="failclosed" value="yes"
-             <?php if ($pconfig['failclosed']) echo "checked"; ?>>
+             <?php if (!empty($pconfig['failclosed'])) echo "checked"; ?>>
       <strong>Block everything a country rule would have matched</strong>
       <br><span class="vexpl">An empty table matches nothing, so by default a
       <em>block</em> rule over a country with no data carries the traffic it was meant

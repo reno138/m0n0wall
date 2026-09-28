@@ -159,7 +159,7 @@ if ($_POST) {
 		$_POST['localnetmask'] = 32;
 	}
 	
-	unset($input_errors);
+	$input_errors = array();
 	$pconfig = $_POST;
 
 	/* input validation */

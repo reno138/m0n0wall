@@ -52,7 +52,7 @@ if (isset($id) && !empty($a_wol[$id])) {
 
 if ($_POST) {
 
-	unset($input_errors);
+	$input_errors = array();
 	$pconfig = $_POST;
 
 	/* input validation */
@@ -67,7 +67,7 @@ if ($_POST) {
 		$input_errors[] = "A valid MAC address must be specified.";
 	}
 
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 		$wolent = array();
 		$wolent['interface'] = $_POST['interface'] ?? null;
 		$wolent['mac'] = $_POST['mac'] ?? null;

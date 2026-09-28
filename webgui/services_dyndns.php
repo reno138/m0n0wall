@@ -57,7 +57,7 @@ $pconfig['dnsupdate_usetcp'] = isset($config['dnsupdate']['usetcp']);
 
 if ($_POST) {
 
-	unset($input_errors);
+	$input_errors = array();
 	$pconfig = $_POST;
 
 	/* input validation */

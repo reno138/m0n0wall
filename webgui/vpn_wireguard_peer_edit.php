@@ -46,7 +46,7 @@ if (isset($id) && !empty($a_peer[$id])) {
 
 if ($_POST) {
 
-	unset($input_errors);
+	$input_errors = array();
 	$pconfig = $_POST;
 
 	$reqdfields = explode(" ", "name");
@@ -103,7 +103,7 @@ if ($_POST) {
 			$input_errors[] = "'" . htmlspecialchars($r) . "' is not a valid network in CIDR notation.";
 	}
 
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 		$peer = array();
 		$peer['name']         = $_POST['name'];
 		$peer['address']      = $_POST['address'];

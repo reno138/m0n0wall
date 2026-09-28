@@ -37,7 +37,7 @@ define('MAX_TTL', 64);
 define('DEFAULT_TTL', 18);
 
 if ($_POST) {
-	unset($input_errors);
+	$input_errors = array();
 	unset($do_traceroute);
 
 	/* input validation */
@@ -49,7 +49,7 @@ if ($_POST) {
 		$input_errors[] = "Maximum number of hops must be between 1 and " . MAX_TTL;	/* a constant does not interpolate */
 	}
 
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 		$do_traceroute = true;
 		$host = $_POST['host'];
 		$ttl = $_POST['ttl'];

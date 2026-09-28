@@ -32,6 +32,12 @@
 $pgtitle = array("Firewall", "NAT", "Edit outbound mapping");
 require("guiconfig.inc");
 
+/* The parent first: saving firewall_nat_out.php with advanced outbound
+   NAT off leaves an empty <advancedoutbound/>, which reads back as an empty
+   STRING, and writing ['rule'] into a string is a fatal TypeError -- one
+   ordinary save on the list page made this page unloadable. */
+if (!is_array($config['nat']['advancedoutbound'] ?? null))
+    $config['nat']['advancedoutbound'] = array();
 if (!is_array($config['nat']['advancedoutbound']['rule'] ?? null))
     $config['nat']['advancedoutbound']['rule'] = array();
     
@@ -89,7 +95,7 @@ if ($_POST) {
         $_POST['destination_subnet'] = 24;
     }
     
-    unset($input_errors);
+    $input_errors = array();
     $pconfig = $_POST;
 
     /* input validation */

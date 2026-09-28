@@ -20,17 +20,19 @@ $omit_nocacheheaders = true;
 $pgtitle = array("VPN", "WireGuard", "Client configuration");
 require("guiconfig.inc");
 
-$tunidx = $_GET['tunnel'];
-$id     = $_GET['id'];
-$fmt    = $_GET['fmt'] ? $_GET['fmt'] : 'qrpage';
+/* ?? '': opened without its parameters (a bookmark, a crawler), the checks
+   below redirect -- they just have to be reached without warning first */
+$tunidx = $_GET['tunnel'] ?? '';
+$id     = $_GET['id'] ?? '';
+$fmt    = !empty($_GET['fmt']) ? $_GET['fmt'] : 'qrpage';
 
-if (!is_numeric($tunidx) || !is_array($config['wireguard']['tunnel'][$tunidx])) {
+if (!is_numeric($tunidx) || !is_array($config['wireguard']['tunnel'][$tunidx] ?? null)) {
 	header("Location: vpn_wireguard.php");
 	exit;
 }
 $tunnel = $config['wireguard']['tunnel'][$tunidx];
 
-if (!is_numeric($id) || !is_array($tunnel['peer'][$id])) {
+if (!is_numeric($id) || !is_array($tunnel['peer'][$id] ?? null)) {
 	header("Location: vpn_wireguard_peers.php?tunnel=" . $tunidx);
 	exit;
 }

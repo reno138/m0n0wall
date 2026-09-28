@@ -36,7 +36,7 @@ define('MAX_COUNT', 10);
 define('DEFAULT_COUNT', 3);
 
 if ($_POST) {
-	unset($input_errors);
+	$input_errors = array();
 	unset($do_ping);
 
 	/* input validation */
@@ -49,7 +49,7 @@ if ($_POST) {
 		$input_errors[] = "Count must be between 1 and " . MAX_COUNT;	/* a constant does not interpolate */
 	}
 
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 		$do_ping = true;
 		$host = $_POST['host'] ?? '';
 		$interface = $_POST['interface'] ?? '';

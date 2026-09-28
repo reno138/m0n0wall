@@ -54,7 +54,7 @@ if (empty($pconfig['nunits']))
 
 if ($_POST) {
 
-	unset($input_errors);
+	$input_errors = array();
 	$pconfig = $_POST;
 
 	/* input validation */

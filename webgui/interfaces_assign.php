@@ -68,7 +68,7 @@ if (is_array($config['wlans']['wlan'] ?? null) && count($config['wlans']['wlan']
 
 if ($_POST) {
 
-	unset($input_errors);
+	$input_errors = array();
 
 	/* input validation */
 

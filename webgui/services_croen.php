@@ -40,7 +40,7 @@
 
 	// Save
 	if (isset($_POST['save']) || isset($_POST['apply'])) {
-		unset($input_errors);
+		$input_errors = array();
 
 		// Validate
 		if (!isset($_POST['apply'])) {

@@ -52,7 +52,7 @@ if (!$pconfig['nentries'])
 
 if ($_POST) {
 
-	unset($input_errors);
+	$input_errors = array();
 	$pconfig = $_POST;
 
 	/* input validation */
@@ -66,7 +66,7 @@ if ($_POST) {
 		$input_errors[] = "Number of log entries to show must be between 5 and 1000.";
 	}
 
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 		$config['syslog']['reverse'] = !empty($_POST['reverse']) ? true : false;
 		$config['syslog']['nentries'] = (int)$_POST['nentries'];
 		$config['syslog']['remoteserver'] = $_POST['remoteserver'] ?? null;

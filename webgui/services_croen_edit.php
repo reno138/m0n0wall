@@ -231,7 +231,7 @@
 	}
 
 	// Get jobs for table in form (and validate them)
-	$jobs_form = Array(); $jobs_save = Array(); $jobs_js = ''; $job_change = ''; unset($input_errors);
+	$jobs_form = Array(); $jobs_save = Array(); $jobs_js = ''; $job_change = ''; $input_errors = array();
 	foreach ($jobs_data AS $job_id => $job_data) {
 		$jobs_form[$job_id] = '';
 		$jobs_save[$job_id] = Array();
@@ -388,7 +388,7 @@
 			}
 		}	
 	} else {
-		unset($input_errors);
+		$input_errors = array();
 	}
 
 	// Include webinterface

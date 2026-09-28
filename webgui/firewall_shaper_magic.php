@@ -323,7 +323,7 @@ $note = '';
 if ($_POST) {
 
     if (!empty($_POST['install'])) {
-        unset($input_errors);
+        $input_errors = array();
         $pconfig = $_POST;
         $reqdfields = explode(" ", "maxup maxdown");
         $reqdfieldsn = explode(",", "Max. Upload,Max.Download");

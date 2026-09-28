@@ -109,7 +109,7 @@ $ifcfg = $config['interfaces'][$if];
 
 if ($_POST) {
 
-	unset($input_errors);
+	$input_errors = array();
 	$pconfig = $_POST;
 
 	/* input validation */
@@ -133,7 +133,7 @@ if ($_POST) {
 		if ((!empty($_POST['server']) && !is_ipaddr($_POST['server']))) 
 			$input_errors[] = "A valid Destination Server IP address  must be specified.";
 		
-		if (!$input_errors) {
+		if (empty($input_errors)) {
 			/* make sure that the DHCP server isn't enabled on this interface */
 			if (isset($config['dhcpd'][$if]['enable'])) 
 				$input_errors[] = "You must disable the DHCP server on the {$iflist[$if]} interface before enabling the DHCP Relay.";
@@ -155,10 +155,17 @@ if ($_POST) {
 		}
 	}
 
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 		$config['dhcrelay']['agentoption'] = !empty($_POST['agentoption']) ? true : false;
 		$config['dhcrelay']['proxydhcp'] = !empty($_POST['proxydhcp']) ? true : false;
 		$config['dhcrelay']['server'] = $_POST['server'] ?? null;
+		/* An interface's relay section saved with nothing in it comes back
+		   as an empty <lan/>, which reads as a STRING -- and writing
+		   ['enable'] into a string is a fatal TypeError. Top-level sections
+		   are normalised at parse time (xmlparse.inc); this is one level
+		   down, where a blanket rule would also catch genuine strings. */
+		if (!is_array($config['dhcrelay'][$if] ?? null))
+			$config['dhcrelay'][$if] = array();
 		$config['dhcrelay'][$if]['enable'] = !empty($_POST['enable']) ? true : false;
 		
 		write_config();

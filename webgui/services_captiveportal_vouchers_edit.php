@@ -59,7 +59,7 @@ $maxcount = (1 << ($config['voucher']['ticketbits'] ?? 10)) - 1;   // Highest Ti
 
 if ($_POST) {
 	
-	unset($input_errors);
+	$input_errors = array();
 	$pconfig = $_POST;
 
     /* input validation */

@@ -61,7 +61,7 @@ if (isset($id) && !empty($a_secondaries[$id])) {
 
 if ($_POST) {
 
-	unset($input_errors);
+	$input_errors = array();
 	$pconfig = $_POST;
 
 	/* input validation */
@@ -110,7 +110,7 @@ if ($_POST) {
 		}	
 	}
 
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 		$secondary = array();
 		$secondary['if'] = $if;
 		$secondary['ipaddr'] = $_POST['ipaddr'] ?? null;

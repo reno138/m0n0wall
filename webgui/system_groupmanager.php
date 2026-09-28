@@ -119,7 +119,7 @@ if (isset($_POST['id']))
 	
 if ($_POST) {
 
-	unset($input_errors);
+	$input_errors = array();
 	
 	foreach ($_POST as $pn => $pv) {
 		if (preg_match("/^del_(\d+)_x$/", $pn, $matches)) {

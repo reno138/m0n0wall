@@ -65,7 +65,7 @@ sort($timezonelist);
 
 if ($_POST) {
 
-	unset($input_errors);
+	$input_errors = array();
 	$pconfig = $_POST;
 
 	/* input validation */
@@ -107,7 +107,7 @@ if ($_POST) {
 		}
 	}
 
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 		$config['system']['hostname'] = strtolower($_POST['hostname']);
 		$config['system']['domain'] = strtolower($_POST['domain']);
 		$oldwebguiproto = $config['system']['webgui']['protocol'] ?? null;

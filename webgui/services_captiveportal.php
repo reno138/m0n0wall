@@ -88,7 +88,7 @@ $pconfig['radmac_format'] = $config['captiveportal']['radmac_format'] ?? null;
 
 if ($_POST) {
 
-	unset($input_errors);
+	$input_errors = array();
 	$pconfig = $_POST;
 
 	/* input validation */

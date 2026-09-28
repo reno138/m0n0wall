@@ -90,7 +90,7 @@ if (isset($id) && !empty($a_wlans[$id])) {
 
 if ($_POST) {
 
-	unset($input_errors);
+	$input_errors = array();
 	$pconfig = $_POST;
 }
 
@@ -137,7 +137,7 @@ if ($_POST) {
 	
 		/* XXX - check whether multiple WLANs are supported on the physical interface */
 
-		if (!$input_errors) {
+		if (empty($input_errors)) {
 			/* if an 11a channel is selected, the mode must be 11a too, and vice versa */
 			$is_chan_11a = (strpos($wlchannels[$_POST['channel'] ?? '']['mode'] ?? '', "11a") !== false);
 			$is_std_11a = (($_POST['standard'] ?? null) == "11a" || ($_POST['standard'] ?? null) == "11na");
@@ -151,7 +151,7 @@ if ($_POST) {
 				$input_errors[] = "WPA is only supported in hostap mode.";
 		}
 
-		if (!$input_errors) {
+		if (empty($input_errors)) {
 			$wlan = array();
 			$wlan['if'] = $_POST['if'] ?? null;
 			$wlan['descr'] = $_POST['descr'] ?? null;

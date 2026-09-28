@@ -51,7 +51,7 @@ if (isset($id) && !empty($a_snat[$id])) {
 
 if ($_POST) {
 	
-	unset($input_errors);
+	$input_errors = array();
 	$pconfig = $_POST;
 
 	/* input validation */
@@ -88,7 +88,7 @@ if ($_POST) {
 		}
 	}
 
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 		$natent = array();
 		$natent['ipaddr'] = $_POST['ipaddr'] ?? null;
 		$natent['descr'] = $_POST['descr'] ?? null;

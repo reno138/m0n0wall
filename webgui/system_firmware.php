@@ -61,7 +61,7 @@ require("guiconfig.inc");
 
 if ($_POST && !file_exists($d_firmwarelock_path)) {
 
-	unset($input_errors);
+	$input_errors = array();
 	unset($sig_warning);
 	
 	if (stristr($_POST['Submit'] ?? '', "Enable"))

@@ -52,7 +52,7 @@ $pconfig['portrangehigh'] = $config['nat']['portrange-high'] ?? null;
 
 if ($_POST) {
 
-	unset($input_errors);
+	$input_errors = array();
 	$savemsgadd = "";
 	
 	if (!empty($_POST['gencert'])) {

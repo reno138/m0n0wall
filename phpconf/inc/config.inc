@@ -530,7 +530,9 @@ function convert_config() {
 		unlink_if_exists("{$g['vardb_path']}/ovpn_dh.pem");
 
 		/* convert openvpn tunnels */
-		if (isset($config['ovpn']['server'])) {
+		/* is_array: an empty <server/> reads back as "", and writing
+		   ['tunnel'] into a string is a fatal TypeError mid-upgrade */
+		if (is_array($config['ovpn']['server'] ?? null)) {
 			$current = &$config['ovpn']['server'];
 
 			/* construct new tunnel array */

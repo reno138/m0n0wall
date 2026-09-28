@@ -45,7 +45,8 @@ $pgtitle = array("Firewall", ipv6enabled() ? ($ipv6rules ? 'IPv6 Rules' : 'IPv4 
 
 $specialsrcdst = explode(" ", "any wanip lan pptp l2tp");
 
-if (!is_array($config['filter'][$configname])) {
+/* ?? null: with IPv6 just enabled there are no v6 rules yet, so rule6 is absent */
+if (!is_array($config['filter'][$configname] ?? null)) {
 	$config['filter'][$configname] = array();
 }
 filter_rules_sort();
@@ -168,8 +169,10 @@ if (isset($id) && !empty($a_filter[$id])) {
 	else
 		$pconfig['proto'] = "any";
 	
-	if ($a_filter[$id]['protocol'] == "icmp" || $a_filter[$id]['protocol'] == "ipv6-icmp")
-		$pconfig['icmptype'] = $a_filter[$id]['icmptype'];
+	/* $pconfig['proto'], just defaulted to "any": a rule for any protocol
+	   stores no protocol key at all */
+	if ($pconfig['proto'] == "icmp" || $pconfig['proto'] == "ipv6-icmp")
+		$pconfig['icmptype'] = $a_filter[$id]['icmptype'] ?? '';
 	
 	address_to_pconfig($a_filter[$id]['source'], $pconfig['src'],
 		$pconfig['srcmask'], $pconfig['srcnot'],
@@ -182,7 +185,7 @@ if (isset($id) && !empty($a_filter[$id])) {
 	$pconfig['disabled'] = isset($a_filter[$id]['disabled']);
 	$pconfig['log'] = isset($a_filter[$id]['log']);
 	/* $pconfig['frags'] intentionally absent -- see the Fragments row. */
-	$pconfig['descr'] = $a_filter[$id]['descr'];
+	$pconfig['descr'] = $a_filter[$id]['descr'] ?? '';	/* optional */
 	
 } else {
 	/* defaults */
@@ -255,7 +258,7 @@ if ($_POST) {
 		$_POST['dstmask'] = $maxnetmask;
 	}
 	
-	unset($input_errors);
+	$input_errors = array();
 	$pconfig = $_POST;
 
 	/* input validation */
@@ -337,7 +340,7 @@ if ($_POST) {
 		$_POST['dstbeginport'] = $tmp;
 	}
 
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 		$filterent = array();
 		$filterent['type'] = $_POST['type'];
 		$filterent['interface'] = $_POST['interface'];

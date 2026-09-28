@@ -53,7 +53,7 @@ if (isset($id) && !empty($a_vlans[$id])) {
 
 if ($_POST) {
 
-	unset($input_errors);
+	$input_errors = array();
 	$pconfig = $_POST;
 
 	/* input validation */

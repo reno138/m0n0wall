@@ -188,7 +188,7 @@ $pconfig['msgexpired'] = $config['voucher']['msgexpired'] ?? null;
 
 if ($_POST) {
 
-	unset($input_errors);
+	$input_errors = array();
 	$pconfig = $_POST;
 	/* keyfp is not a form field, so replacing $pconfig wholesale above loses it.
 	   Without this the page reported "not yet generated" after EVERY Save, with a
@@ -355,7 +355,7 @@ if ($_POST) {
 	}
 }
 
-/* Reported here, after the POST handler's unset($input_errors), so a failed
+/* Reported here, after the POST handler resets $input_errors, so a failed
    secret bootstrap is shown on both a GET and a POST. */
 if ($keygen_error !== "")
 	$input_errors[] = $keygen_error;

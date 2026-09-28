@@ -72,7 +72,7 @@ if ($_POST) {
 	if (empty($_POST['endport']))
 		$_POST['endport'] = $_POST['beginport'] ?? null;
 	
-	unset($input_errors);
+	$input_errors = array();
 	$pconfig = $_POST;
 
 	/* input validation */

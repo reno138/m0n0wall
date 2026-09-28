@@ -52,7 +52,7 @@ if (isset($id) && !empty($a_user[$id])) {
 
 if ($_POST) {
 	
-	unset($input_errors);
+	$input_errors = array();
 	$pconfig = $_POST;
 
 	/* input validation */

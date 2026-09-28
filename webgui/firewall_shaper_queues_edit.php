@@ -47,7 +47,7 @@ if (isset($id) && !empty($a_queues[$id])) {
 
 if ($_POST) {
 	
-	unset($input_errors);
+	$input_errors = array();
 	$pconfig = $_POST;
 
 	/* input validation */
@@ -61,7 +61,7 @@ if ($_POST) {
 		$input_errors[] = "The weight must be an integer between 1 and 100.";
 	}
 
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 		$queue = array();
 		
 		$queue['targetpipe'] = $_POST['targetpipe'];

@@ -42,7 +42,7 @@ if (isset($id) && !empty($a_tunnel[$id])) {
 
 if ($_POST) {
 
-	unset($input_errors);
+	$input_errors = array();
 	$pconfig = $_POST;
 
 	$reqdfields = explode(" ", "if address subnet listenport");
@@ -89,7 +89,7 @@ if ($_POST) {
 		}
 	}
 
-	if (!$input_errors) {
+	if (empty($input_errors)) {
 		$tunnel = isset($id) && !empty($a_tunnel[$id]) ? $a_tunnel[$id] : array();
 
 		$tunnel['if']         = $_POST['if'] ?? null;

@@ -32,6 +32,12 @@
 $pgtitle = array("Firewall", "NAT", "Outbound");
 require("guiconfig.inc");
 
+/* The parent first: saving firewall_nat_out.php with advanced outbound
+   NAT off leaves an empty <advancedoutbound/>, which reads back as an empty
+   STRING, and writing ['rule'] into a string is a fatal TypeError -- one
+   ordinary save on the list page made this page unloadable. */
+if (!is_array($config['nat']['advancedoutbound'] ?? null))
+    $config['nat']['advancedoutbound'] = array();
 if (!is_array($config['nat']['advancedoutbound']['rule'] ?? null))
     $config['nat']['advancedoutbound']['rule'] = array();
     

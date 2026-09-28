@@ -57,7 +57,7 @@ if ($_POST || !empty($_GET['mac'])) {
 		}
 	}
 	
-	unset($input_errors);
+	$input_errors = array();
 	
 	if (!empty($_GET['mac'])) {
 		/* csrf-magic only guards POST (it returns early for any other method),

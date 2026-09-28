@@ -37,7 +37,7 @@ require("guiconfig.inc");
 
 if ($_POST) {
 
-	unset($input_errors);
+	$input_errors = array();
 	
 	$mode = "";
 	if (stristr($_POST['Submit'] ?? '', "Restore"))
