@@ -341,4 +341,44 @@ foreach (array(false, true) as $v6) {
 }
 $GLOBALS['MW_TEST_V6'] = false;
 
+/* ---- anti-spoof: IPv6, address families, and static routes ------------ */
+$save = $config;
+$GLOBALS['MW_TEST_V6'] = true;
+$config['interfaces']['lan']['ipaddr6'] = 'fd00:10:1:10::1';
+$config['interfaces']['lan']['subnet6'] = '64';
+$out = pf_rules_generate();
+is_true ('v6 LAN gets an IPv6 anti-spoof check',
+         preg_match('/^block in log quick on em1 inet6 from ! fd00:10:1:10:[0-9:]*\/64 to any$/m', $out) === 1);
+is_true ('link-scope multicast is let through ahead of it',
+         strpos($out, 'pass in quick on em1 inet6 from fe80::/10 to ff02::/16') !== false);
+is_true ('the IPv4 check names its family too',
+         preg_match('/^block in log quick on em1 inet from ! /m', $out) === 1);
+
+/* IPv6 on, but LAN has no v6 prefix: no check, and never an empty prefix */
+unset($config['interfaces']['lan']['ipaddr6'], $config['interfaces']['lan']['subnet6']);
+$out = pf_rules_generate();
+is_false('no v6 prefix on LAN: no IPv6 check for it', strpos($out, 'LAN IPv6 anti-spoof') !== false);
+is_false('and no rule with an empty address anywhere',
+         preg_match('#(from|to) !? ?/#', $out) === 1);
+
+/* A static route on LAN used to make the check "pass in quick from <net> to
+   any" -- a quick pass that skipped every user rule on the interface. */
+$config['interfaces']['lan']['ipaddr6'] = 'fd00:10:1:10::1';
+$config['interfaces']['lan']['subnet6'] = '64';
+$config['staticroutes'] = array(
+    'route'  => array(array('interface'=>'lan','network'=>'10.99.0.0/16','gateway'=>'192.168.1.99')),
+    'route6' => array(array('interface'=>'lan','network'=>'fd00:99::/48','gateway'=>'fd00:10:1:10::99')));
+$out = pf_rules_generate();
+is_true ('routed networks become a table, with the LAN prefix',
+         preg_match('#^table <spoof_lan> const \{ [0-9.]+/[0-9]+, 10\.99\.0\.0/16 \}$#m', $out) === 1);
+is_true ('and a v6 table', strpos($out, 'table <spoof_lan6> const {') !== false);
+is_true ('the check is one negated block against it',
+         strpos($out, 'block in log quick on em1 inet from ! <spoof_lan> to any') !== false);
+is_true ('the table is declared before it is used',
+         strpos($out, 'table <spoof_lan>') < strpos($out, 'from ! <spoof_lan>'));
+is_false('and the spoof check never passes anything outright',
+         preg_match('#^pass in quick on em1 (inet6? )?from [0-9a-f:.]+/[0-9]+ to any$#m', $out) === 1);
+$config = $save;
+$GLOBALS['MW_TEST_V6'] = false;
+
 exit(mw_report('filter_pf assembly'));
