@@ -156,11 +156,18 @@ function datadisk_setup() {
 		mwexec("/sbin/tunefs -j enable {$dev}");
 		if (mwexec("/sbin/mount -o noatime {$dev} " . DATADISK_MOUNT) == 0) {
 			@mkdir(DATADISK_LOGDIR, 0755);
+			/* dmesg.boot describes ONE boot, and system_get_dmesg_boot() only
+			   writes it when it is missing -- so on persistent storage it
+			   would describe the boot the partition was made on, forever.
+			   Keep the last boot's as .prev (useful after a crash) and let this
+			   boot write its own. */
+			if (file_exists(DATADISK_LOGDIR . "/dmesg.boot"))
+				@rename(DATADISK_LOGDIR . "/dmesg.boot", DATADISK_LOGDIR . "/dmesg.boot.prev");
 			/* this boot's files -- dmesg.boot and the logs etc/rc touched -- go
 			   onto the disk; logs already there are kept, not overwritten */
 			foreach (glob("{$g['varlog_path']}/*") as $f) {
 				$dst = DATADISK_LOGDIR . "/" . basename($f);
-				if (basename($f) == "dmesg.boot" || !file_exists($dst)) {
+				if (!file_exists($dst)) {
 					@copy($f, $dst);
 					/* copy() applies the umask, not the source mode; the logs
 					   are 0600 */
