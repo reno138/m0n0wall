@@ -25,7 +25,11 @@ enable)
 	# Fail loudly: the webGUI checks this exit status (and that /ftmp really
 	# is a separate filesystem) before it offers the upload form.
 	if ! /sbin/mdmfs -s 192m md1 /ftmp > /tmp/rc.firmware.err 2>&1; then
-		/usr/bin/logger -t rc.firmware "enable: could not create the upload RAM disk: `cat /tmp/rc.firmware.err`"
+		# user.err, not logger's default user.notice, which syslog.conf does
+		# not route to system.log; and to stderr as well, so the webGUI's
+		# firmware_rc() carries the reason in its own log line
+		/usr/bin/logger -p user.err -t rc.firmware "enable: could not create the upload RAM disk: `cat /tmp/rc.firmware.err`"
+		cat /tmp/rc.firmware.err >&2
 		exit 1
 	fi
 	;;
