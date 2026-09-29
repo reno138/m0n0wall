@@ -46,17 +46,48 @@ upgrade)
 	mkdir /tmp/configbak
 	cp -p /conf/* /tmp/configbak
 
+	# The persistent data partition (datadisk.inc) sits at the end of the
+	# disk, past anything an image within budget reaches. The dd below
+	# rewrites the partition table from the image, which has no entry for it:
+	# record where it is, release it, and put the entry back afterwards. Its
+	# contents are never written.
+	DATAPART=`/sbin/gpart show -p -l $CFDEVICE 2>/dev/null | /usr/bin/awk '$4 == "m0n0data" { idx = $3; sub(/.*p/, "", idx); print $1, $2, idx }'`
+	if [ -n "$DATAPART" ]; then
+		echo "Releasing the data partition..."
+		/usr/bin/killall syslogd pflogd > /dev/null 2>&1
+		sleep 1
+		/sbin/umount -f /data > /dev/null 2>&1
+	fi
+
 	# unmount /cf
 	/sbin/umount -f /cf
 
 	# dd image onto card
 	if [ -r $2 ]; then
-		/usr/bin/gunzip -S "" -c $2 | dd of=/dev/$CFDEVICE ibs=64k obs=64k > /dev/null 2>&1
+		/usr/bin/gunzip -S "" -c $2 | dd of=/dev/$CFDEVICE ibs=64k obs=64k > /dev/null 2>/tmp/dd.err
 		# The image is GPT and sized for its own content, so on any larger disk
 		# the backup header is not at the last LBA. Rewrite it, as the installer
 		# does, or every boot warns and some firmware refuses the table.
 		/sbin/gpart recover $CFDEVICE > /dev/null 2>&1
 		echo "Image installed."
+
+		# Put the data partition's entry back, exactly where it was -- but
+		# only if the image ended before it. dd's own byte count says how far
+		# it wrote (gzip -l cannot: the signature follows the gzip data).
+		if [ -n "$DATAPART" ]; then
+			DSTART=`echo $DATAPART | /usr/bin/awk '{print $1}'`
+			DSIZE=`echo $DATAPART | /usr/bin/awk '{print $2}'`
+			DIDX=`echo $DATAPART | /usr/bin/awk '{print $3}'`
+			SECT=`/sbin/gpart list $CFDEVICE | /usr/bin/awk '/Sectorsize/ { print $2; exit }'`
+			IMGBYTES=`/usr/bin/awk '/bytes transferred/ { print $1 }' /tmp/dd.err`
+			if [ -n "$IMGBYTES" ] && [ $(( IMGBYTES / ${SECT:-512} )) -lt $DSTART ]; then
+				/sbin/gpart add -i $DIDX -b $DSTART -s $DSIZE -t freebsd-ufs -l m0n0data $CFDEVICE > /dev/null 2>&1 \
+					&& echo "Data partition kept." \
+					|| echo "WARNING: could not restore the data partition entry."
+			else
+				echo "WARNING: the image reaches into the data partition; it will be re-created empty."
+			fi
+		fi
 	fi
 
 	# mount /cf

@@ -147,6 +147,7 @@ cp /etc/pf.os etc/ || { echo "ERROR: /etc/pf.os missing on the build host"; exit
 [ -f "$SRC/build/files/mpd-modem.script" ]  && cp "$SRC/build/files/mpd-modem.script" etc/mpd-modem/mpd.script
 # Log rotation replaces the old circular-log scheme -- see the file's header.
 [ -f "$SRC/build/files/newsyslog.conf" ]    && cp "$SRC/build/files/newsyslog.conf" etc/
+[ -f "$SRC/build/files/newsyslog-disk.conf" ] && cp "$SRC/build/files/newsyslog-disk.conf" etc/
 # After the tarball on purpose: it replaces the clog-era syslog.conf in there.
 [ -f "$SRC/build/files/syslog.conf" ]       && cp "$SRC/build/files/syslog.conf" etc/
 # Also after the tarball: adds the address-change guard to the hook.
@@ -166,12 +167,14 @@ fi
 mkdir -p var/empty && chmod 0555 var/empty
 
 echo "Populating the base system from the manifest..."
-perl "$SRC/build/minibsd/mkmini.pl" "$SRC/build/minibsd/m0n0wall.files" / "$FS/"
+perl "$SRC/build/minibsd/mkmini.pl" "$SRC/build/minibsd/m0n0wall.files" / "$FS/" \
+	|| { echo "ERROR: the image manifest could not be fully copied" >&2; exit 1; }
 
 echo "Resolving the base-system library closure..."
 cd "$MW_BUILDPATH/tmp" 2>/dev/null || { mkdir -p "$MW_BUILDPATH/tmp"; cd "$MW_BUILDPATH/tmp"; }
 perl "$SRC/build/minibsd/mklibs.pl" "$FS" > m0n0wall.libs
-perl "$SRC/build/minibsd/mkmini.pl" m0n0wall.libs / "$FS"
+perl "$SRC/build/minibsd/mkmini.pl" m0n0wall.libs / "$FS" \
+	|| { echo "ERROR: the library closure could not be fully copied" >&2; exit 1; }
 echo "  $(wc -l < m0n0wall.libs | tr -d ' ') libraries"
 
 echo

@@ -38,6 +38,18 @@ sbin/pflogd
 # GPT tooling: the installer runs 'gpart recover' after dd'ing the image onto
 # a larger disk, and diag pages report partitioning.
 sbin/gpart
+# gpart's verbs live in a class module it loads at run time. Without it every
+# verb except list/status/load/unload fails with "Unknown command" -- which is
+# how the 'gpart recover' after each install and upgrade had been failing in
+# silence (hence "secondary GPT header is not in the last LBA" at every boot).
+# datadisk.inc needs show, recover and add.
+lib/geom/geom_part.so
+# checks the persistent data partition at boot (datadisk.inc)
+sbin/fsck
+sbin/fsck_ffs:sbin/fsck_ufs
+# newfs -j hands journal creation to tunefs; without it newfs silently made a
+# plain soft-updates filesystem. datadisk.inc also runs it on every boot.
+sbin/tunefs
 sbin/kldstat
 sbin/dhclient
 sbin/devd

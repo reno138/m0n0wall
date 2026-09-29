@@ -217,6 +217,20 @@ makeimage() {
 	    -p freebsd-ufs:="$TMP/root-$platform.ufs" \
 	    -o "$TMP/image-$platform.bin"
 
+	# Image budget gate. An upgrade dd's the whole image over the start of the
+	# disk; the persistent data partition (phpconf/inc/datadisk.inc) never
+	# starts before twice this budget, so an image within it can never reach
+	# the data. Keep MW_IMAGE_BUDGET_MB in step with DATADISK_IMAGE_BUDGET.
+	MW_IMAGE_BUDGET_MB=120
+	imgbytes=$(stat -f %z "$TMP/image-$platform.bin")
+	if [ "$imgbytes" -gt $((MW_IMAGE_BUDGET_MB * 1024 * 1024)) ]; then
+		echo
+		echo "ERROR: $platform image is $((imgbytes / 1048576)) MB, over the ${MW_IMAGE_BUDGET_MB} MB budget." >&2
+		echo "       Raising the budget means raising DATADISK_IMAGE_BUDGET too." >&2
+		exit 1
+	fi
+	echo -n " ($((imgbytes / 1048576)) of ${MW_IMAGE_BUDGET_MB} MB)"
+
 	rm -f "$TMP/esp-$platform.img" "$TMP/root-$platform.ufs"
 	gzip -9f "$TMP/image-$platform.bin"
 	mv "$TMP/image-$platform.bin.gz" "$IMAGES/$platform-$VERSION.img"

@@ -435,10 +435,17 @@ function system_log_rotation_start() {
 	/* -C creates any log listed in newsyslog.conf that does not exist yet, which
 	   also gives them the 600 mode the file specifies rather than whatever
 	   etc/rc's touch left behind. */
-	mwexec("/usr/sbin/newsyslog -C");
+	/* datadisk_setup() copies whichever config fits where the logs are --
+	   small limits on the RAM disk, the 1 GB budget on the data partition --
+	   to /var/etc. /etc/newsyslog.conf is the RAM-disk one, so it is the safe
+	   fallback. */
+	$conf = file_exists("{$g['varetc_path']}/newsyslog.conf")
+	        ? "{$g['varetc_path']}/newsyslog.conf" : "/etc/newsyslog.conf";
+
+	mwexec("/usr/sbin/newsyslog -C -f " . escapeshellarg($conf));
 
 	mwexec("/usr/local/bin/minicron 3600 {$g['varrun_path']}/newsyslogcron.pid " .
-	       "/usr/sbin/newsyslog");
+	       "\"/usr/sbin/newsyslog -f {$conf}\"");
 }
 
 function system_webgui_start() {

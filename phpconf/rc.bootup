@@ -39,6 +39,11 @@
 	require_once("config.inc");
 	require_once("functions.inc");
 	
+	/* the persistent data partition, and /var/log on it -- before anything
+	   starts logging (config.inc has just found the boot disk) */
+	require_once("datadisk.inc");
+	datadisk_setup();
+	
 	/* check whether config reset is desired (via hardware button on WRAP/ALIX) */
 	system_check_reset_button();
 		
