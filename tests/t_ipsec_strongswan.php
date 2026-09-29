@@ -100,6 +100,26 @@ $config['ipsec']['tunnel'][0]['p1']['mode'] = '';
 $v2 = ipsec_ss_config_generate();
 is_true ('no mode means IKEv2',     strpos($v2, 'version      = 2') !== false);
 
+/* The webGUI's new-tunnel and mobile defaults (2026-09-29), exactly as the
+   pages store them -- 'ikev2' as the mode, 'rijndael 256' as the lists spell
+   AES-256, and hmac_-prefixed phase-2 hashes. They must come out as IKEv2
+   with aes256-sha256-modp2048 in BOTH phases, PFS included. */
+$config['ipsec']['tunnel'][0]['p1'] = array('mode'=>'ikev2','encryption-algorithm'=>'rijndael 256',
+    'hash-algorithm'=>'sha256','dhgroup'=>'14','pre-shared-key'=>'sekrit');
+$config['ipsec']['tunnel'][0]['p2'] = array('encryption-algorithm-option'=>array('rijndael 256'),
+    'hash-algorithm-option'=>array('hmac_sha256'),'pfsgroup'=>'14');
+$d = ipsec_ss_config_generate();
+is_true ('default mode "ikev2" negotiates IKEv2', strpos($d, 'version      = 2') !== false);
+is_false('and is not aggressive',                 strpos($d, 'aggressive') !== false);
+is_true ('default IKE proposal',  strpos($d, 'proposals    = aes256-sha256-modp2048') !== false);
+is_true ('default ESP proposal, with PFS',
+         strpos($d, 'esp_proposals = aes256-sha256-modp2048') !== false);
+is_false('no 3des/md5/sha1/modp1024 anywhere in a default tunnel',
+         preg_match('/3des|md5|sha1|modp1024/', $d) === 1);
+/* the ECP groups the lists now offer are real */
+is_same ('group 19 is ecp256', ipsec_ss_dh('19'), 'ecp256');
+is_same ('group 20 is ecp384', ipsec_ss_dh('20'), 'ecp384');
+
 /* nothing enabled */
 $config['ipsec'] = array();
 $empty = ipsec_ss_config_generate();

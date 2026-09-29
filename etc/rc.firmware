@@ -21,7 +21,13 @@ enable)
 	# firmware.img. Keep this comfortably above 3x the image and above
 	# upload_max_filesize in php.ini. Fetching from a URL would need one copy;
 	# see the plan.
-	/sbin/mdmfs -s 192m md1 /ftmp > /dev/null 2>&1
+	#
+	# Fail loudly: the webGUI checks this exit status (and that /ftmp really
+	# is a separate filesystem) before it offers the upload form.
+	if ! /sbin/mdmfs -s 192m md1 /ftmp > /tmp/rc.firmware.err 2>&1; then
+		/usr/bin/logger -t rc.firmware "enable: could not create the upload RAM disk: `cat /tmp/rc.firmware.err`"
+		exit 1
+	fi
 	;;
 upgrade)
 	# wait 5 seconds before beginning

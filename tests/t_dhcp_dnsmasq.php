@@ -138,4 +138,36 @@ $empty = dhcp_dnsmasq_config_generate();
 is_false('no ranges when nothing is enabled', strpos($empty, 'dhcp-range') !== false);
 is_false('not authoritative when nothing is enabled', strpos($empty, 'dhcp-authoritative') !== false);
 
+/* ---- interface binding -------------------------------------------------
+ * dnsmasq used to listen on every interface. It must never listen on WAN (for
+ * DNS or DHCP) and must serve DHCP only where DHCP is enabled. */
+$GLOBALS['MW_WAN_REAL'] = array(false => 'em0', true => 'em0');
+$config['interfaces']['wan'] = array('if' => 'em0', 'ipaddr' => 'dhcp');
+$config['interfaces']['opt3'] = array('if' => 'em4', 'ipaddr' => '10.7.7.1', 'subnet' => '24', 'enable' => true);
+$config['dhcpd'] = array(
+   'lan'  => array('enable' => true, 'range' => array('from' => '192.168.1.100', 'to' => '192.168.1.199')),
+   'opt1' => array('enable' => true, 'range' => array('from' => '10.9.9.100', 'to' => '10.9.9.199')));
+$b = dnsmasq_binding_conf();
+is_true ('bind-dynamic: a socket per interface, following live changes', strpos($b, "bind-dynamic\n") !== false);
+is_true ('never listens on the WAN device',         strpos($b, "except-interface=em0\n") !== false);
+is_false('no DHCP exclusion for LAN, which has DHCP', strpos($b, "no-dhcp-interface=em1\n") !== false);
+is_false('nor for opt1, which has DHCP',              strpos($b, "no-dhcp-interface=em2\n") !== false);
+is_true ('an enabled OPT without DHCP is excluded from DHCP', strpos($b, "no-dhcp-interface=em4\n") !== false);
+is_false('a bridged OPT is not listed separately',  strpos($b, "em3") !== false);
+is_same ('WAN named once only', substr_count($b, 'except-interface='), 1);
+
+/* DHCP on an OPT only: LAN must then be excluded from DHCP */
+$config['dhcpd'] = array('opt1' => array('enable' => true, 'range' => array('from' => '10.9.9.100', 'to' => '10.9.9.199')));
+$b = dnsmasq_binding_conf();
+is_true ('LAN without DHCP is excluded from DHCP', strpos($b, "no-dhcp-interface=em1\n") !== false);
+
+/* PPPoE WAN and a 6to4 tunnel: the real devices are excluded too */
+$GLOBALS['MW_WAN_REAL'] = array(false => 'ng0', true => 'stf0');
+$b = dnsmasq_binding_conf();
+is_true ('the PPPoE device is excluded',  strpos($b, "except-interface=ng0\n") !== false);
+is_true ('the 6to4 tunnel is excluded',   strpos($b, "except-interface=stf0\n") !== false);
+is_true ('and the physical WAN port too', strpos($b, "except-interface=em0\n") !== false);
+
 exit(mw_report('dhcp (dnsmasq)'));
+
+function get_real_wan_interface($ipv6 = false) { return $GLOBALS['MW_WAN_REAL'][$ipv6]; }

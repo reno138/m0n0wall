@@ -138,16 +138,21 @@ if (isset($id) && !empty($a_ipsec[$id])) {
 	/* defaults */
 	$pconfig['interface'] = "wan";
 	$pconfig['localnet'] = "lan";
-	$pconfig['p1mode'] = "main";
+	/* Modern defaults (2026-09-29): IKEv2, AES-256, SHA-256, DH group 14 in
+	   both phases, PFS on. These used to be IKEv1 main / 3DES / SHA-1 / DH 2
+	   (1024-bit, broken) and phase 2 offered 3DES, Blowfish, CAST128 and MD5
+	   with no PFS. Only a NEW tunnel gets these: an existing one keeps what it
+	   has stored. 'rijndael 256' is how the lists spell AES-256. */
+	$pconfig['p1mode'] = "ikev2";
 	$pconfig['p1myidentt'] = "myaddress";
 	$pconfig['p1authentication_method'] = "pre_shared_key";
-	$pconfig['p1ealgo'] = "3des";
-	$pconfig['p1halgo'] = "sha1";
-	$pconfig['p1dhgroup'] = "2";
+	$pconfig['p1ealgo'] = "rijndael 256";
+	$pconfig['p1halgo'] = "sha256";
+	$pconfig['p1dhgroup'] = "14";
 	$pconfig['p2proto'] = "esp";
-	$pconfig['p2ealgos'] = explode(",", "3des,blowfish,cast128,rijndael");
-	$pconfig['p2halgos'] = explode(",", "hmac_sha1,hmac_md5");
-	$pconfig['p2pfsgroup'] = "0";
+	$pconfig['p2ealgos'] = array("rijndael 256");
+	$pconfig['p2halgos'] = array("hmac_sha256");
+	$pconfig['p2pfsgroup'] = "14";
 	$pconfig['remotebits'] = 32;
 }
 
@@ -452,13 +457,15 @@ function methodsel_change() {
                   <td width="22%" valign="top" class="vncellreq">Negotiation mode</td>
                   <td width="78%" class="vtable">
 					<select name="p1mode" class="formfld">
-                      <?php $modes = explode(" ", "main aggressive"); foreach ($modes as $mode): ?>
+                      <?php foreach ($p1_modes as $mode => $modename): ?>
                       <option value="<?=$mode;?>" <?php if ($mode == ($pconfig['p1mode'] ?? null)) echo "selected"; ?>> 
-                      <?=htmlspecialchars($mode);?>
+                      <?=htmlspecialchars($modename);?>
                       </option>
                       <?php endforeach; ?>
-                    </select> <br> <span class="vexpl">Aggressive is faster, but 
-                    less secure.</span></td>
+                    </select> <br> <span class="vexpl">IKEv2 is recommended. Use IKEv1 only
+                    for a peer that supports nothing else &ndash; and avoid IKEv1
+                    aggressive mode with a pre-shared key: it sends a hash of the key
+                    that can be cracked offline.</span></td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">My identifier</td>

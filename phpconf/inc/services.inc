@@ -417,6 +417,9 @@ function services_dnsmasq_configure() {
 		}
 		$dnsmasqconf = "edns-packet-max=4096\n";
 
+		/* never listen on WAN; DHCP only where enabled -- see dhcp_dnsmasq.inc */
+		$dnsmasqconf .= dnsmasq_binding_conf();
+
 		/* DHCP only: no DNS listener at all */
 		if (!$dns_on)
 			$dnsmasqconf .= "port=0\n";

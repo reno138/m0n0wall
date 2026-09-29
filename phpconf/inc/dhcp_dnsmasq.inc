@@ -94,6 +94,57 @@ function dhcp_dnsmasq_leases_read() {
 	return $leases;
 }
 
+
+/* Which interfaces dnsmasq may listen on, and which of those may serve DHCP.
+ *
+ * Nothing restricted it before: dnsmasq opened wildcard sockets (*:53 on v4
+ * and v6, and *:67 once DHCP was on) on EVERY interface, WAN included. pf's
+ * default deny kept WAN closed, and DHCP only answered where a dhcp-range
+ * matched the interface's subnet -- so it was safe, but by coincidence rather
+ * than by configuration.
+ *
+ * Now:
+ *   bind-dynamic         a socket per interface, following interfaces that
+ *                        come and go -- they are reconfigured live now (WAN
+ *                        re-plug, VLAN edits), so bind-interfaces would go
+ *                        stale.
+ *   except-interface     the WAN device, the PPPoE/tunnel device the WAN may
+ *                        really be, and any IPv6 transition tunnel: dnsmasq
+ *                        never listens outside, for DNS or DHCP.
+ *   no-dhcp-interface    every internal interface WITHOUT DHCP enabled, so
+ *                        DHCP answers exactly where it has been told to and
+ *                        nowhere else. DNS still answers on all of them, as it
+ *                        did. Loopback is always kept (the firewall resolves
+ *                        through it).
+ */
+function dnsmasq_binding_conf() {
+	global $config;
+
+	$wan = array($config['interfaces']['wan']['if'] ?? '',
+	             get_real_wan_interface(), get_real_wan_interface(true));
+	$wan = array_values(array_unique(array_filter($wan)));
+
+	$dhcpdevs = array();
+	foreach (dhcp_dnsmasq_enabled_interfaces() as $e)
+		$dhcpdevs[] = $e['if']['if'];
+
+	$internal = array($config['interfaces']['lan']['if'] ?? '');
+	foreach (opt_interfaces() as $optif) {
+		$oc = $config['interfaces'][$optif] ?? array();
+		if (isset($oc['enable']) && !empty($oc['if']) && empty($oc['bridge']))
+			$internal[] = $oc['if'];
+	}
+	$internal = array_values(array_unique(array_filter($internal)));
+
+	$out = "bind-dynamic\n";
+	foreach ($wan as $d)
+		$out .= "except-interface={$d}\n";
+	foreach ($internal as $d)
+		if (!in_array($d, $dhcpdevs, true) && !in_array($d, $wan, true))
+			$out .= "no-dhcp-interface={$d}\n";
+	return $out;
+}
+
 /* The interfaces DHCP is actually served on: enabled in $config['dhcpd'] with
  * a usable range, on an interface that exists and (LAN aside) is enabled,
  * real and not bridged. One place for the rule, used both to build the

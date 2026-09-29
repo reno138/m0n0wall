@@ -39,16 +39,22 @@ $a_ipsec = &$config['ipsec']['mobileclients'];
 
 if (count($a_ipsec) == 0) {
 	/* defaults */
-	$pconfig['p1mode'] = "aggressive";
+	/* Modern defaults (2026-09-29) -- see vpn_ipsec_edit.php. This one was
+	   IKEv1 AGGRESSIVE mode with a pre-shared key: the responder sends a hash
+	   of the PSK before either side is authenticated, so anyone who can reach
+	   the WAN could capture it and crack the key offline. strongSwan handles
+	   PSK and certificate road warriors under IKEv2 alike. Applies only while
+	   no mobile-client settings have been saved. */
+	$pconfig['p1mode'] = "ikev2";
 	$pconfig['p1myidentt'] = "myaddress";
-	$pconfig['p1ealgo'] = "3des";
-	$pconfig['p1halgo'] = "sha1";
-	$pconfig['p1dhgroup'] = "2";
+	$pconfig['p1ealgo'] = "rijndael 256";
+	$pconfig['p1halgo'] = "sha256";
+	$pconfig['p1dhgroup'] = "14";
 	$pconfig['p1authentication_method'] = "pre_shared_key";
 	$pconfig['p2proto'] = "esp";
-	$pconfig['p2ealgos'] = explode(",", "3des,blowfish,cast128,rijndael");
-	$pconfig['p2halgos'] = explode(",", "hmac_sha1,hmac_md5");
-	$pconfig['p2pfsgroup'] = "0";
+	$pconfig['p2ealgos'] = array("rijndael 256");
+	$pconfig['p2halgos'] = array("hmac_sha256");
+	$pconfig['p2pfsgroup'] = "14";
 } else {
 	$pconfig['enable'] = isset($a_ipsec['enable']);
 	$pconfig['natt'] = isset($a_ipsec['natt']);
@@ -244,13 +250,15 @@ function methodsel_change() {
                   <td width="22%" valign="top" class="vncellreq">Negotiation mode</td>
                         <td width="78%" class="vtable">
 					<select name="p1mode" class="formfld">
-                      <?php $modes = explode(" ", "main aggressive"); foreach ($modes as $mode): ?>
+                      <?php foreach ($p1_modes as $mode => $modename): ?>
                       <option value="<?=$mode;?>" <?php if ($mode == ($pconfig['p1mode'] ?? null)) echo "selected"; ?>> 
-                      <?=htmlspecialchars($mode);?>
+                      <?=htmlspecialchars($modename);?>
                       </option>
                       <?php endforeach; ?>
-                    </select> <br> <span class="vexpl">Aggressive is faster, but 
-                    less secure.</span></td>
+                    </select> <br> <span class="vexpl">IKEv2 is recommended. Use IKEv1 only
+                    for a peer that supports nothing else &ndash; and avoid IKEv1
+                    aggressive mode with a pre-shared key: it sends a hash of the key
+                    that can be cracked offline.</span></td>
                 </tr>
                 <tr> 
                   <td width="22%" valign="top" class="vncellreq">My identifier</td>

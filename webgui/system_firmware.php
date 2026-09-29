@@ -59,6 +59,14 @@ require("guiconfig.inc");
  * fetched file. It must not be reinstated in the form above.
  */
 
+/* The flag says upload is enabled but the RAM disk is not there (it was
+   never mounted, or something unmounted it): go back to offering "Enable"
+   rather than an upload form that can only fail with HTTP 500. */
+if (file_exists($d_fwupenabled_path) && !firmware_upload_ready()) {
+	unlink($d_fwupenabled_path);
+	$fwup_reset = true;
+}
+
 if ($_POST && !file_exists($d_firmwarelock_path)) {
 
 	$input_errors = array();
@@ -75,10 +83,17 @@ if ($_POST && !file_exists($d_firmwarelock_path)) {
 		
 	if (!empty($mode)) {
 		if ($mode == "enable") {
-			exec_rc_script("/etc/rc.firmware enable");
-			touch($d_fwupenabled_path);
+			/* Only claim "enabled" once the RAM disk is really there. */
+			if (firmware_rc("enable") == 0 && firmware_upload_ready()) {
+				touch($d_fwupenabled_path);
+			} else {
+				$input_errors[] = "Could not create the RAM disk the upload needs " .
+					"({$g['ftmp_path']}), so firmware upload was not enabled. " .
+					"The system log has the reason.";
+				firmware_rc("disable");
+			}
 		} else if ($mode == "disable") {
-			exec_rc_script("/etc/rc.firmware disable");
+			firmware_rc("disable");
 			if (file_exists($d_fwupenabled_path))
 				unlink($d_fwupenabled_path);
 		} else if ($mode == "upgrade") {
@@ -89,7 +104,7 @@ if ($_POST && !file_exists($d_firmwarelock_path)) {
 				else if (!file_exists($_FILES['ulfile']['tmp_name'])) {
 					/* probably out of memory for the MFS */
 					$input_errors[] = "Image upload failed (out of memory?)";
-					exec_rc_script("/etc/rc.firmware disable");
+					firmware_rc("disable");
 					if (file_exists($d_fwupenabled_path))
 						unlink($d_fwupenabled_path);
 				} else {
@@ -119,7 +134,9 @@ if ($_POST && !file_exists($d_firmwarelock_path)) {
 			if (empty($input_errors) && !file_exists($d_firmwarelock_path) && (empty($sig_warning) || !empty($_POST['sig_override']))) {			
 				/* fire up the update script in the background */
 				touch($d_firmwarelock_path);
-				exec_rc_script_async("/etc/rc.firmware upgrade {$g['ftmp_path']}/firmware.img");
+				/* directly, not exec_rc_script_async(): see firmware_rc() */
+				exec("nohup /etc/rc.firmware upgrade " .
+					escapeshellarg("{$g['ftmp_path']}/firmware.img") . " >/dev/null 2>&1 &");
 				
 				$savemsg = "The firmware is now being installed. The firewall will reboot automatically.";
 			}
@@ -130,6 +147,8 @@ if ($_POST && !file_exists($d_firmwarelock_path)) {
 <?php include("fbegin.inc"); ?>
 <?php if (!empty($input_errors)) print_input_errors($input_errors); ?>
 <?php if (!empty($savemsg)) print_info_box($savemsg); ?>
+<?php if (!empty($fwup_reset)) print_info_box("Firmware upload had been enabled, but its RAM disk is no " .
+	"longer mounted, so it has been switched off. Enable it again to upload an image."); ?>
 <?php /* $fwinfo is gone: it echoed a third party's HTTP response body,
            unescaped, into this page. See the note at the top of the file. */ ?>
 <?php if (!in_array($g['platform'], $fwupplatforms)): ?>

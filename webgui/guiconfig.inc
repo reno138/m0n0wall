@@ -135,10 +135,19 @@ $p1_halgos = array('sha1' => 'SHA-1', 'sha256' => 'SHA-256', 'sha384' => 'SHA-38
 $p1_authentication_methods = array('pre_shared_key' => 'Pre-shared key', 'rsasig' => 'RSA signature');
 $p2_halgos = array('hmac_sha1' => 'SHA-1', 'hmac_md5' => 'MD5', 'hmac_sha256' => 'SHA-256', 'hmac_sha384' => 'SHA-384', 'hmac_sha512' => 'SHA-512');
 $p2_protos = array('esp' => 'ESP', 'ah' => 'AH');
+/* IKE negotiation. The strongSwan generator (ipsec_strongswan.inc) makes any
+   value other than main/aggressive an IKEv2 connection, so IKEv2 is the
+   'ikev2' entry here -- and an entry saved with no mode at all, which already
+   negotiated IKEv2, now also DISPLAYS as IKEv2 (first option). */
+$p1_modes = array('ikev2' => 'IKEv2', 'main' => 'IKEv1 main mode', 'aggressive' => 'IKEv1 aggressive mode');
+/* 19-21 are the NIST elliptic-curve groups: stronger than 14 and cheaper to
+   compute. ipsec_ss_dh() already mapped them; the lists never offered them. */
 $p1_keygroups = array('1' => '1 (768 bit)', '2' => '2 (1024 bit)', '5' => '5 (1536 bit)', '14' => '14 (2048 bit)',
-	'15' => '15 (3072 bit)', '16' => '16 (4096 bit)', '17' => '17 (6144 bit)', '18' => '18 (8192 bit)');
+	'15' => '15 (3072 bit)', '16' => '16 (4096 bit)', '17' => '17 (6144 bit)', '18' => '18 (8192 bit)',
+	'19' => '19 (ECP 256 bit)', '20' => '20 (ECP 384 bit)', '21' => '21 (ECP 521 bit)');
 $p2_pfskeygroups = array('0' => 'off', '1' => '1 (768 bit)', '2' => '2 (1024 bit)', '5' => '5 (1536 bit)', '14' => '14 (2048 bit)',
-	'15' => '15 (3072 bit)', '16' => '16 (4096 bit)', '17' => '17 (6144 bit)', '18' => '18 (8192 bit)');
+	'15' => '15 (3072 bit)', '16' => '16 (4096 bit)', '17' => '17 (6144 bit)', '18' => '18 (8192 bit)',
+	'19' => '19 (ECP 256 bit)', '20' => '20 (ECP 384 bit)', '21' => '21 (ECP 521 bit)');
 
 $pptpd_subnet_sizes = array(16 => 28, 32 => 27, 64 => 26, 128 => 25, 256 => 24);
 $ipsec_l2tp_subnet_sizes = array(16 => 28, 32 => 27, 64 => 26, 128 => 25, 256 => 24);
@@ -190,6 +199,28 @@ function exec_rc_script($scriptname) {
 	
 	exec($scriptname . " >/dev/null 2>&1", $execoutput, $retval);
 	return $retval; 
+}
+
+/* Firmware operations. These deliberately do NOT go through exec_rc_script():
+   that returns 0 without running anything while a reboot is pending, which
+   made "Enable firmware upload" report success with no RAM disk mounted --
+   the upload then streamed into the root RAM disk (a few MB free) and lighttpd
+   answered 500 partway through. A firmware upgrade ends in a reboot anyway, so
+   a pending one is no reason to refuse it. */
+function firmware_rc($arg) {
+	exec("/etc/rc.firmware " . $arg . " 2>&1", $out, $rc);
+	if ($rc != 0)
+		log_error("rc.firmware {$arg} failed (exit {$rc}): " . implode(" ", $out));
+	return $rc;
+}
+
+/* True only when /ftmp is its own filesystem -- the RAM disk rc.firmware
+   mounts -- rather than a plain directory on the root RAM disk. */
+function firmware_upload_ready() {
+	global $g;
+	$a = @stat($g['ftmp_path']);
+	$b = @stat("/");
+	return $a && $b && ($a['dev'] != $b['dev']);
 }
 
 function exec_rc_script_async($scriptname) {
